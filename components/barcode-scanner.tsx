@@ -15,6 +15,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
   const [error, setError] = useState<string | null>(null)
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null)
+  const [isDetecting, setIsDetecting] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null)
@@ -114,6 +115,9 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     const scanBarcode = async () => {
       try {
         if (videoRef.current && codeReaderRef.current && !videoRef.current.paused) {
+          // Show detecting indicator
+          setIsDetecting(true)
+          
           // Create a canvas to capture the current video frame
           const canvas = document.createElement('canvas')
           const context = canvas.getContext('2d')
@@ -144,6 +148,9 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               }
             }
           }
+          
+          // Hide detecting indicator after a short delay
+          setTimeout(() => setIsDetecting(false), 200)
         }
       } catch (err) {
         // Ignore scanning errors - they're expected when no barcode is found
@@ -151,6 +158,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         if (Math.random() < 0.01) {
           console.log("[v0] Manual scanning (no barcode found)")
         }
+        setIsDetecting(false)
       }
     }
 
@@ -225,12 +233,29 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
 
         {isScanning && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-64 h-40 border-2 border-primary rounded-lg shadow-lg">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-primary rounded-tl-lg" />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-primary rounded-tr-lg" />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-primary rounded-bl-lg" />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-primary rounded-br-lg" />
+            <div className={`w-64 h-40 border-2 rounded-lg shadow-lg transition-colors ${
+              isDetecting ? 'border-green-500 bg-green-500/10' : 'border-primary'
+            }`}>
+              <div className={`absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 rounded-tl-lg ${
+                isDetecting ? 'border-green-500' : 'border-primary'
+              }`} />
+              <div className={`absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 rounded-tr-lg ${
+                isDetecting ? 'border-green-500' : 'border-primary'
+              }`} />
+              <div className={`absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 rounded-bl-lg ${
+                isDetecting ? 'border-green-500' : 'border-primary'
+              }`} />
+              <div className={`absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 rounded-br-lg ${
+                isDetecting ? 'border-green-500' : 'border-primary'
+              }`} />
             </div>
+          </div>
+        )}
+
+        {/* Scanning indicator */}
+        {isDetecting && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+            Scanning...
           </div>
         )}
 
