@@ -137,14 +137,10 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
                 setLastScannedCode(scannedCode)
                 console.log("[v0] Barcode scanned:", scannedCode)
                 
-                // Check if it looks like an ISBN
-                if (isValidISBN(scannedCode)) {
-                  console.log("[v0] Valid ISBN found:", scannedCode)
-                  onScanSuccess(scannedCode)
-                  stopScanning()
-                } else {
-                  console.log("[v0] Scanned code is not a valid ISBN:", scannedCode)
-                }
+                // For testing: accept any barcode, not just ISBNs
+                console.log("[v0] Any barcode found:", scannedCode)
+                onScanSuccess(scannedCode)
+                stopScanning()
               }
             }
           }
@@ -278,6 +274,15 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
       </div>
 
       <p className="text-sm text-muted-foreground text-center">Position the barcode within the frame to scan</p>
+      
+      <div className="text-center">
+        <a 
+          href="/test-barcodes" 
+          className="text-sm text-blue-600 hover:text-blue-800 underline"
+        >
+          Need test barcodes? Click here for test page
+        </a>
+      </div>
     </div>
   )
 }
