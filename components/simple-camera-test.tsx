@@ -17,6 +17,12 @@ export function SimpleCameraTest() {
     setButtonClicked(true)
     setError(null)
     try {
+      // Stop any existing camera streams first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      
       console.log("[TEST] Requesting camera access...")
       console.log("[TEST] navigator.mediaDevices available:", !!navigator.mediaDevices)
       console.log("[TEST] getUserMedia available:", !!navigator.mediaDevices?.getUserMedia)

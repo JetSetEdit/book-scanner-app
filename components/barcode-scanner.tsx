@@ -23,6 +23,17 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
   const startScanning = async () => {
     setError(null)
     try {
+      // Stop any existing camera streams first
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+      }
+      
+      // Also stop any other camera streams that might be running
+      const devices = await navigator.mediaDevices.enumerateDevices()
+      const videoDevices = devices.filter(device => device.kind === 'videoinput')
+      console.log("[v0] Available video devices:", videoDevices.length)
+      
       console.log("[v0] Requesting camera access...")
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
