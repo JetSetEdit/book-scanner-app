@@ -29,34 +29,39 @@ export function SimpleCameraTest() {
       console.log("[TEST] Stream tracks:", stream.getTracks())
       console.log("[TEST] Stream active:", stream.active)
       
-      if (videoRef.current) {
-        console.log("[TEST] Setting video srcObject...")
-        videoRef.current.srcObject = stream
-        streamRef.current = stream
-        console.log("[TEST] Setting isScanning to true...")
-        setIsScanning(true)
-        console.log("[TEST] Video element updated")
-        
-        // Force video to play
-        videoRef.current.onloadedmetadata = () => {
-          console.log("[TEST] Video metadata loaded, dimensions:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight)
-          videoRef.current?.play().then(() => {
-            console.log("[TEST] Video play started")
-          }).catch((err) => {
-            console.error("[TEST] Video play failed:", err)
-          })
+      // Set scanning state first to render the video element
+      console.log("[TEST] Setting isScanning to true...")
+      setIsScanning(true)
+      streamRef.current = stream
+      
+      // Wait for React to render the video element
+      setTimeout(() => {
+        if (videoRef.current) {
+          console.log("[TEST] Setting video srcObject...")
+          videoRef.current.srcObject = stream
+          console.log("[TEST] Video element updated")
+          
+          // Force video to play
+          videoRef.current.onloadedmetadata = () => {
+            console.log("[TEST] Video metadata loaded, dimensions:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight)
+            videoRef.current?.play().then(() => {
+              console.log("[TEST] Video play started")
+            }).catch((err) => {
+              console.error("[TEST] Video play failed:", err)
+            })
+          }
+          
+          videoRef.current.oncanplay = () => {
+            console.log("[TEST] Video can play")
+          }
+          
+          videoRef.current.onerror = (e) => {
+            console.error("[TEST] Video error:", e)
+          }
+        } else {
+          console.error("[TEST] videoRef.current is still null after timeout!")
         }
-        
-        videoRef.current.oncanplay = () => {
-          console.log("[TEST] Video can play")
-        }
-        
-        videoRef.current.onerror = (e) => {
-          console.error("[TEST] Video error:", e)
-        }
-      } else {
-        console.error("[TEST] videoRef.current is null!")
-      }
+      }, 100) // Small delay to let React render
     } catch (err) {
       console.error("[TEST] Camera access error:", err)
       setError(`Unable to access camera: ${err.message}`)
