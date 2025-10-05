@@ -61,9 +61,20 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               console.error("[v0] Video play failed:", err)
             })
             
-            // Temporarily disable barcode scanning to get camera working
-            console.log("[v0] Camera preview ready - barcode scanning disabled for now")
-            // TODO: Re-enable barcode scanning once camera is stable
+            // Initialize barcode reader but don't let it control the video
+            try {
+              const codeReader = new BrowserMultiFormatReader()
+              codeReaderRef.current = codeReader
+              console.log("[v0] Barcode reader initialized")
+              
+              // Start manual frame capture scanning
+              setTimeout(() => {
+                startManualBarcodeScanning()
+              }, 2000) // Wait 2 seconds for video to be completely stable
+            } catch (err) {
+              console.error("[v0] Error initializing barcode reader:", err)
+              setError("Barcode scanning not available, but camera is working")
+            }
           }
           
           videoRef.current.oncanplay = () => {
@@ -92,33 +103,48 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     }
   }
 
-  const startBarcodeScanning = () => {
+  const startManualBarcodeScanning = () => {
     if (!videoRef.current || !codeReaderRef.current) {
-      console.log("[v0] Cannot start barcode scanning - missing video or codeReader")
+      console.log("[v0] Cannot start manual barcode scanning - missing video or codeReader")
       return
     }
 
-    console.log("[v0] Starting barcode scanning...")
+    console.log("[v0] Starting manual barcode scanning...")
 
     const scanBarcode = async () => {
       try {
         if (videoRef.current && codeReaderRef.current && !videoRef.current.paused) {
-          const result = await codeReaderRef.current.decodeFromVideoElement(videoRef.current)
-          if (result && result.getText()) {
-            const scannedCode = result.getText()
+          // Create a canvas to capture the current video frame
+          const canvas = document.createElement('canvas')
+          const context = canvas.getContext('2d')
+          
+          if (context && videoRef.current.videoWidth > 0) {
+            canvas.width = videoRef.current.videoWidth
+            canvas.height = videoRef.current.videoHeight
             
-            // Avoid duplicate scans
-            if (scannedCode !== lastScannedCode) {
-              setLastScannedCode(scannedCode)
-              console.log("[v0] Barcode scanned:", scannedCode)
+            // Draw the current video frame to canvas
+            context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+            
+            // Convert canvas to image data and scan it
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+            const result = await codeReaderRef.current.decodeFromImageData(imageData)
+            
+            if (result && result.getText()) {
+              const scannedCode = result.getText()
               
-              // Check if it looks like an ISBN
-              if (isValidISBN(scannedCode)) {
-                console.log("[v0] Valid ISBN found:", scannedCode)
-                onScanSuccess(scannedCode)
-                stopScanning()
-              } else {
-                console.log("[v0] Scanned code is not a valid ISBN:", scannedCode)
+              // Avoid duplicate scans
+              if (scannedCode !== lastScannedCode) {
+                setLastScannedCode(scannedCode)
+                console.log("[v0] Barcode scanned:", scannedCode)
+                
+                // Check if it looks like an ISBN
+                if (isValidISBN(scannedCode)) {
+                  console.log("[v0] Valid ISBN found:", scannedCode)
+                  onScanSuccess(scannedCode)
+                  stopScanning()
+                } else {
+                  console.log("[v0] Scanned code is not a valid ISBN:", scannedCode)
+                }
               }
             }
           }
@@ -127,14 +153,14 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         // Ignore scanning errors - they're expected when no barcode is found
         // Only log occasionally to avoid spam
         if (Math.random() < 0.01) {
-          console.log("[v0] Scanning (no barcode found)")
+          console.log("[v0] Manual scanning (no barcode found)")
         }
       }
     }
 
-    // Scan every 1000ms (slower to reduce conflicts)
-    scanningIntervalRef.current = setInterval(scanBarcode, 1000)
-    console.log("[v0] Barcode scanning interval started")
+    // Scan every 2000ms (even slower to avoid conflicts)
+    scanningIntervalRef.current = setInterval(scanBarcode, 2000)
+    console.log("[v0] Manual barcode scanning interval started")
   }
 
   const isValidISBN = (code: string): boolean => {
