@@ -150,7 +150,14 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     <div className="space-y-4">
       <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
         {isScanning ? (
-          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <video 
+            ref={videoRef} 
+            autoPlay 
+            playsInline 
+            muted
+            className="w-full h-full object-cover"
+            style={{ transform: 'scaleX(-1)' }} // Mirror the video like a selfie camera
+          />
         ) : (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-2">

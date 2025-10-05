@@ -58,7 +58,9 @@ export function SimpleCameraTest() {
             ref={videoRef} 
             autoPlay 
             playsInline 
+            muted
             className="w-full h-full object-cover"
+            style={{ transform: 'scaleX(-1)' }} // Mirror the video like a selfie camera
             onLoadedMetadata={() => console.log("[TEST] Video metadata loaded")}
             onCanPlay={() => console.log("[TEST] Video can play")}
             onError={(e) => console.error("[TEST] Video error:", e)}
