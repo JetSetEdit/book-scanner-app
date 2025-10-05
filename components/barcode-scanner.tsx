@@ -55,7 +55,11 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           // Wait for video to be ready
           videoRef.current.onloadedmetadata = () => {
             console.log("[v0] Video metadata loaded")
-            videoRef.current?.play()
+            videoRef.current?.play().then(() => {
+              console.log("[v0] Video play started successfully")
+            }).catch((err) => {
+              console.error("[v0] Video play failed:", err)
+            })
             
             // Initialize barcode reader after video is ready
             try {
@@ -69,6 +73,22 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               console.error("[v0] Error initializing barcode reader:", err)
               setError("Barcode scanning not available, but camera is working")
             }
+          }
+          
+          videoRef.current.oncanplay = () => {
+            console.log("[v0] Video can play")
+          }
+          
+          videoRef.current.onerror = (e) => {
+            console.error("[v0] Video error:", e)
+          }
+          
+          videoRef.current.onpause = () => {
+            console.log("[v0] Video paused")
+          }
+          
+          videoRef.current.onended = () => {
+            console.log("[v0] Video ended")
           }
         } else {
           console.error("[v0] videoRef.current is still null after timeout!")
@@ -201,6 +221,16 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           <div className="absolute top-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
             <span className="text-sm font-medium">ISBN Found!</span>
+          </div>
+        )}
+
+        {/* Debug info for main scanner */}
+        {isScanning && (
+          <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+            <div>Scanning: {isScanning ? 'Yes' : 'No'}</div>
+            <div>Video Element: {videoRef.current ? 'Exists' : 'Missing'}</div>
+            <div>Stream: {streamRef.current ? 'Active' : 'None'}</div>
+            <div>Video Playing: {videoRef.current?.paused === false ? 'Yes' : 'No'}</div>
           </div>
         )}
       </div>
