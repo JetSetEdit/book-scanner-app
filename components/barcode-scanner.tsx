@@ -77,6 +77,13 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           
           videoRef.current.oncanplay = () => {
             console.log("[v0] Video can play")
+            // Force play again to ensure it's actually playing
+            setTimeout(() => {
+              if (videoRef.current && videoRef.current.paused) {
+                console.log("[v0] Video was paused, forcing play again")
+                videoRef.current.play()
+              }
+            }, 500)
           }
           
           videoRef.current.onerror = (e) => {
@@ -194,8 +201,12 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             autoPlay 
             playsInline 
             muted
-            className="w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }} // Mirror the video like a selfie camera
+            className="w-full h-full"
+            style={{ 
+              transform: 'scaleX(-1)',
+              backgroundColor: 'black',
+              objectFit: 'cover'
+            }}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
