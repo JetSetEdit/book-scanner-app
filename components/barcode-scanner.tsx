@@ -273,6 +273,8 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             <div>Video Element: {videoRef.current ? 'Exists' : 'Missing'}</div>
             <div>Stream: {streamRef.current ? 'Active' : 'None'}</div>
             <div>Video Playing: {videoRef.current?.paused === false ? 'Yes' : 'No'}</div>
+            <div>Detecting: {isDetecting ? 'Yes' : 'No'}</div>
+            <div>Code Reader: {codeReaderRef.current ? 'Ready' : 'Missing'}</div>
           </div>
         )}
       </div>
@@ -297,6 +299,22 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           </Button>
         )}
       </div>
+
+      {/* Test button to see visual indicators */}
+      {isScanning && (
+        <div className="text-center">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              setIsDetecting(true)
+              setTimeout(() => setIsDetecting(false), 1000)
+            }}
+          >
+            Test Visual Indicators
+          </Button>
+        </div>
+      )}
 
       <p className="text-sm text-muted-foreground text-center">Position the barcode within the frame to scan</p>
       
