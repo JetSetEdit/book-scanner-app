@@ -4,7 +4,15 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Camera, CameraOff, AlertCircle, CheckCircle } from "lucide-react"
-import { BrowserMultiFormatReader } from "@zxing/library"
+// Import ZXing library with error handling
+let BrowserMultiFormatReader: any = null
+try {
+  const zxing = require("@zxing/library")
+  BrowserMultiFormatReader = zxing.BrowserMultiFormatReader
+  console.log("[v0] ZXing library loaded successfully")
+} catch (error) {
+  console.error("[v0] Failed to load ZXing library:", error)
+}
 
 interface BarcodeScannerProps {
   onScanSuccess: (isbn: string) => void
@@ -63,17 +71,26 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             })
             
             // Initialize barcode reader but don't let it control the video
+            if (!BrowserMultiFormatReader) {
+              console.error("[v0] BrowserMultiFormatReader is not available")
+              setError("Barcode scanning library not loaded, but camera is working")
+              return
+            }
+            
             try {
+              console.log("[v0] Attempting to initialize BrowserMultiFormatReader...")
               const codeReader = new BrowserMultiFormatReader()
               codeReaderRef.current = codeReader
-              console.log("[v0] Barcode reader initialized")
+              console.log("[v0] Barcode reader initialized successfully:", codeReader)
               
               // Start manual frame capture scanning
               setTimeout(() => {
+                console.log("[v0] Starting manual barcode scanning after delay...")
                 startManualBarcodeScanning()
               }, 2000) // Wait 2 seconds for video to be completely stable
             } catch (err) {
               console.error("[v0] Error initializing barcode reader:", err)
+              console.error("[v0] Error details:", err.message)
               setError("Barcode scanning not available, but camera is working")
             }
           }
