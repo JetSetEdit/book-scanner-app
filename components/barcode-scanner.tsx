@@ -337,9 +337,9 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         )}
       </div>
 
-      {/* Test button to see visual indicators */}
+      {/* Test buttons */}
       {isScanning && (
-        <div className="text-center">
+        <div className="text-center space-y-2">
           <Button 
             variant="outline" 
             size="sm" 
@@ -350,6 +350,30 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           >
             Test Visual Indicators
           </Button>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                console.log("[v0] Manual test - simulating ISBN barcode")
+                onScanSuccess("9780008710262")
+              }}
+            >
+              Test ISBN
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                console.log("[v0] Manual test - simulating product barcode")
+                onScanSuccess("1234567890123")
+              }}
+            >
+              Test Product
+            </Button>
+          </div>
         </div>
       )}
 
