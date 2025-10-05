@@ -139,8 +139,10 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     console.log("[v0] Starting manual barcode scanning...")
 
     const scanBarcode = async () => {
+      console.log("[v0] scanBarcode function called")
       try {
         if (videoRef.current && codeReaderRef.current && !videoRef.current.paused) {
+          console.log("[v0] Starting barcode detection...")
           // Show detecting indicator
           setIsDetecting(true)
           
@@ -149,11 +151,13 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           const context = canvas.getContext('2d')
           
           if (context && videoRef.current.videoWidth > 0) {
+            console.log("[v0] Video dimensions:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight)
             canvas.width = videoRef.current.videoWidth
             canvas.height = videoRef.current.videoHeight
             
             // Draw the current video frame to canvas
             context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
+            console.log("[v0] Canvas created, attempting to decode...")
             
             // Convert canvas to image data and scan it
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
@@ -161,6 +165,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             
             if (result && result.getText()) {
               const scannedCode = result.getText()
+              console.log("[v0] Barcode detected:", scannedCode)
               
               // Avoid duplicate scans
               if (scannedCode !== lastScannedCode) {
@@ -172,18 +177,24 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
                 onScanSuccess(scannedCode)
                 stopScanning()
               }
+            } else {
+              console.log("[v0] No barcode found in this frame")
             }
+          } else {
+            console.log("[v0] Canvas context or video dimensions not available")
           }
           
           // Hide detecting indicator after a short delay
           setTimeout(() => setIsDetecting(false), 200)
+        } else {
+          console.log("[v0] Cannot scan - missing requirements:", {
+            videoRef: !!videoRef.current,
+            codeReader: !!codeReaderRef.current,
+            videoPaused: videoRef.current?.paused
+          })
         }
       } catch (err) {
-        // Ignore scanning errors - they're expected when no barcode is found
-        // Only log occasionally to avoid spam
-        if (Math.random() < 0.01) {
-          console.log("[v0] Manual scanning (no barcode found)")
-        }
+        console.log("[v0] Scanning error:", err.message)
         setIsDetecting(false)
       }
     }
