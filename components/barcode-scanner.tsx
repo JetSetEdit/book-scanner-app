@@ -23,22 +23,37 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
   const startScanning = async () => {
     setError(null)
     try {
+      console.log("[v0] Requesting camera access...")
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       })
 
+      console.log("[v0] Camera stream obtained:", stream)
+      
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         streamRef.current = stream
         setIsScanning(true)
         setHasPermission(true)
 
-        // Initialize barcode reader
-        const codeReader = new BrowserMultiFormatReader()
-        codeReaderRef.current = codeReader
-
-        // Start scanning for barcodes
-        startBarcodeScanning()
+        // Wait for video to be ready
+        videoRef.current.onloadedmetadata = () => {
+          console.log("[v0] Video metadata loaded")
+          videoRef.current?.play()
+          
+          // Initialize barcode reader after video is ready
+          try {
+            const codeReader = new BrowserMultiFormatReader()
+            codeReaderRef.current = codeReader
+            console.log("[v0] Barcode reader initialized")
+            
+            // Start scanning for barcodes
+            startBarcodeScanning()
+          } catch (err) {
+            console.error("[v0] Error initializing barcode reader:", err)
+            setError("Barcode scanning not available, but camera is working")
+          }
+        }
       }
     } catch (err) {
       console.error("[v0] Camera access error:", err)
@@ -48,7 +63,12 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
   }
 
   const startBarcodeScanning = () => {
-    if (!videoRef.current || !codeReaderRef.current) return
+    if (!videoRef.current || !codeReaderRef.current) {
+      console.log("[v0] Cannot start barcode scanning - missing video or codeReader")
+      return
+    }
+
+    console.log("[v0] Starting barcode scanning...")
 
     const scanBarcode = async () => {
       try {
@@ -64,19 +84,27 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               
               // Check if it looks like an ISBN
               if (isValidISBN(scannedCode)) {
+                console.log("[v0] Valid ISBN found:", scannedCode)
                 onScanSuccess(scannedCode)
                 stopScanning()
+              } else {
+                console.log("[v0] Scanned code is not a valid ISBN:", scannedCode)
               }
             }
           }
         }
       } catch (err) {
         // Ignore scanning errors - they're expected when no barcode is found
+        // Only log occasionally to avoid spam
+        if (Math.random() < 0.01) {
+          console.log("[v0] Scanning (no barcode found)")
+        }
       }
     }
 
     // Scan every 500ms
     scanningIntervalRef.current = setInterval(scanBarcode, 500)
+    console.log("[v0] Barcode scanning interval started")
   }
 
   const isValidISBN = (code: string): boolean => {
