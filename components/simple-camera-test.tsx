@@ -20,12 +20,31 @@ export function SimpleCameraTest() {
       })
 
       console.log("[TEST] Camera stream obtained:", stream)
+      console.log("[TEST] Stream tracks:", stream.getTracks())
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream
         streamRef.current = stream
         setIsScanning(true)
         console.log("[TEST] Video element updated")
+        
+        // Force video to play
+        videoRef.current.onloadedmetadata = () => {
+          console.log("[TEST] Video metadata loaded, dimensions:", videoRef.current?.videoWidth, "x", videoRef.current?.videoHeight)
+          videoRef.current?.play().then(() => {
+            console.log("[TEST] Video play started")
+          }).catch((err) => {
+            console.error("[TEST] Video play failed:", err)
+          })
+        }
+        
+        videoRef.current.oncanplay = () => {
+          console.log("[TEST] Video can play")
+        }
+        
+        videoRef.current.onerror = (e) => {
+          console.error("[TEST] Video error:", e)
+        }
       }
     } catch (err) {
       console.error("[TEST] Camera access error:", err)
@@ -52,18 +71,19 @@ export function SimpleCameraTest() {
 
   return (
     <div className="space-y-4">
-      <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
+      <div className="relative aspect-video bg-muted rounded-lg overflow-hidden border-2 border-dashed border-gray-300">
         {isScanning ? (
           <video 
             ref={videoRef} 
             autoPlay 
             playsInline 
             muted
-            className="w-full h-full object-cover"
-            style={{ transform: 'scaleX(-1)' }} // Mirror the video like a selfie camera
-            onLoadedMetadata={() => console.log("[TEST] Video metadata loaded")}
-            onCanPlay={() => console.log("[TEST] Video can play")}
-            onError={(e) => console.error("[TEST] Video error:", e)}
+            className="w-full h-full object-cover bg-black"
+            style={{ 
+              transform: 'scaleX(-1)',
+              minHeight: '200px',
+              minWidth: '100%'
+            }}
           />
         ) : (
           <div className="flex items-center justify-center h-full">
@@ -71,6 +91,15 @@ export function SimpleCameraTest() {
               <Camera className="h-12 w-12 mx-auto text-muted-foreground" />
               <p className="text-sm text-muted-foreground">Camera preview will appear here</p>
             </div>
+          </div>
+        )}
+        
+        {/* Debug info */}
+        {isScanning && (
+          <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+            <div>Scanning: {isScanning ? 'Yes' : 'No'}</div>
+            <div>Video Element: {videoRef.current ? 'Exists' : 'Missing'}</div>
+            <div>Stream: {streamRef.current ? 'Active' : 'None'}</div>
           </div>
         )}
       </div>
