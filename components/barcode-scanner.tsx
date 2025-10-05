@@ -237,7 +237,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         {lastScannedCode && (
           <div className="absolute top-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
-            <span className="text-sm font-medium">ISBN Found!</span>
+            <span className="text-sm font-medium">Barcode Found!</span>
           </div>
         )}
 

@@ -51,9 +51,20 @@ export function ScannerInterface() {
     await handleSearch(isbn)
   }
 
-  const handleScanSuccess = async (scannedIsbn: string) => {
-    setIsbn(scannedIsbn)
-    await handleSearch(scannedIsbn)
+  const handleScanSuccess = async (scannedBarcode: string) => {
+    setIsbn(scannedBarcode)
+    
+    // Check if it's a valid ISBN (10 or 13 digits)
+    const cleanBarcode = scannedBarcode.replace(/[^\d]/g, '')
+    const isISBN = cleanBarcode.length === 10 || cleanBarcode.length === 13
+    
+    if (isISBN) {
+      // It's an ISBN, try to find it as a book
+      await handleSearch(scannedBarcode)
+    } else {
+      // It's not an ISBN, redirect to product page
+      router.push(`/product/${scannedBarcode}`)
+    }
   }
 
   return (
