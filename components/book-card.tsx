@@ -1,0 +1,102 @@
+import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { SpiceRating } from "@/components/spice-rating"
+import { AgeRatingBadge } from "@/components/age-rating-badge"
+import { ExternalLink } from "lucide-react"
+import Image from "next/image"
+
+interface BookCardProps {
+  book: {
+    isbn: string
+    title: string
+    author?: string
+    cover_url?: string
+    description?: string
+    publisher?: string
+    published_date?: string
+    page_count?: number
+    categories?: string[]
+  }
+  spiceLevel?: number
+  ageRating?: string
+  affiliateLink?: string
+}
+
+export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCardProps) {
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-6">
+        <div className="flex gap-6">
+          {/* Book Cover */}
+          <div className="flex-shrink-0">
+            <div className="w-32 h-48 bg-muted rounded-lg overflow-hidden relative">
+              {book.cover_url ? (
+                <Image
+                  src={book.cover_url || "/placeholder.svg"}
+                  alt={`Cover of ${book.title}`}
+                  fill
+                  className="object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">No Cover</div>
+              )}
+            </div>
+          </div>
+
+          {/* Book Details */}
+          <div className="flex-1 space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold text-balance mb-1">{book.title}</h2>
+              {book.author && <p className="text-muted-foreground">by {book.author}</p>}
+            </div>
+
+            {/* Ratings */}
+            <div className="flex flex-wrap gap-3">
+              {spiceLevel !== undefined && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Spice Level:</span>
+                  <SpiceRating level={spiceLevel} />
+                </div>
+              )}
+              {ageRating && <AgeRatingBadge rating={ageRating} />}
+            </div>
+
+            {/* Description */}
+            {book.description && <p className="text-sm text-muted-foreground line-clamp-3">{book.description}</p>}
+
+            {/* Metadata */}
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              {book.publisher && <span>Publisher: {book.publisher}</span>}
+              {book.published_date && <span>Published: {book.published_date}</span>}
+              {book.page_count && <span>{book.page_count} pages</span>}
+            </div>
+
+            {/* Categories */}
+            {book.categories && book.categories.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {book.categories.map((category) => (
+                  <Badge key={category} variant="secondary">
+                    {category}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            {/* Affiliate Link */}
+            {affiliateLink && (
+              <a
+                href={affiliateLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                Buy on Amazon
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}

@@ -1,0 +1,90 @@
+"use client"
+
+import { BookCard } from "@/components/book-card"
+import { ContentWarningsList } from "@/components/content-warnings-list"
+import { AddWarningDialog } from "@/components/add-warning-dialog"
+import { AddSpiceRatingDialog } from "@/components/add-spice-rating-dialog"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Plus, ArrowLeft } from "lucide-react"
+import { addContentWarning, addSpiceRating } from "@/app/actions/warning-actions"
+import { useRouter } from "next/navigation"
+
+interface BookDetailsProps {
+  book: {
+    id: string
+    isbn: string
+    title: string
+    author?: string
+    cover_url?: string
+    description?: string
+    publisher?: string
+    published_date?: string
+    page_count?: number
+    categories?: string[]
+  }
+  spiceLevel?: number
+  ageRating?: string
+  warnings: Array<{
+    id: string
+    category: string
+    description: string
+    severity: "mild" | "moderate" | "severe"
+    helpful_count: number
+    not_helpful_count: number
+    user_validation?: boolean | null
+  }>
+}
+
+export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetailsProps) {
+  const router = useRouter()
+  
+  const handleAddWarning = async (data: { category: string; description: string; severity: string }) => {
+    return await addContentWarning(book.id, data)
+  }
+
+  const handleAddRating = async (data: { spiceLevel: number; ageRating: string }) => {
+    return await addSpiceRating(book.id, data)
+  }
+
+  const handleBack = () => {
+    router.push('/')
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Back Button */}
+      <Button 
+        variant="outline" 
+        onClick={handleBack}
+        className="flex items-center gap-2"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back
+      </Button>
+      <BookCard
+        book={book}
+        spiceLevel={spiceLevel}
+        ageRating={ageRating}
+        affiliateLink={`https://www.amazon.com/s?k=${book.isbn}`}
+      />
+
+      <ContentWarningsList warnings={warnings} isAuthorApproved={true} />
+
+      {/* Temporarily hidden - user contribution section */}
+      {/* <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Plus className="h-5 w-5" />
+            Contribute
+          </CardTitle>
+          <CardDescription>Help the community by adding content warnings or ratings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <AddWarningDialog bookId={book.id} onSubmit={handleAddWarning} />
+          <AddSpiceRatingDialog bookId={book.id} onSubmit={handleAddRating} />
+        </CardContent>
+      </Card> */}
+    </div>
+  )
+}
