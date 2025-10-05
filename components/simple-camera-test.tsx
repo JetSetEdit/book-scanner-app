@@ -8,23 +8,32 @@ import { Camera, CameraOff, AlertCircle } from "lucide-react"
 export function SimpleCameraTest() {
   const [isScanning, setIsScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [buttonClicked, setButtonClicked] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
   const startScanning = async () => {
+    console.log("[TEST] startScanning called")
+    setButtonClicked(true)
     setError(null)
     try {
       console.log("[TEST] Requesting camera access...")
+      console.log("[TEST] navigator.mediaDevices available:", !!navigator.mediaDevices)
+      console.log("[TEST] getUserMedia available:", !!navigator.mediaDevices?.getUserMedia)
+      
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       })
 
       console.log("[TEST] Camera stream obtained:", stream)
       console.log("[TEST] Stream tracks:", stream.getTracks())
+      console.log("[TEST] Stream active:", stream.active)
       
       if (videoRef.current) {
+        console.log("[TEST] Setting video srcObject...")
         videoRef.current.srcObject = stream
         streamRef.current = stream
+        console.log("[TEST] Setting isScanning to true...")
         setIsScanning(true)
         console.log("[TEST] Video element updated")
         
@@ -45,10 +54,12 @@ export function SimpleCameraTest() {
         videoRef.current.onerror = (e) => {
           console.error("[TEST] Video error:", e)
         }
+      } else {
+        console.error("[TEST] videoRef.current is null!")
       }
     } catch (err) {
       console.error("[TEST] Camera access error:", err)
-      setError("Unable to access camera. Please check permissions and try again.")
+      setError(`Unable to access camera: ${err.message}`)
     }
   }
 
@@ -95,8 +106,9 @@ export function SimpleCameraTest() {
         )}
         
         {/* Debug info */}
-        {isScanning && (
+        {(isScanning || buttonClicked) && (
           <div className="absolute top-2 left-2 bg-black bg-opacity-75 text-white text-xs p-2 rounded">
+            <div>Button Clicked: {buttonClicked ? 'Yes' : 'No'}</div>
             <div>Scanning: {isScanning ? 'Yes' : 'No'}</div>
             <div>Video Element: {videoRef.current ? 'Exists' : 'Missing'}</div>
             <div>Stream: {streamRef.current ? 'Active' : 'None'}</div>
