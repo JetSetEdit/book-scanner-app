@@ -61,31 +61,13 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               console.error("[v0] Video play failed:", err)
             })
             
-            // Initialize barcode reader after video is ready
-            try {
-              const codeReader = new BrowserMultiFormatReader()
-              codeReaderRef.current = codeReader
-              console.log("[v0] Barcode reader initialized")
-              
-              // Start scanning for barcodes with a delay to let video stabilize
-              setTimeout(() => {
-                startBarcodeScanning()
-              }, 1000) // Wait 1 second for video to be stable
-            } catch (err) {
-              console.error("[v0] Error initializing barcode reader:", err)
-              setError("Barcode scanning not available, but camera is working")
-            }
+            // Temporarily disable barcode scanning to get camera working
+            console.log("[v0] Camera preview ready - barcode scanning disabled for now")
+            // TODO: Re-enable barcode scanning once camera is stable
           }
           
           videoRef.current.oncanplay = () => {
             console.log("[v0] Video can play")
-            // Force play again to ensure it's actually playing
-            setTimeout(() => {
-              if (videoRef.current && videoRef.current.paused) {
-                console.log("[v0] Video was paused, forcing play again")
-                videoRef.current.play()
-              }
-            }, 500)
           }
           
           videoRef.current.onerror = (e) => {
