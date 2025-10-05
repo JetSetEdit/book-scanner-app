@@ -91,6 +91,19 @@ export function SimpleCameraTest() {
     }
   }, [])
 
+  // Stop scanning when component unmounts (when switching tabs)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && isScanning) {
+        console.log("[TEST] Page hidden, stopping camera")
+        stopScanning()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [isScanning])
+
   return (
     <div className="space-y-4">
       <div className="relative aspect-video bg-muted rounded-lg overflow-hidden border-2 border-dashed border-gray-300">

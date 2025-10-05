@@ -104,7 +104,16 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           }
           
           videoRef.current.onpause = () => {
-            console.log("[v0] Video paused")
+            console.log("[v0] Video paused - attempting to restart")
+            // Try to restart the video if it gets paused
+            setTimeout(() => {
+              if (videoRef.current && videoRef.current.paused) {
+                console.log("[v0] Restarting paused video")
+                videoRef.current.play().catch(err => {
+                  console.error("[v0] Failed to restart video:", err)
+                })
+              }
+            }, 100)
           }
           
           videoRef.current.onended = () => {
