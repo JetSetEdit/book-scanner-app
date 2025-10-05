@@ -67,8 +67,10 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               codeReaderRef.current = codeReader
               console.log("[v0] Barcode reader initialized")
               
-              // Start scanning for barcodes
-              startBarcodeScanning()
+              // Start scanning for barcodes with a delay to let video stabilize
+              setTimeout(() => {
+                startBarcodeScanning()
+              }, 1000) // Wait 1 second for video to be stable
             } catch (err) {
               console.error("[v0] Error initializing barcode reader:", err)
               setError("Barcode scanning not available, but camera is working")
@@ -118,7 +120,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
 
     const scanBarcode = async () => {
       try {
-        if (videoRef.current && codeReaderRef.current) {
+        if (videoRef.current && codeReaderRef.current && !videoRef.current.paused) {
           const result = await codeReaderRef.current.decodeFromVideoElement(videoRef.current)
           if (result && result.getText()) {
             const scannedCode = result.getText()
@@ -148,8 +150,8 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
       }
     }
 
-    // Scan every 500ms
-    scanningIntervalRef.current = setInterval(scanBarcode, 500)
+    // Scan every 1000ms (slower to reduce conflicts)
+    scanningIntervalRef.current = setInterval(scanBarcode, 1000)
     console.log("[v0] Barcode scanning interval started")
   }
 
