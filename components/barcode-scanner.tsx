@@ -160,28 +160,21 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             console.log("[v0] Canvas created, attempting to decode...")
             console.log("[v0] Available methods on codeReader:", Object.getOwnPropertyNames(codeReaderRef.current))
             
-            // Try different methods to decode the canvas
+            // Use the original ZXing method that works
             let result = null
             try {
-              // Method 1: Try decodeFromCanvas
-              result = await codeReaderRef.current.decodeFromCanvas(canvas)
-              console.log("[v0] decodeFromCanvas result:", result)
-            } catch (err1) {
-              console.log("[v0] decodeFromCanvas failed:", err1.message)
+              // Convert canvas to data URL and use decodeFromImageUrl
+              const dataURL = canvas.toDataURL('image/png')
+              result = await codeReaderRef.current.decodeFromImageUrl(dataURL)
+              console.log("[v0] decodeFromImageUrl result:", result)
+            } catch (err) {
+              console.log("[v0] decodeFromImageUrl failed:", err.message)
+              // Fallback: try decodeFromCanvas
               try {
-                // Method 2: Try decodeFromImageData
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
-                result = await codeReaderRef.current.decodeFromImageData(imageData)
-                console.log("[v0] decodeFromImageData result:", result)
+                result = await codeReaderRef.current.decodeFromCanvas(canvas)
+                console.log("[v0] decodeFromCanvas result:", result)
               } catch (err2) {
-                console.log("[v0] decodeFromImageData failed:", err2.message)
-                try {
-                  // Method 3: Try decodeFromImage
-                  result = await codeReaderRef.current.decodeFromImage(canvas)
-                  console.log("[v0] decodeFromImage result:", result)
-                } catch (err3) {
-                  console.log("[v0] decodeFromImage failed:", err3.message)
-                }
+                console.log("[v0] decodeFromCanvas also failed:", err2.message)
               }
             }
             
