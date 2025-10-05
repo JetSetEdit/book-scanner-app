@@ -30,31 +30,39 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
 
       console.log("[v0] Camera stream obtained:", stream)
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        streamRef.current = stream
-        setIsScanning(true)
-        setHasPermission(true)
-
-        // Wait for video to be ready
-        videoRef.current.onloadedmetadata = () => {
-          console.log("[v0] Video metadata loaded")
-          videoRef.current?.play()
+      // Set scanning state first to render the video element
+      setIsScanning(true)
+      setHasPermission(true)
+      streamRef.current = stream
+      
+      // Wait for React to render the video element
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          console.log("[v0] Video element updated")
           
-          // Initialize barcode reader after video is ready
-          try {
-            const codeReader = new BrowserMultiFormatReader()
-            codeReaderRef.current = codeReader
-            console.log("[v0] Barcode reader initialized")
+          // Wait for video to be ready
+          videoRef.current.onloadedmetadata = () => {
+            console.log("[v0] Video metadata loaded")
+            videoRef.current?.play()
             
-            // Start scanning for barcodes
-            startBarcodeScanning()
-          } catch (err) {
-            console.error("[v0] Error initializing barcode reader:", err)
-            setError("Barcode scanning not available, but camera is working")
+            // Initialize barcode reader after video is ready
+            try {
+              const codeReader = new BrowserMultiFormatReader()
+              codeReaderRef.current = codeReader
+              console.log("[v0] Barcode reader initialized")
+              
+              // Start scanning for barcodes
+              startBarcodeScanning()
+            } catch (err) {
+              console.error("[v0] Error initializing barcode reader:", err)
+              setError("Barcode scanning not available, but camera is working")
+            }
           }
+        } else {
+          console.error("[v0] videoRef.current is still null after timeout!")
         }
-      }
+      }, 100) // Small delay to let React render
     } catch (err) {
       console.error("[v0] Camera access error:", err)
       setError("Unable to access camera. Please check permissions and try again.")
