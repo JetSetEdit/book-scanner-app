@@ -131,6 +131,25 @@ export function ScannerInterface() {
             </form>
           </TabsContent>
         </Tabs>
+        
+        <div className="text-center space-y-2 mt-4 pt-4 border-t">
+          <div>
+            <a 
+              href="/scanner" 
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              🎯 Dedicated Scanner Page (Recommended)
+            </a>
+          </div>
+          <div>
+            <a 
+              href="/test-barcodes" 
+              className="text-sm text-gray-600 hover:text-gray-800 underline"
+            >
+              Need test barcodes? Click here for test page
+            </a>
+          </div>
+        </div>
       </CardContent>
     </Card>
   )
