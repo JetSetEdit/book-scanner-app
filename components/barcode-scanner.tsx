@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Camera, CameraOff, AlertCircle, CheckCircle, Loader2 } from "lucide-react"
+import { Camera, CameraOff, AlertCircle, CheckCircle, Loader2, ArrowUp, ArrowDown, RotateCcw } from "lucide-react"
 // Import ZXing library with error handling
 let BrowserMultiFormatReader: any = null
 try {
@@ -26,6 +26,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
   const [isDetecting, setIsDetecting] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false) // Loading state for processing
   const [statusMessage, setStatusMessage] = useState<string>("") // Status messages
+  const [scanAttempts, setScanAttempts] = useState(0) // Track scan attempts for distance guidance
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null)
@@ -210,6 +211,8 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
                   }
                 } else {
                   console.log("[v0] No barcode found in this frame")
+                  // Increment scan attempts for distance guidance
+                  setScanAttempts(prev => prev + 1)
                 }
           } else {
             console.log("[v0] Canvas context or video dimensions not available")
@@ -243,6 +246,14 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     return cleanCode.length === 10 || cleanCode.length === 13
   }
 
+  // Get distance guidance based on scan attempts
+  const getDistanceGuidance = () => {
+    if (scanAttempts < 5) return null
+    if (scanAttempts < 10) return "Try moving closer to the barcode"
+    if (scanAttempts < 15) return "Move closer or ensure good lighting"
+    return "Try different angle or better lighting"
+  }
+
   const stopScanning = () => {
     // Stop barcode scanning
     if (scanningIntervalRef.current) {
@@ -269,6 +280,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     setIsDetecting(false) // Ensure detecting state is reset
     setIsProcessing(false) // Reset processing state
     setStatusMessage("") // Clear status message
+    setScanAttempts(0) // Reset scan attempts
   }
 
   useEffect(() => {
@@ -302,26 +314,31 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           </div>
         )}
 
-        {isScanning && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className={`w-64 h-40 border-2 rounded-lg shadow-lg transition-colors ${
-              isDetecting ? 'border-green-500 bg-green-500/10' : 'border-primary'
-            }`}>
-              <div className={`absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 rounded-tl-lg ${
-                isDetecting ? 'border-green-500' : 'border-primary'
-              }`} />
-              <div className={`absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 rounded-tr-lg ${
-                isDetecting ? 'border-green-500' : 'border-primary'
-              }`} />
-              <div className={`absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 rounded-bl-lg ${
-                isDetecting ? 'border-green-500' : 'border-primary'
-              }`} />
-              <div className={`absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 rounded-br-lg ${
-                isDetecting ? 'border-green-500' : 'border-primary'
-              }`} />
-            </div>
-          </div>
-        )}
+            {isScanning && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className={`w-64 h-40 border-2 rounded-lg shadow-lg transition-colors ${
+                  isDetecting ? 'border-green-500 bg-green-500/10' : 'border-primary'
+                }`}>
+                  <div className={`absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 rounded-tl-lg ${
+                    isDetecting ? 'border-green-500' : 'border-primary'
+                  }`} />
+                  <div className={`absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 rounded-tr-lg ${
+                    isDetecting ? 'border-green-500' : 'border-primary'
+                  }`} />
+                  <div className={`absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 rounded-bl-lg ${
+                    isDetecting ? 'border-green-500' : 'border-primary'
+                  }`} />
+                  <div className={`absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 rounded-br-lg ${
+                    isDetecting ? 'border-green-500' : 'border-primary'
+                  }`} />
+                  
+                  {/* Distance indicator */}
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black/50 px-2 py-1 rounded">
+                    📏 Optimal distance
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Scanning indicator */}
             {isDetecting && (
@@ -375,6 +392,22 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
                   <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
                 )}
                 {statusMessage}
+              </div>
+            </div>
+          )}
+
+          {/* Distance Guidance */}
+          {isScanning && getDistanceGuidance() && (
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-2 rounded-lg text-sm border border-orange-200">
+                {scanAttempts < 10 ? (
+                  <ArrowUp className="h-4 w-4" />
+                ) : scanAttempts < 15 ? (
+                  <ArrowDown className="h-4 w-4" />
+                ) : (
+                  <RotateCcw className="h-4 w-4" />
+                )}
+                {getDistanceGuidance()}
               </div>
             </div>
           )}
@@ -433,7 +466,15 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         </div>
       )}
 
-      <p className="text-sm text-muted-foreground text-center">Position the barcode within the frame to scan</p>
+          <div className="text-center space-y-2">
+            <p className="text-sm text-muted-foreground">Position the barcode within the frame to scan</p>
+            {isScanning && (
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p>💡 <strong>Tips:</strong> Hold steady, ensure good lighting, try different angles</p>
+                <p>📏 <strong>Distance:</strong> 6-12 inches from barcode works best</p>
+              </div>
+            )}
+          </div>
       
       <div className="text-center">
         <a 
