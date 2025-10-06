@@ -336,6 +336,38 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
                   <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs text-white bg-black/50 px-2 py-1 rounded">
                     📏 Optimal distance
                   </div>
+                  
+                  {/* Distance guidance overlay */}
+                  {getDistanceGuidance() && (
+                    <div className="absolute top-2 left-2 right-2 bg-black/75 text-white px-3 py-2 rounded-lg text-sm">
+                      <div className="flex items-center gap-2">
+                        {scanAttempts < 10 ? (
+                          <ArrowUp className="h-4 w-4 text-orange-400" />
+                        ) : scanAttempts < 15 ? (
+                          <ArrowDown className="h-4 w-4 text-orange-400" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4 text-orange-400" />
+                        )}
+                        <span className="font-medium">{getDistanceGuidance()}</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Scanning tips overlay - show when ready and no guidance */}
+                  {!getDistanceGuidance() && statusMessage === "Ready to scan! Point camera at a barcode" && (
+                    <div className="absolute bottom-2 left-2 right-2 bg-black/75 text-white px-3 py-2 rounded-lg text-xs">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">💡</span>
+                          <span>Hold steady, ensure good lighting</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-400">📏</span>
+                          <span>6-12 inches from barcode works best</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -396,21 +428,6 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             </div>
           )}
 
-          {/* Distance Guidance */}
-          {isScanning && getDistanceGuidance() && (
-            <div className="text-center">
-              <div className="inline-flex items-center gap-2 bg-orange-50 text-orange-700 px-3 py-2 rounded-lg text-sm border border-orange-200">
-                {scanAttempts < 10 ? (
-                  <ArrowUp className="h-4 w-4" />
-                ) : scanAttempts < 15 ? (
-                  <ArrowDown className="h-4 w-4" />
-                ) : (
-                  <RotateCcw className="h-4 w-4" />
-                )}
-                {getDistanceGuidance()}
-              </div>
-            </div>
-          )}
 
           <div className="flex gap-2">
             {!isScanning ? (
@@ -466,15 +483,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         </div>
       )}
 
-          <div className="text-center space-y-2">
-            <p className="text-sm text-muted-foreground">Position the barcode within the frame to scan</p>
-            {isScanning && (
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p>💡 <strong>Tips:</strong> Hold steady, ensure good lighting, try different angles</p>
-                <p>📏 <strong>Distance:</strong> 6-12 inches from barcode works best</p>
-              </div>
-            )}
-          </div>
+          <p className="text-sm text-muted-foreground text-center">Position the barcode within the frame to scan</p>
       
       <div className="text-center">
         <a 
