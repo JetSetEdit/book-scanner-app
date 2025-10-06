@@ -4,16 +4,6 @@ import { BookOpen, Shield, Users } from "lucide-react"
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6" />
-            <h1 className="text-xl font-bold">Book Content Scanner</h1>
-          </div>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto">

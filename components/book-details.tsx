@@ -2,6 +2,7 @@
 
 import { BookCard } from "@/components/book-card"
 import { ContentWarningsList } from "@/components/content-warnings-list"
+import { StoryGraphData } from "@/components/storygraph-data"
 import { AddWarningDialog } from "@/components/add-warning-dialog"
 import { AddSpiceRatingDialog } from "@/components/add-spice-rating-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -22,6 +23,7 @@ interface BookDetailsProps {
     published_date?: string
     page_count?: number
     categories?: string[]
+    storygraph_rating?: number
   }
   spiceLevel?: number
   ageRating?: string
@@ -70,6 +72,9 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
       />
 
       <ContentWarningsList warnings={warnings} isAuthorApproved={true} />
+
+      {/* StoryGraph Data Section */}
+      <StoryGraphData book={book} warnings={warnings} />
 
       {/* Temporarily hidden - user contribution section */}
       {/* <Card>

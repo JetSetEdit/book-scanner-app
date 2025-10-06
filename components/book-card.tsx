@@ -1,9 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { SpiceRating } from "@/components/spice-rating"
-import { AgeRatingBadge } from "@/components/age-rating-badge"
 import { ExternalLink } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 
 interface BookCardProps {
   book: {
@@ -16,6 +15,7 @@ interface BookCardProps {
     published_date?: string
     page_count?: number
     categories?: string[]
+    storygraph_rating?: number
   }
   spiceLevel?: number
   ageRating?: string
@@ -24,8 +24,9 @@ interface BookCardProps {
 
 export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCardProps) {
   return (
-    <Card className="overflow-hidden">
-      <CardContent className="p-6">
+    <Link href={`/book/${book.isbn}`}>
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+        <CardContent className="p-6">
         <div className="flex gap-6">
           {/* Book Cover */}
           <div className="flex-shrink-0">
@@ -51,15 +52,32 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
             </div>
 
             {/* Ratings */}
-            <div className="flex flex-wrap gap-3">
-              {spiceLevel !== undefined && (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Spice Level:</span>
-                  <SpiceRating level={spiceLevel} />
+            {spiceLevel !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Spice Level:</span>
+                <span className="text-sm text-muted-foreground">{spiceLevel}/5</span>
+              </div>
+            )}
+            {ageRating && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Age Rating:</span>
+                <Badge variant="secondary">{ageRating}</Badge>
+              </div>
+            )}
+            {book.storygraph_rating && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">StoryGraph Rating:</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-semibold text-yellow-600">
+                    {book.storygraph_rating.toFixed(1)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">/5.0</span>
+                  <Badge variant="outline" className="text-xs">
+                    StoryGraph
+                  </Badge>
                 </div>
-              )}
-              {ageRating && <AgeRatingBadge rating={ageRating} />}
-            </div>
+              </div>
+            )}
 
             {/* Description */}
             {book.description && <p className="text-sm text-muted-foreground line-clamp-3">{book.description}</p>}
@@ -96,7 +114,8 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
             )}
           </div>
         </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   )
 }
