@@ -15,17 +15,37 @@ export default function ScannerPage() {
     console.log("[SCANNER] Barcode scanned:", barcode)
     setLastScannedCode(barcode)
     
-    // Check if it's a valid ISBN (10 or 13 digits)
+    // Check if it's a valid ISBN using proper validation
     const cleanBarcode = barcode.replace(/[^\d]/g, '')
-    const isISBN = cleanBarcode.length === 10 || cleanBarcode.length === 13
+    const isISBN = isValidISBN(cleanBarcode)
     
     if (isISBN) {
       // It's an ISBN, redirect to book page
+      console.log("[SCANNER] Detected as ISBN, going to book page")
       router.push(`/book/${barcode}`)
     } else {
       // It's not an ISBN, redirect to product page
+      console.log("[SCANNER] Detected as product barcode, going to product page")
       router.push(`/product/${barcode}`)
     }
+  }
+
+  // Proper ISBN validation function
+  const isValidISBN = (code: string): boolean => {
+    // Remove any non-digit characters
+    const cleanCode = code.replace(/[^\d]/g, '')
+    
+    // ISBN-10: exactly 10 digits
+    if (cleanCode.length === 10) {
+      return true
+    }
+    
+    // ISBN-13: exactly 13 digits and starts with 978 or 979
+    if (cleanCode.length === 13) {
+      return cleanCode.startsWith('978') || cleanCode.startsWith('979')
+    }
+    
+    return false
   }
 
   const handleBack = () => {
