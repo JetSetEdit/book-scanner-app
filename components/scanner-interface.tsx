@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { BarcodeScanner } from "@/components/barcode-scanner"
-import { SimpleCameraTest } from "@/components/simple-camera-test"
 import { lookupBook } from "@/app/actions/book-actions"
 import { BookOpen, Keyboard, ScanLine, AlertCircle } from "lucide-react"
 
@@ -103,14 +102,10 @@ export function ScannerInterface() {
         )}
 
             <Tabs defaultValue="scan" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="scan" className="flex items-center gap-2">
                   <ScanLine className="h-4 w-4" />
                   Scan Barcode
-                </TabsTrigger>
-                <TabsTrigger value="test" className="flex items-center gap-2">
-                  <ScanLine className="h-4 w-4" />
-                  Camera Test
                 </TabsTrigger>
                 <TabsTrigger value="manual" className="flex items-center gap-2">
                   <Keyboard className="h-4 w-4" />
@@ -122,9 +117,6 @@ export function ScannerInterface() {
                 <BarcodeScanner onScanSuccess={handleScanSuccess} />
               </TabsContent>
 
-              <TabsContent value="test" className="space-y-4">
-                <SimpleCameraTest />
-              </TabsContent>
 
           <TabsContent value="manual" className="space-y-4">
             <form onSubmit={handleManualSubmit} className="space-y-4">
