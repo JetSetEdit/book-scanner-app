@@ -43,9 +43,40 @@ export class StoryGraphAPI {
     try {
       console.log(`[StoryGraph] Searching for: ${query}`)
       
-      // Call our Python script via API
-      const response = await fetch(`/api/storygraph?command=search&query=${encodeURIComponent(query)}`)
-      const result = await response.json()
+      // Call our Python script directly (server-side)
+      const { spawn } = await import('child_process')
+      const path = await import('path')
+      
+      const scriptPath = path.join(process.cwd(), 'scripts', 'storygraph_client.py')
+      const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python')
+      
+      const result = await new Promise((resolve, reject) => {
+        const python = spawn(venvPython, [scriptPath, 'search', query])
+        
+        let output = ''
+        let error = ''
+        
+        python.stdout.on('data', (data) => {
+          output += data.toString()
+        })
+        
+        python.stderr.on('data', (data) => {
+          error += data.toString()
+        })
+        
+        python.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const parsed = JSON.parse(output)
+              resolve(parsed)
+            } catch (e) {
+              reject(new Error('Failed to parse Python output'))
+            }
+          } else {
+            reject(new Error(`Python script failed: ${error}`))
+          }
+        })
+      })
       
       if (result.success && result.data) {
         // Parse the JSON string returned by Python
@@ -76,9 +107,40 @@ export class StoryGraphAPI {
     try {
       console.log(`[StoryGraph] Getting book details for ID: ${bookId}`)
       
-      // Call our Python script via API
-      const response = await fetch(`/api/storygraph?command=book&query=${encodeURIComponent(bookId)}`)
-      const result = await response.json()
+      // Call our Python script directly (server-side)
+      const { spawn } = await import('child_process')
+      const path = await import('path')
+      
+      const scriptPath = path.join(process.cwd(), 'scripts', 'storygraph_client.py')
+      const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python')
+      
+      const result = await new Promise((resolve, reject) => {
+        const python = spawn(venvPython, [scriptPath, 'book', bookId])
+        
+        let output = ''
+        let error = ''
+        
+        python.stdout.on('data', (data) => {
+          output += data.toString()
+        })
+        
+        python.stderr.on('data', (data) => {
+          error += data.toString()
+        })
+        
+        python.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const parsed = JSON.parse(output)
+              resolve(parsed)
+            } catch (e) {
+              reject(new Error('Failed to parse Python output'))
+            }
+          } else {
+            reject(new Error(`Python script failed: ${error}`))
+          }
+        })
+      })
       
       if (result.success && result.data) {
         // Parse the JSON string returned by Python
@@ -110,9 +172,40 @@ export class StoryGraphAPI {
       const cleanISBN = isbn.replace(/[-\s]/g, '')
       console.log(`[StoryGraph] Searching by ISBN: ${cleanISBN}`)
       
-      // Call our Python script via API
-      const response = await fetch(`/api/storygraph?command=isbn&query=${encodeURIComponent(cleanISBN)}`)
-      const result = await response.json()
+      // Call our Python script directly (server-side)
+      const { spawn } = await import('child_process')
+      const path = await import('path')
+      
+      const scriptPath = path.join(process.cwd(), 'scripts', 'storygraph_client.py')
+      const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python')
+      
+      const result = await new Promise((resolve, reject) => {
+        const python = spawn(venvPython, [scriptPath, 'isbn', cleanISBN])
+        
+        let output = ''
+        let error = ''
+        
+        python.stdout.on('data', (data) => {
+          output += data.toString()
+        })
+        
+        python.stderr.on('data', (data) => {
+          error += data.toString()
+        })
+        
+        python.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const parsed = JSON.parse(output)
+              resolve(parsed)
+            } catch (e) {
+              reject(new Error('Failed to parse Python output'))
+            }
+          } else {
+            reject(new Error(`Python script failed: ${error}`))
+          }
+        })
+      })
       
       if (result.success && result.data) {
         // Parse the JSON string returned by Python
