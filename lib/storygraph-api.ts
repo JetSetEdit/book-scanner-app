@@ -41,34 +41,24 @@ export class StoryGraphAPI {
    */
   async searchBooks(query: string): Promise<StoryGraphSearchResult> {
     try {
-      // For now, we'll use a mock implementation
-      // In a real implementation, you'd scrape StoryGraph or use their API
       console.log(`[StoryGraph] Searching for: ${query}`)
       
-      // Mock data for testing
-      const mockResults: StoryGraphBook[] = [
-        {
-          title: "When the Moon Hatched",
-          authors: ["Sarah A. Parker"],
-          pages: "400",
-          first_pub: "2024",
-          tags: ["fantasy", "romance", "adventure", "magic"],
-          average_rating: "4.2",
-          description: "A fantasy romance novel about magic and adventure.",
-          warnings: {
-            graphic: ["Violence", "Sexual Content"],
-            moderate: ["Death", "War"],
-            minor: ["Language"]
-          },
-          book_id: "fbdd6b7c-f512-47f2-aa94-d8bf0d5f5175",
-          isbn: "9780008710262",
-          cover_url: "https://images.storygraph.com/covers/123456.jpg"
+      // Call our Python script via API
+      const response = await fetch(`/api/storygraph?command=search&query=${encodeURIComponent(query)}`)
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        // Parse the JSON string returned by Python
+        const books = typeof result.data === 'string' ? JSON.parse(result.data) : result.data
+        return {
+          success: true,
+          data: books
         }
-      ]
-
-      return {
-        success: true,
-        data: mockResults
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Search failed'
+        }
       }
     } catch (error) {
       console.error('[StoryGraph] Search error:', error)
@@ -86,28 +76,22 @@ export class StoryGraphAPI {
     try {
       console.log(`[StoryGraph] Getting book details for ID: ${bookId}`)
       
-      // Mock data for testing
-      const mockBook: StoryGraphBook = {
-        title: "When the Moon Hatched",
-        authors: ["Sarah A. Parker"],
-        pages: "400",
-        first_pub: "2024",
-        tags: ["fantasy", "romance", "adventure", "magic"],
-        average_rating: "4.2",
-        description: "A fantasy romance novel about magic and adventure.",
-        warnings: {
-          graphic: ["Violence", "Sexual Content"],
-          moderate: ["Death", "War"],
-          minor: ["Language"]
-        },
-        book_id: bookId,
-        isbn: "9780008710262",
-        cover_url: "https://images.storygraph.com/covers/123456.jpg"
-      }
-
-      return {
-        success: true,
-        data: mockBook
+      // Call our Python script via API
+      const response = await fetch(`/api/storygraph?command=book&query=${encodeURIComponent(bookId)}`)
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        // Parse the JSON string returned by Python
+        const book = typeof result.data === 'string' ? JSON.parse(result.data) : result.data
+        return {
+          success: true,
+          data: book
+        }
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Failed to get book details'
+        }
       }
     } catch (error) {
       console.error('[StoryGraph] Book details error:', error)
@@ -126,36 +110,22 @@ export class StoryGraphAPI {
       const cleanISBN = isbn.replace(/[-\s]/g, '')
       console.log(`[StoryGraph] Searching by ISBN: ${cleanISBN}`)
       
-      // For now, return mock data
-      // In a real implementation, you'd search StoryGraph by ISBN
-      if (cleanISBN === '9780008710262') {
-        const mockBook: StoryGraphBook = {
-          title: "When the Moon Hatched",
-          authors: ["Sarah A. Parker"],
-          pages: "400",
-          first_pub: "2024",
-          tags: ["fantasy", "romance", "adventure", "magic"],
-          average_rating: "4.2",
-          description: "A fantasy romance novel about magic and adventure.",
-          warnings: {
-            graphic: ["Violence", "Sexual Content"],
-            moderate: ["Death", "War"],
-            minor: ["Language"]
-          },
-          book_id: "fbdd6b7c-f512-47f2-aa94-d8bf0d5f5175",
-          isbn: cleanISBN,
-          cover_url: "https://images.storygraph.com/covers/123456.jpg"
-        }
-
+      // Call our Python script via API
+      const response = await fetch(`/api/storygraph?command=isbn&query=${encodeURIComponent(cleanISBN)}`)
+      const result = await response.json()
+      
+      if (result.success && result.data) {
+        // Parse the JSON string returned by Python
+        const book = typeof result.data === 'string' ? JSON.parse(result.data) : result.data
         return {
           success: true,
-          data: mockBook
+          data: book
         }
-      }
-
-      return {
-        success: false,
-        error: 'Book not found with this ISBN'
+      } else {
+        return {
+          success: false,
+          error: result.error || 'Book not found with this ISBN'
+        }
       }
     } catch (error) {
       console.error('[StoryGraph] ISBN search error:', error)

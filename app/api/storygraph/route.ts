@@ -23,9 +23,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const scriptPath = path.join(process.cwd(), 'scripts', 'storygraph_client.py')
+    const venvPython = path.join(process.cwd(), 'venv', 'bin', 'python')
     
     const result = await new Promise((resolve, reject) => {
-      const python = spawn('python3', [scriptPath, command, query])
+      const python = spawn(venvPython, [scriptPath, command, query])
       
       let output = ''
       let error = ''
