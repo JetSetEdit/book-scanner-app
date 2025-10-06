@@ -3,31 +3,36 @@
 import { BarcodeScanner } from "@/components/barcode-scanner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Camera, TestTube } from "lucide-react"
+import { ArrowLeft, Camera, TestTube, Loader2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 export default function ScannerPage() {
   const router = useRouter()
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const handleScanSuccess = (barcode: string) => {
     console.log("[SCANNER] Barcode scanned:", barcode)
     setLastScannedCode(barcode)
+    setIsProcessing(true)
     
     // Check if it's a valid ISBN using proper validation
     const cleanBarcode = barcode.replace(/[^\d]/g, '')
     const isISBN = isValidISBN(cleanBarcode)
     
-    if (isISBN) {
-      // It's an ISBN, redirect to book page
-      console.log("[SCANNER] Detected as ISBN, going to book page")
-      router.push(`/book/${barcode}`)
-    } else {
-      // It's not an ISBN, redirect to product page
-      console.log("[SCANNER] Detected as product barcode, going to product page")
-      router.push(`/product/${barcode}`)
-    }
+    // Add a small delay to show processing state
+    setTimeout(() => {
+      if (isISBN) {
+        // It's an ISBN, redirect to book page
+        console.log("[SCANNER] Detected as ISBN, going to book page")
+        router.push(`/book/${barcode}`)
+      } else {
+        // It's not an ISBN, redirect to product page
+        console.log("[SCANNER] Detected as product barcode, going to product page")
+        router.push(`/product/${barcode}`)
+      }
+    }, 500)
   }
 
   // Proper ISBN validation function
@@ -147,6 +152,12 @@ export default function ScannerPage() {
                   <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
                     <h4 className="font-medium text-green-800">Last Scanned:</h4>
                     <p className="text-sm text-green-700 font-mono">{lastScannedCode}</p>
+                    {isProcessing && (
+                      <div className="mt-2 flex items-center gap-2 text-blue-600">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Processing...</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Camera, CameraOff, AlertCircle, CheckCircle } from "lucide-react"
+import { Camera, CameraOff, AlertCircle, CheckCircle, Loader2 } from "lucide-react"
 // Import ZXing library with error handling
 let BrowserMultiFormatReader: any = null
 try {
@@ -24,6 +24,8 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null)
   const [isDetecting, setIsDetecting] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false) // Loading state for processing
+  const [statusMessage, setStatusMessage] = useState<string>("") // Status messages
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null)
@@ -31,6 +33,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
 
   const startScanning = async () => {
     setError(null)
+    setStatusMessage("Initializing camera...")
     try {
       // Stop any existing camera streams first
       if (streamRef.current) {
@@ -43,12 +46,14 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
       const videoDevices = devices.filter(device => device.kind === 'videoinput')
       console.log("[v0] Available video devices:", videoDevices.length)
       
+      setStatusMessage("Requesting camera permission...")
       console.log("[v0] Requesting camera access...")
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       })
 
       console.log("[v0] Camera stream obtained:", stream)
+      setStatusMessage("Setting up camera...")
       
       // Set scanning state first to render the video element
       setIsScanning(true)
@@ -60,10 +65,12 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           console.log("[v0] Video element updated")
+          setStatusMessage("Starting video feed...")
           
           // Wait for video to be ready
           videoRef.current.onloadedmetadata = () => {
             console.log("[v0] Video metadata loaded")
+            setStatusMessage("Initializing barcode scanner...")
             videoRef.current?.play().then(() => {
               console.log("[v0] Video play started successfully")
             }).catch((err) => {
@@ -74,6 +81,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
             if (!BrowserMultiFormatReader) {
               console.error("[v0] BrowserMultiFormatReader is not available")
               setError("Barcode scanning library not loaded, but camera is working")
+              setStatusMessage("")
               return
             }
             
@@ -82,6 +90,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               const codeReader = new BrowserMultiFormatReader()
               codeReaderRef.current = codeReader
               console.log("[v0] Barcode reader initialized successfully:", codeReader)
+              setStatusMessage("Ready to scan! Point camera at a barcode")
               
               // Start manual frame capture scanning
               setTimeout(() => {
@@ -92,6 +101,7 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               console.error("[v0] Error initializing barcode reader:", err)
               console.error("[v0] Error details:", err.message)
               setError("Barcode scanning not available, but camera is working")
+              setStatusMessage("")
             }
           }
           
@@ -178,23 +188,29 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
               }
             }
             
-            if (result && result.getText()) {
-              const scannedCode = result.getText()
-              console.log("[v0] Barcode detected:", scannedCode)
-              
-              // Avoid duplicate scans
-              if (scannedCode !== lastScannedCode) {
-                setLastScannedCode(scannedCode)
-                console.log("[v0] Barcode scanned:", scannedCode)
-                
-                // For testing: accept any barcode, not just ISBNs
-                console.log("[v0] Any barcode found:", scannedCode)
-                onScanSuccess(scannedCode)
-                stopScanning()
-              }
-            } else {
-              console.log("[v0] No barcode found in this frame")
-            }
+                if (result && result.getText()) {
+                  const scannedCode = result.getText()
+                  console.log("[v0] Barcode detected:", scannedCode)
+                  
+                  // Avoid duplicate scans
+                  if (scannedCode !== lastScannedCode) {
+                    setLastScannedCode(scannedCode)
+                    console.log("[v0] Barcode scanned:", scannedCode)
+                    setStatusMessage("Barcode found! Processing...")
+                    setIsProcessing(true)
+                    
+                    // For testing: accept any barcode, not just ISBNs
+                    console.log("[v0] Any barcode found:", scannedCode)
+                    
+                    // Add a small delay to show the processing state
+                    setTimeout(() => {
+                      onScanSuccess(scannedCode)
+                      stopScanning()
+                    }, 1000)
+                  }
+                } else {
+                  console.log("[v0] No barcode found in this frame")
+                }
           } else {
             console.log("[v0] Canvas context or video dimensions not available")
           }
@@ -250,6 +266,9 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
     }
     setIsScanning(false)
     setLastScannedCode(null)
+    setIsDetecting(false) // Ensure detecting state is reset
+    setIsProcessing(false) // Reset processing state
+    setStatusMessage("") // Clear status message
   }
 
   useEffect(() => {
@@ -304,12 +323,20 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
           </div>
         )}
 
-        {/* Scanning indicator */}
-        {isDetecting && (
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
-            Scanning...
-          </div>
-        )}
+            {/* Scanning indicator */}
+            {isDetecting && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-600 text-white px-3 py-1 rounded-full text-sm font-medium animate-pulse">
+                Scanning...
+              </div>
+            )}
+
+            {/* Processing indicator */}
+            {isProcessing && (
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Processing...
+              </div>
+            )}
 
         {lastScannedCode && (
           <div className="absolute top-4 right-4 bg-green-600 text-white px-3 py-2 rounded-lg flex items-center gap-2">
@@ -338,19 +365,33 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
         </Alert>
       )}
 
-      <div className="flex gap-2">
-        {!isScanning ? (
-          <Button onClick={startScanning} className="flex-1" size="lg">
-            <Camera className="mr-2 h-4 w-4" />
-            Start Camera
-          </Button>
-        ) : (
-          <Button onClick={stopScanning} variant="destructive" className="flex-1" size="lg">
-            <CameraOff className="mr-2 h-4 w-4" />
-            Stop Camera
-          </Button>
-        )}
-      </div>
+          {/* Status Message */}
+          {statusMessage && (
+            <div className="text-center">
+              <div className="inline-flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm">
+                {isProcessing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                )}
+                {statusMessage}
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            {!isScanning ? (
+              <Button onClick={startScanning} className="flex-1" size="lg" disabled={isProcessing}>
+                <Camera className="mr-2 h-4 w-4" />
+                Start Camera
+              </Button>
+            ) : (
+              <Button onClick={stopScanning} variant="destructive" className="flex-1" size="lg" disabled={isProcessing}>
+                <CameraOff className="mr-2 h-4 w-4" />
+                Stop Camera
+              </Button>
+            )}
+          </div>
 
       {/* Test buttons */}
       {isScanning && (
