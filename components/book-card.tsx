@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { ExternalLink } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { AustralianClassification } from "@/components/australian-classification"
 
 interface BookCardProps {
   book: {
@@ -16,13 +17,23 @@ interface BookCardProps {
     page_count?: number
     categories?: string[]
     storygraph_rating?: number
+    classification_rating?: string
   }
   spiceLevel?: number
   ageRating?: string
   affiliateLink?: string
 }
 
+// Helper function to extract classification rating from categories
+function getClassificationFromCategories(categories?: string[]): string | null {
+  if (!categories) return null
+  const classificationTag = categories.find(cat => cat.startsWith('CLASSIFICATION:'))
+  return classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+}
+
 export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCardProps) {
+  // Extract classification rating from categories if not directly available
+  const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
   return (
     <Link href={`/book/${book.isbn}`}>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
@@ -76,6 +87,15 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
                     StoryGraph
                   </Badge>
                 </div>
+              </div>
+            )}
+            {classificationRating && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium">Classification:</span>
+                <AustralianClassification 
+                  rating={classificationRating as any} 
+                  size="sm" 
+                />
               </div>
             )}
 

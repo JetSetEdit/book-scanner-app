@@ -58,6 +58,7 @@ export async function lookupBook(isbn: string) {
           page_count: bookData.page_count || (storyGraphData?.pages ? parseInt(storyGraphData.pages) : undefined),
           categories: bookData.categories || storyGraphData?.tags,
           storygraph_rating: storyGraphData?.average_rating ? parseFloat(storyGraphData.average_rating) : null,
+          classification_rating: bookData.classification_rating || null,
         })
 
         if (insertError) {

@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-import { BookOpen, Library, ScanLine, TestTube, Menu, X } from "lucide-react"
+import { BookOpen, Library, ScanLine, TestTube, Shield, Settings, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const navigation = [
@@ -26,6 +26,16 @@ const navigation = [
     name: "Test StoryGraph",
     href: "/test-storygraph",
     icon: TestTube,
+  },
+  {
+    name: "Test Classification",
+    href: "/test-classification",
+    icon: Shield,
+  },
+  {
+    name: "Add Classifications",
+    href: "/admin-classification",
+    icon: Settings,
   },
 ]
 

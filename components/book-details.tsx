@@ -3,6 +3,7 @@
 import { BookCard } from "@/components/book-card"
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { StoryGraphData } from "@/components/storygraph-data"
+import { AustralianClassification } from "@/components/australian-classification"
 import { AddWarningDialog } from "@/components/add-warning-dialog"
 import { AddSpiceRatingDialog } from "@/components/add-spice-rating-dialog"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -24,6 +25,7 @@ interface BookDetailsProps {
     page_count?: number
     categories?: string[]
     storygraph_rating?: number
+    classification_rating?: string
   }
   spiceLevel?: number
   ageRating?: string
@@ -38,8 +40,18 @@ interface BookDetailsProps {
   }>
 }
 
+// Helper function to extract classification rating from categories
+function getClassificationFromCategories(categories?: string[]): string | null {
+  if (!categories) return null
+  const classificationTag = categories.find(cat => cat.startsWith('CLASSIFICATION:'))
+  return classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+}
+
 export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetailsProps) {
   const router = useRouter()
+  
+  // Extract classification rating from categories if not directly available
+  const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
   
   const handleAddWarning = async (data: { category: string; description: string; severity: string }) => {
     return await addContentWarning(book.id, data)
@@ -72,6 +84,30 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
       />
 
       <ContentWarningsList warnings={warnings} isAuthorApproved={true} />
+
+      {/* Australian Classification Section */}
+      {classificationRating && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AustralianClassification rating={classificationRating as any} size="md" />
+              <span>Australian Classification</span>
+            </CardTitle>
+            <CardDescription>
+              Official classification rating from the Australian Classification Board
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <AustralianClassification 
+                rating={classificationRating as any} 
+                size="lg" 
+                showLabel={true}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* StoryGraph Data Section */}
       <StoryGraphData book={book} warnings={warnings} />

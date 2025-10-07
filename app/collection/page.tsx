@@ -3,6 +3,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BookOpen, Library } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
+import { AustralianClassification } from "@/components/australian-classification"
+
+// Helper function to extract classification rating from categories
+function getClassificationFromCategories(categories?: string[]): string | null {
+  if (!categories) return null
+  const classificationTag = categories.find(cat => cat.startsWith('CLASSIFICATION:'))
+  return classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+}
 
 export default async function CollectionPage() {
   const supabase = await createClient()
@@ -103,6 +111,20 @@ export default async function CollectionPage() {
                           <h3 className="font-bold text-lg text-balance mb-1">{book.title}</h3>
                           {book.author && <p className="text-sm text-muted-foreground">by {book.author}</p>}
                         </div>
+
+                        {/* Classification Rating */}
+                        {(() => {
+                          const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
+                          return classificationRating && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium">Classification:</span>
+                              <AustralianClassification 
+                                rating={classificationRating as any} 
+                                size="sm" 
+                              />
+                            </div>
+                          )
+                        })()}
 
                         {/* Metadata */}
                         <div className="text-xs text-muted-foreground space-y-1">
