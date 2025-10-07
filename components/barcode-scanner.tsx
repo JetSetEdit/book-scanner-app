@@ -485,14 +485,6 @@ export function BarcodeScanner({ onScanSuccess }: BarcodeScannerProps) {
 
           <p className="text-sm text-muted-foreground text-center">Position the barcode within the frame to scan</p>
       
-      <div className="text-center">
-        <a 
-          href="/test-barcodes" 
-          className="text-sm text-blue-600 hover:text-blue-800 underline"
-        >
-          Need test barcodes? Click here for test page
-        </a>
-      </div>
     </div>
   )
 }

@@ -21,6 +21,7 @@ interface BookCardProps {
   spiceLevel?: number
   ageRating?: string
   affiliateLink?: string
+  isClickable?: boolean
 }
 
 // Helper function to extract classification rating from categories
@@ -30,14 +31,14 @@ function getClassificationFromCategories(categories?: string[]): string | null {
   return classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
 }
 
-export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCardProps) {
+export function BookCard({ book, spiceLevel, ageRating, affiliateLink, isClickable = true }: BookCardProps) {
   // Extract classification rating from categories if not directly available
   const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
-  return (
-    <Link href={`/book/${book.isbn}`}>
-      <Card className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-        <CardContent className="p-6">
-        <div className="flex gap-6">
+  
+  const cardContent = (
+    <Card className={`overflow-hidden hover:shadow-lg transition-shadow min-h-[400px] ${isClickable ? 'cursor-pointer' : ''}`}>
+        <CardContent className="p-6 h-full">
+        <div className="flex gap-6 h-full">
           {/* Book Cover */}
           <div className="flex-shrink-0">
             <div className="w-32 h-48 bg-muted rounded-lg overflow-hidden relative">
@@ -55,11 +56,12 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
           </div>
 
           {/* Book Details */}
-          <div className="flex-1 space-y-4">
-            <div>
-              <h2 className="text-2xl font-bold text-balance mb-1">{book.title}</h2>
-              {book.author && <p className="text-muted-foreground">by {book.author}</p>}
-            </div>
+          <div className="flex-1 flex flex-col justify-between">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-2xl font-bold text-balance mb-1">{book.title}</h2>
+                {book.author && <p className="text-muted-foreground">by {book.author}</p>}
+              </div>
 
             {/* Ratings */}
             {spiceLevel !== undefined && (
@@ -105,13 +107,16 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
               </div>
             )}
 
+            </div>
+            
             {/* Affiliate Link */}
             {affiliateLink && (
               <a
                 href={affiliateLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline mt-4"
+                onClick={(e) => e.stopPropagation()}
               >
                 Buy on Amazon
                 <ExternalLink className="h-4 w-4" />
@@ -121,6 +126,15 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
         </div>
         </CardContent>
       </Card>
-    </Link>
   )
+
+  if (isClickable) {
+    return (
+      <Link href={`/book/${book.isbn}`}>
+        {cardContent}
+      </Link>
+    )
+  }
+
+  return cardContent
 }

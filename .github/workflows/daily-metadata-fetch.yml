@@ -1,0 +1,41 @@
+name: Daily Metadata Fetch
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC (adjust timezone as needed)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  fetch-metadata:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch metadata for pending books
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Make a request to our metadata fetch API
+          curl -X GET "${{ secrets.VERCEL_URL }}/api/fetch-metadata" \
+            -H "Authorization: Bearer ${{ secrets.API_SECRET }}" \
+            -H "Content-Type: application/json" || echo "Metadata fetch completed"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Daily metadata fetch failed. Check the logs for details."
+          # You could add Slack/Discord notifications here
+

@@ -134,14 +134,18 @@ export function ContentWarningsList({ warnings, isAuthorApproved = false }: Cont
         {!isExpanded && (
           <div className="mt-3 p-3 bg-muted rounded-lg">
             <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <span className="font-medium">{severeCount} Severe</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                <span className="font-medium">{moderateCount} Moderate</span>
-              </div>
+              {severeCount > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                  <span className="font-medium">{severeCount} Severe</span>
+                </div>
+              )}
+              {moderateCount > 0 && (
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                  <span className="font-medium">{moderateCount} Moderate</span>
+                </div>
+              )}
               {mildCount > 0 && (
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>

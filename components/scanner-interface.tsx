@@ -11,13 +11,14 @@ import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { BarcodeScanner } from "@/components/barcode-scanner"
-import { lookupBook } from "@/app/actions/book-actions"
+// Removed old lookupBook import - using new API endpoint instead
 import { BookOpen, Keyboard, ScanLine, AlertCircle } from "lucide-react"
 
 export function ScannerInterface() {
   const [isbn, setIsbn] = useState("")
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const router = useRouter()
 
   const handleSearch = async (searchIsbn: string) => {
@@ -28,17 +29,36 @@ export function ScannerInterface() {
 
     setIsSearching(true)
     setError(null)
+    setSuccess(null)
 
     try {
-      const result = await lookupBook(searchIsbn)
+      const response = await fetch('/api/scan-isbn', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isbn: searchIsbn }),
+      })
 
-      if (result?.error) {
+      const result = await response.json()
+
+      if (result.error) {
         setError(result.error)
-      } else if (result?.success && result?.isbn) {
-        router.push(`/book/${result.isbn}`)
+      } else if (result.success) {
+        if (result.isNewBook) {
+          setSuccess("📚 New book submitted for review! We'll add it to our database soon.")
+          // Clear the form after successful submission
+          setTimeout(() => {
+            setIsbn("")
+            setSuccess(null)
+          }, 3000)
+        } else {
+          // Existing book found, navigate to book page
+          router.push(`/book/${result.book.isbn}`)
+        }
       }
     } catch (err) {
-      console.error("[v0] Search error:", err)
+      console.error("Search error:", err)
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsSearching(false)
@@ -101,6 +121,13 @@ export function ScannerInterface() {
           </Alert>
         )}
 
+        {success && (
+          <Alert className="mb-4 border-green-200 bg-green-50">
+            <AlertCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          </Alert>
+        )}
+
             <Tabs defaultValue="scan" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="scan" className="flex items-center gap-2">
@@ -142,24 +169,6 @@ export function ScannerInterface() {
           </TabsContent>
         </Tabs>
         
-        <div className="text-center space-y-2 mt-4 pt-4 border-t">
-          <div>
-            <a 
-              href="/scanner" 
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
-            >
-              🎯 Dedicated Scanner Page (Recommended)
-            </a>
-          </div>
-          <div>
-            <a 
-              href="/test-barcodes" 
-              className="text-sm text-gray-600 hover:text-gray-800 underline"
-            >
-              Need test barcodes? Click here for test page
-            </a>
-          </div>
-        </div>
       </CardContent>
     </Card>
   )

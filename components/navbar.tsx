@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
-import { BookOpen, Library, ScanLine, Menu, X } from "lucide-react"
+import { BookOpen, Library, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
   const navigation = [
@@ -13,14 +13,9 @@ import { cn } from "@/lib/utils"
       icon: BookOpen,
     },
     {
-      name: "My Collection",
+      name: "Book Database",
       href: "/collection",
       icon: Library,
-    },
-    {
-      name: "Scanner",
-      href: "/scanner",
-      icon: ScanLine,
     },
   ]
 

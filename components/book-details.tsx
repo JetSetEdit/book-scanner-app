@@ -64,7 +64,7 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Back Button */}
       <Button 
         variant="outline" 
@@ -79,6 +79,7 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
         spiceLevel={spiceLevel}
         ageRating={ageRating}
         affiliateLink={`https://www.amazon.com/s?k=${book.isbn}`}
+        isClickable={false}
       />
 
       <ContentWarningsList warnings={warnings} isAuthorApproved={true} />
