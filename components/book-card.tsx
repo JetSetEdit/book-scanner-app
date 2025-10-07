@@ -16,7 +16,6 @@ interface BookCardProps {
     published_date?: string
     page_count?: number
     categories?: string[]
-    storygraph_rating?: number
     classification_rating?: string
   }
   spiceLevel?: number
@@ -73,20 +72,6 @@ export function BookCard({ book, spiceLevel, ageRating, affiliateLink }: BookCar
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Age Rating:</span>
                 <Badge variant="secondary">{ageRating}</Badge>
-              </div>
-            )}
-            {book.storygraph_rating && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">StoryGraph Rating:</span>
-                <div className="flex items-center gap-1">
-                  <span className="text-sm font-semibold text-yellow-600">
-                    {book.storygraph_rating.toFixed(1)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">/5.0</span>
-                  <Badge variant="outline" className="text-xs">
-                    StoryGraph
-                  </Badge>
-                </div>
               </div>
             )}
             {classificationRating && (
