@@ -23,7 +23,6 @@ interface BookData {
   published_date?: string
   page_count?: number
   categories?: string[]
-  classification_rating?: string
 }
 
 export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {

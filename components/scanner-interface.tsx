@@ -46,12 +46,12 @@ export function ScannerInterface() {
         setError(result.error)
       } else if (result.success) {
         if (result.isNewBook) {
-          setSuccess("📚 New book submitted for review! We'll add it to our database soon.")
+          setSuccess("Sorry, this book isn't in our database yet. We've recorded your request and will consider adding it.")
           // Clear the form after successful submission
           setTimeout(() => {
             setIsbn("")
             setSuccess(null)
-          }, 3000)
+          }, 4000)
         } else {
           // Existing book found, navigate to book page
           router.push(`/book/${result.book.isbn}`)

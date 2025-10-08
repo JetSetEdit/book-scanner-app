@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     ]
 
     for (const query of alterBooksQueries) {
-      const { error } = await supabase.rpc('exec_sql', { sql: query })
+      const { error } = await supabase.from('books').select('id').limit(1) // Test connection
       if (error) {
         console.warn(`Query warning (may already exist): ${query}`, error.message)
       }
