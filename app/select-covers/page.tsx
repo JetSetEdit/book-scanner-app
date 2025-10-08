@@ -29,6 +29,7 @@ export default function SelectCoversPage() {
   const [selectedCovers, setSelectedCovers] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [fetching, setFetching] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   // Dev environment check
@@ -107,6 +108,34 @@ export default function SelectCoversPage() {
       setMessage({ type: 'error', text: 'Error updating covers' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const fetchAllCovers = async () => {
+    setFetching(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch('/api/fetch-all-covers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        setMessage({ type: 'success', text: 'Successfully fetched covers from all APIs! Check the results below.' })
+        // Refresh cover options to show new covers
+        await fetchCoverOptions()
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Failed to fetch covers from APIs' })
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error fetching covers from APIs' })
+    } finally {
+      setFetching(false)
     }
   }
 
@@ -283,7 +312,7 @@ export default function SelectCoversPage() {
         </div>
 
         <div className="mt-8 space-y-4">
-          <div className="flex justify-center gap-4">
+          <div className="flex justify-center gap-4 flex-wrap">
             <Button 
               onClick={saveSelectedCovers}
               disabled={saving}
@@ -311,10 +340,21 @@ export default function SelectCoversPage() {
             >
               Auto-Select Best Quality
             </Button>
+
+            <Button 
+              onClick={fetchAllCovers}
+              disabled={fetching}
+              variant="secondary"
+              size="lg"
+              className="px-8"
+            >
+              {fetching ? 'Fetching from APIs...' : 'Fetch All API Covers'}
+            </Button>
           </div>
           
           <div className="text-center text-sm text-muted-foreground">
             <p>💡 <strong>Dev Tip:</strong> Use "Auto-Select Best Quality" to quickly select the highest quality cover for each book</p>
+            <p>🔄 <strong>API Fetch:</strong> Use "Fetch All API Covers" to search Google Books, Open Library, and other APIs for more cover options</p>
             <p>📁 All cover files are stored in <code>public/book-covers/</code> and automatically detected</p>
           </div>
         </div>
