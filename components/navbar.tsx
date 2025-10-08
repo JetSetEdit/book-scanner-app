@@ -17,6 +17,11 @@ import { cn } from "@/lib/utils"
       href: "/collection",
       icon: Library,
     },
+    {
+      name: "Select Covers",
+      href: "/select-covers",
+      icon: BookOpen,
+    },
   ]
 
 export function Navbar() {
