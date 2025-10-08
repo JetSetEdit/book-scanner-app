@@ -134,6 +134,24 @@ async function fetchFromOpenLibrary(isbn, title, author) {
       }
     }
 
+    // Try direct ISBN-based cover first
+    const directCoverUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+    try {
+      const testResponse = await fetch(directCoverUrl, { method: 'HEAD' });
+      if (testResponse.ok) {
+        return {
+          cover_url: directCoverUrl,
+          title: title,
+          author: author,
+          source: 'Open Library',
+          variant: 'Open Library ISBN Direct',
+          confidence: 'high'
+        };
+      }
+    } catch (error) {
+      // Continue to search method
+    }
+
     // Fallback to title search
     const searchQueries = [
       `"${title}" "${author}"`,

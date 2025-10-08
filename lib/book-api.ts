@@ -53,7 +53,7 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
       isbn: cleanIsbn,
       title: bookData.title,
       author: bookData.authors?.[0]?.name,
-      cover_url: bookData.cover?.large || bookData.cover?.medium || bookData.cover?.small,
+      cover_url: `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`,
       description: bookData.excerpts?.[0]?.text,
       publisher: bookData.publishers?.[0]?.name,
       published_date: bookData.publish_date,
