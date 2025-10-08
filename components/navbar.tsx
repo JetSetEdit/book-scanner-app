@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils"
       icon: Library,
     },
     {
-      name: "Select Covers",
+      name: "Select Covers (DEV)",
       href: "/select-covers",
       icon: BookOpen,
     },

@@ -19,6 +19,8 @@ interface CoverOption {
   url: string
   size_kb: number
   source: string
+  variant: string
+  is_current: boolean
 }
 
 export default function SelectCoversPage() {
@@ -28,6 +30,9 @@ export default function SelectCoversPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+  // Dev environment check
+  const isDev = process.env.NODE_ENV === 'development' || window.location.hostname === 'localhost'
 
   useEffect(() => {
     fetchBooks()
@@ -117,6 +122,26 @@ export default function SelectCoversPage() {
     return 'bg-red-100 text-red-800'
   }
 
+  // Show warning if not in dev environment
+  if (!isDev) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-8">
+            <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-red-800 mb-4">Development Tool Only</h1>
+            <p className="text-red-700 mb-4">
+              This page is only available in development mode and should never be deployed to production.
+            </p>
+            <p className="text-sm text-red-600">
+              If you're seeing this in production, please contact the development team.
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -132,9 +157,21 @@ export default function SelectCoversPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Select Book Covers</h1>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <h2 className="font-semibold">🚧 DEVELOPMENT TOOL ONLY 🚧</h2>
+            </div>
+            <p className="text-red-700 mt-2 text-sm">
+              This page is for development use only and should never be deployed to production.
+              Use this to visually select book covers and test cover functionality.
+            </p>
+          </div>
+          
+          <h1 className="text-3xl font-bold mb-2">Select Book Covers (DEV)</h1>
           <p className="text-muted-foreground">
             Choose the best cover image for each book. Larger file sizes typically indicate better quality.
+            This tool automatically detects all available cover variants from different sources.
           </p>
         </div>
 
@@ -198,9 +235,14 @@ export default function SelectCoversPage() {
                           
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <Badge variant="outline" className="text-xs">
-                                {option.source}
-                              </Badge>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className="text-xs">
+                                  Source: {option.source}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  Variant: {option.variant}
+                                </Badge>
+                              </div>
                               <span className={`text-sm font-medium ${getFileSizeColor(option.size_kb)}`}>
                                 {option.size_kb}KB
                               </span>
@@ -210,12 +252,19 @@ export default function SelectCoversPage() {
                               {option.filename}
                             </div>
                             
-                            <Badge 
-                              className={`text-xs ${getFileSizeBadge(option.size_kb)}`}
-                            >
-                              {option.size_kb > 20 ? 'High Quality' : 
-                               option.size_kb > 10 ? 'Medium Quality' : 'Low Quality'}
-                            </Badge>
+                            <div className="flex gap-1">
+                              <Badge 
+                                className={`text-xs ${getFileSizeBadge(option.size_kb)}`}
+                              >
+                                {option.size_kb > 20 ? 'High Quality' : 
+                                 option.size_kb > 10 ? 'Medium Quality' : 'Low Quality'}
+                              </Badge>
+                              {option.is_current && (
+                                <Badge className="text-xs bg-blue-100 text-blue-800">
+                                  Current
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )
@@ -233,15 +282,41 @@ export default function SelectCoversPage() {
           })}
         </div>
 
-        <div className="mt-8 flex justify-center">
-          <Button 
-            onClick={saveSelectedCovers}
-            disabled={saving}
-            size="lg"
-            className="px-8"
-          >
-            {saving ? 'Saving...' : 'Save Selected Covers'}
-          </Button>
+        <div className="mt-8 space-y-4">
+          <div className="flex justify-center gap-4">
+            <Button 
+              onClick={saveSelectedCovers}
+              disabled={saving}
+              size="lg"
+              className="px-8"
+            >
+              {saving ? 'Saving...' : 'Save Selected Covers'}
+            </Button>
+            
+            <Button 
+              onClick={() => {
+                // Auto-select highest quality covers
+                const autoSelections: Record<string, string> = {}
+                Object.keys(coverOptions).forEach(isbn => {
+                  const options = coverOptions[isbn]
+                  if (options.length > 0) {
+                    // Select the first option (highest quality due to sorting)
+                    autoSelections[isbn] = options[0].filename
+                  }
+                })
+                setSelectedCovers(autoSelections)
+              }}
+              variant="outline"
+              size="lg"
+            >
+              Auto-Select Best Quality
+            </Button>
+          </div>
+          
+          <div className="text-center text-sm text-muted-foreground">
+            <p>💡 <strong>Dev Tip:</strong> Use "Auto-Select Best Quality" to quickly select the highest quality cover for each book</p>
+            <p>📁 All cover files are stored in <code>public/book-covers/</code> and automatically detected</p>
+          </div>
         </div>
       </div>
     </div>
