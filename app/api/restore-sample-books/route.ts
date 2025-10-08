@@ -74,7 +74,7 @@ const sampleBooks = [
     ageRating: "18+"
   },
   {
-    isbn: "9781668001234",
+    isbn: "9781668001234", // Holiday Ever After - need real ISBN
     title: "Holiday Ever After",
     author: "Hannah Grace",
     cover_url: null,
@@ -109,7 +109,7 @@ const sampleBooks = [
     ageRating: "PG-13"
   },
   {
-    isbn: "9781668001235",
+    isbn: "9781668026250", // Daydream - real ISBN
     title: "Daydream",
     author: "Hannah Grace",
     cover_url: null,
@@ -184,7 +184,7 @@ const sampleBooks = [
     ageRating: "R"
   },
   {
-    isbn: "9781668001236",
+    isbn: "9781398525726", // Wildfire - real ISBN
     title: "Wildfire",
     author: "Hannah Grace",
     cover_url: null,
@@ -229,7 +229,7 @@ const sampleBooks = [
     ageRating: "R"
   },
   {
-    isbn: "9781668001237",
+    isbn: "9781668026038", // Icebreaker - real ISBN
     title: "Icebreaker",
     author: "Hannah Grace",
     cover_url: null,
