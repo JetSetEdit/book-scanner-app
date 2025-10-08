@@ -3,9 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import fs from 'fs'
 import path from 'path'
 
-// Read the correct cover results
+// Read the correct cover results (if file exists)
 const resultsPath = path.join(process.cwd(), 'correct-covers-results.json')
-const coverResults = JSON.parse(fs.readFileSync(resultsPath, 'utf8'))
+let coverResults = []
+if (fs.existsSync(resultsPath)) {
+  coverResults = JSON.parse(fs.readFileSync(resultsPath, 'utf8'))
+}
 
 export async function POST(request: NextRequest) {
   try {
