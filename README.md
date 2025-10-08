@@ -12,6 +12,22 @@ A comprehensive book scanning application that helps users discover content warn
 
 ## Architecture
 
+### API Strategy
+
+The app uses a **TOS-friendly API hierarchy** for book metadata fetching:
+
+1. **Primary Source: Open Library API** 
+   - Free, open-source, no API keys required
+   - Reliable and cacheable results
+   - URL: `https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data`
+
+2. **Fallback Source: Google Books API**
+   - High-quality metadata and covers
+   - Requires API key (optional)
+   - URL: `https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}`
+
+This ensures reliable book data fetching while maintaining compliance with terms of service.
+
 ### Database Schema
 
 #### Books Table

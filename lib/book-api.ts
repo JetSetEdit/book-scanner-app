@@ -26,34 +26,60 @@ interface BookData {
 }
 
 export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
-  try {
-    // Clean ISBN (remove hyphens and spaces)
-    const cleanIsbn = isbn.replace(/[-\s]/g, "")
+  // Clean ISBN (remove hyphens and spaces)
+  const cleanIsbn = isbn.replace(/[-\s]/g, "")
 
-    // Try Open Library API
+  console.log(`[Book API] Fetching book data for ISBN: ${cleanIsbn}`)
+
+  // 1. Try Open Library API first (primary source)
+  const openLibResult = await fetchFromOpenLibrary(cleanIsbn)
+  if (openLibResult) {
+    console.log(`[Book API] ✅ Found book via Open Library: ${openLibResult.title}`)
+    return openLibResult
+  }
+
+  // 2. Fallback to Google Books API
+  console.log(`[Book API] Open Library failed, trying Google Books...`)
+  const googleResult = await fetchFromGoogleBooks(cleanIsbn)
+  if (googleResult) {
+    console.log(`[Book API] ✅ Found book via Google Books: ${googleResult.title}`)
+    return googleResult
+  }
+
+  // 3. Both APIs failed
+  console.log(`[Book API] ❌ Book not found in any API for ISBN: ${cleanIsbn}`)
+  return null
+}
+
+async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
+  try {
     const response = await fetch(
-      `https://openlibrary.org/api/books?bibkeys=ISBN:${cleanIsbn}&format=json&jscmd=data`,
-      { next: { revalidate: 86400 } }, // Cache for 24 hours
+      `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,
+      { 
+        next: { revalidate: 86400 }, // Cache for 24 hours
+        headers: {
+          'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
+        }
+      }
     )
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`)
+      throw new Error(`Open Library API request failed: ${response.status}`)
     }
 
     const data = await response.json()
-    const bookKey = `ISBN:${cleanIsbn}`
+    const bookKey = `ISBN:${isbn}`
     const bookData: OpenLibraryBook = data[bookKey]
 
-    if (!bookData) {
-      // Try Google Books API as fallback
-      return await fetchFromGoogleBooks(cleanIsbn)
+    if (!bookData || !bookData.title) {
+      return null
     }
 
     return {
-      isbn: cleanIsbn,
+      isbn,
       title: bookData.title,
       author: bookData.authors?.[0]?.name,
-      cover_url: `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`,
+      cover_url: `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
       description: bookData.excerpts?.[0]?.text,
       publisher: bookData.publishers?.[0]?.name,
       published_date: bookData.publish_date,
@@ -61,7 +87,7 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
       categories: bookData.subjects?.slice(0, 5).map((s) => s.name),
     }
   } catch (error) {
-    console.error("[v0] Error fetching book from Open Library:", error)
+    console.error("[Book API] Open Library error:", error)
     return null
   }
 }
@@ -70,6 +96,9 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
   try {
     const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`, {
       next: { revalidate: 86400 },
+      headers: {
+        'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
+      }
     })
 
     if (!response.ok) {
@@ -83,6 +112,10 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
     }
 
     const book = data.items[0].volumeInfo
+
+    if (!book.title) {
+      return null
+    }
 
     return {
       isbn,
@@ -100,7 +133,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       categories: book.categories?.slice(0, 5),
     }
   } catch (error) {
-    console.error("[v0] Error fetching book from Google Books:", error)
+    console.error("[Book API] Google Books error:", error)
     return null
   }
 }
