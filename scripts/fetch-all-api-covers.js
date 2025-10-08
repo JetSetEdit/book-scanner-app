@@ -85,8 +85,12 @@ async function fetchFromGoogleBooks(isbn, title, author) {
       if (data.items && data.items.length > 0) {
         for (const item of data.items) {
           const book = item.volumeInfo;
-          if (book.imageLinks?.thumbnail) {
-            const coverUrl = book.imageLinks.thumbnail.replace("http:", "https:").replace("&edge=curl", "");
+          if (book.imageLinks?.large || book.imageLinks?.medium || book.imageLinks?.small || book.imageLinks?.thumbnail) {
+            const coverUrl = (book.imageLinks.large || book.imageLinks.medium || book.imageLinks.small || book.imageLinks.thumbnail || book.imageLinks.smallThumbnail)
+              .replace("http:", "https:")
+              .replace("&edge=curl", "")
+              .replace("zoom=1", "zoom=2")
+              .replace("zoom=5", "zoom=2");
             return {
               cover_url: coverUrl,
               title: book.title,

@@ -88,7 +88,11 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       isbn,
       title: book.title,
       author: book.authors?.[0],
-      cover_url: book.imageLinks?.thumbnail?.replace("http:", "https:"),
+      cover_url: book.imageLinks?.large?.replace("http:", "https:") || 
+                 book.imageLinks?.medium?.replace("http:", "https:") || 
+                 book.imageLinks?.small?.replace("http:", "https:") || 
+                 book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") || 
+                 book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
       description: book.description,
       publisher: book.publisher,
       published_date: book.publishedDate,
