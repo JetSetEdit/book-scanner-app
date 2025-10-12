@@ -83,13 +83,22 @@ export async function POST(request: NextRequest) {
 
     // Insert the generated warnings into the database
     // Note: Only include columns that exist in the current schema
-    const warningsToInsert = result.content_warnings.map(warning => ({
-      book_id: bookId,
-      category: warning.category,
-      description: warning.description,
-      severity: warning.severity,
-      user_id: null // AI-generated warnings don't have a user_id
-    }))
+    const warningsToInsert = result.content_warnings.map(warning => {
+      const baseWarning = {
+        book_id: bookId,
+        category: warning.category,
+        description: warning.description,
+        severity: warning.severity,
+        user_id: null // AI-generated warnings don't have a user_id
+      }
+      
+      // Only add reasoning if it exists (graceful handling of missing column)
+      if (warning.reasoning) {
+        return { ...baseWarning, reasoning: warning.reasoning }
+      }
+      
+      return baseWarning
+    })
 
     const { data: insertedWarnings, error: insertError } = await supabaseAdmin
       .from('content_warnings')

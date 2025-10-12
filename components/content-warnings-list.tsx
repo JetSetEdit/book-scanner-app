@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { AlertTriangle, Shield, CheckCircle, Eye, EyeOff, HelpCircle, ChevronDown, ChevronRight } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { AlertTriangle, Shield, CheckCircle, Eye, EyeOff, HelpCircle, ChevronDown, ChevronRight, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
 import { AIWarningBadge } from "@/components/ai-warning-badge"
@@ -20,6 +21,7 @@ interface ContentWarning {
   user_validation?: boolean | null
   is_author_approved?: boolean
   source?: string
+  reasoning?: string
 }
 
 interface ContentWarningsListProps {
@@ -234,14 +236,28 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
                 {aiWarnings.map((warning) => (
                   <div key={warning.id} className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className={cn(
-                        "text-xs",
-                        warning.severity === "severe" && "border-red-500 text-red-700",
-                        warning.severity === "moderate" && "border-orange-500 text-orange-700",
-                        warning.severity === "mild" && "border-yellow-500 text-yellow-700"
-                      )}>
-                        {categoryLabels[warning.category] || warning.category}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className={cn(
+                          "text-xs",
+                          warning.severity === "severe" && "border-red-500 text-red-700",
+                          warning.severity === "moderate" && "border-orange-500 text-orange-700",
+                          warning.severity === "mild" && "border-yellow-500 text-yellow-700"
+                        )}>
+                          {categoryLabels[warning.category] || warning.category}
+                        </Badge>
+                        {warning.reasoning && (
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Info className="h-3 w-3 text-muted-foreground hover:text-foreground cursor-help" />
+                            </PopoverTrigger>
+                            <PopoverContent className="max-w-xs">
+                              <p className="text-xs">
+                                <strong>AI Reasoning:</strong> {warning.reasoning}
+                              </p>
+                            </PopoverContent>
+                          </Popover>
+                        )}
+                      </div>
                       <Badge variant="secondary" className="text-xs">
                         {warning.severity}
                       </Badge>

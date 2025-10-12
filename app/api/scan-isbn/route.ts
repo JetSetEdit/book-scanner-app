@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
               category: warning.category,
               description: warning.description,
               severity: warning.severity,
-              user_id: null // AI-generated warnings don't have a user_id
+              user_id: null, // AI-generated warnings don't have a user_id
+              reasoning: warning.reasoning // AI reasoning for the warning
             }))
             
             const { error: insertError } = await supabaseAdmin
@@ -156,7 +157,8 @@ export async function POST(request: NextRequest) {
                 category: warning.category,
                 description: warning.description,
                 severity: warning.severity,
-                user_id: null // AI-generated warnings don't have a user_id
+                user_id: null, // AI-generated warnings don't have a user_id
+                reasoning: warning.reasoning // AI reasoning for the warning
                 // Note: is_author_approved and source columns will be added via migration
               }))
 
@@ -245,7 +247,8 @@ export async function POST(request: NextRequest) {
               category: warning.category,
               description: warning.description,
               severity: warning.severity,
-              user_id: null
+              user_id: null,
+              reasoning: warning.reasoning // AI reasoning for the warning
             }))
 
             const { error: insertError } = await supabaseAdmin

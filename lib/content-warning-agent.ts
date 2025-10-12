@@ -87,7 +87,8 @@ For ISBN-only requests, return:
     {
       "category": "violence",
       "description": "Brief description of the violent content",
-      "severity": "moderate"
+      "severity": "moderate",
+      "reasoning": "Why this warning was generated (e.g., 'Book description mentions battles and combat')"
     }
   ],
   "confidence": "high/medium/low",
@@ -123,10 +124,12 @@ For regular content warning requests, return just the content_warnings array.
 
 **Important**: If the book description mentions themes like "murder", "dark", "gritty", "secrets", "trauma", or similar, you should generate appropriate warnings. It's better to be cautious and helpful to readers.
 
-## Examples of Good Content Warnings:
-- "Contains scenes of violence including fighting and weapons" (violence, moderate)
-- "Deals with themes of depression and mental health struggles" (mental_health, moderate)  
-- "Includes character death and grief" (death, mild)
+## Examples of Good Content Warnings with Reasoning:
+- "Contains scenes of violence including fighting and weapons" (violence, moderate) - Reasoning: "Book description mentions 'epic battles' and 'sword fighting'"
+- "Deals with themes of depression and mental health struggles" (mental_health, moderate) - Reasoning: "Plot summary indicates character deals with 'inner demons' and 'psychological trauma'"
+- "Includes character death and grief" (death, mild) - Reasoning: "Genre is fantasy adventure which typically involves character deaths in battle"
+
+**Important**: For each content warning, provide a clear "reasoning" field that explains WHY you generated that specific warning. This helps users understand the AI's decision-making process.
 - "Contains sexual content and mature themes" (sexual_content, moderate)
 - "Addresses substance abuse and addiction" (substance_abuse, moderate)
 
@@ -150,6 +153,7 @@ type ContentWarning = {
   category: 'violence' | 'sexual_content' | 'substance_abuse' | 'mental_health' | 'death' | 'abuse' | 'discrimination' | 'other';
   description: string;
   severity: 'mild' | 'moderate' | 'severe';
+  reasoning?: string;
 };
 
 type WorkflowOutput = {
