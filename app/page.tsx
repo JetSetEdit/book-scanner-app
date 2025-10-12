@@ -1,4 +1,3 @@
-import { ScannerInterface } from "@/components/scanner-interface"
 import { BookOpen, Shield, Users } from "lucide-react"
 
 export default function HomePage() {
@@ -15,7 +14,15 @@ export default function HomePage() {
             </p>
           </div>
 
-          <ScannerInterface />
+          <div className="text-center p-8 bg-muted rounded-lg">
+            <p className="text-muted-foreground">Scanner interface temporarily disabled</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              You can still test the system by visiting: <br />
+              <a href="/book/9780375826696" className="text-primary hover:underline">
+                /book/9780375826696
+              </a>
+            </p>
+          </div>
 
           {/* Features */}
           <div className="grid md:grid-cols-3 gap-6 mt-12">
