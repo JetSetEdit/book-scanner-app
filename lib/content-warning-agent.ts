@@ -95,7 +95,19 @@ For ISBN-only requests, return:
   "reasoning": "How you found the information"
 }
 
-For regular content warning requests, return just the content_warnings array.
+For regular content warning requests, return a JSON object with this structure:
+{
+  "content_warnings": [
+    {
+      "category": "violence",
+      "description": "Brief description of the violent content",
+      "severity": "moderate",
+      "reasoning": "Why this warning was generated (e.g., 'Book description mentions battles and combat')"
+    }
+  ],
+  "confidence": "high/medium/low",
+  "reasoning": "Overall reasoning for the analysis"
+}
 
 ## Categories:
 - violence: Physical violence, fighting, weapons, war
@@ -300,21 +312,34 @@ Please analyze this book and generate appropriate content warnings. Consider the
     let reasoning = "AI-generated content warnings based on book metadata";
 
     try {
-      // Look for JSON in the response
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        contentWarnings = JSON.parse(jsonMatch[0]);
-        
-        // Validate the warnings
-        contentWarnings = contentWarnings.filter(warning => 
-          warning.category && 
-          warning.description && 
-          warning.severity &&
-          ['violence', 'sexual_content', 'substance_abuse', 'mental_health', 'death', 'abuse', 'discrimination', 'other'].includes(warning.category) &&
-          ['mild', 'moderate', 'severe'].includes(warning.severity)
-        );
+      // Look for JSON in the response - try full object first, then array
+      const objectMatch = responseText.match(/\{[\s\S]*\}/);
+      const arrayMatch = responseText.match(/\[[\s\S]*\]/);
+      
+      if (objectMatch) {
+        // Try to parse as full object with reasoning
+        const result = JSON.parse(objectMatch[0]);
+        if (result.content_warnings && Array.isArray(result.content_warnings)) {
+          contentWarnings = result.content_warnings;
+          confidence = result.confidence || confidence;
+          reasoning = result.reasoning || reasoning;
+        }
+      } else if (arrayMatch) {
+        // Fallback to simple array format
+        contentWarnings = JSON.parse(arrayMatch[0]);
+      }
+      
+      // Validate the warnings
+      contentWarnings = contentWarnings.filter(warning => 
+        warning.category && 
+        warning.description && 
+        warning.severity &&
+        ['violence', 'sexual_content', 'substance_abuse', 'mental_health', 'death', 'abuse', 'discrimination', 'other'].includes(warning.category) &&
+        ['mild', 'moderate', 'severe'].includes(warning.severity)
+      );
 
-        // Determine confidence based on available information
+      // Determine confidence based on available information if not set by AI
+      if (confidence === 'medium') {
         if (workflow.book_description && workflow.book_categories) {
           confidence = 'high';
         } else if (workflow.book_description || workflow.book_categories) {
