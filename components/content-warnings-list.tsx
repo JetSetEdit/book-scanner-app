@@ -131,12 +131,22 @@ export function ContentWarningsList({ warnings, isAuthorApproved = false }: Cont
           </Button>
         </div>
         <CardDescription>
-          {isAuthorApproved 
-            ? "Author-approved content warnings from the publisher" 
-            : warnings.some(w => w.source === 'ai_generated' || w.user_id === null)
-              ? "AI-generated and community-submitted content warnings for this book"
-              : "Community-submitted content warnings for this book"
-          }
+          {(() => {
+            const aiWarnings = warnings.filter(w => w.source === 'ai_generated' || w.user_id === null)
+            const communityWarnings = warnings.filter(w => w.source === 'user_submitted' || (w.user_id !== null && w.source !== 'ai_generated'))
+            
+            if (isAuthorApproved) {
+              return "Author-approved content warnings from the publisher"
+            } else if (aiWarnings.length > 0 && communityWarnings.length > 0) {
+              return `${aiWarnings.length} AI-generated and ${communityWarnings.length} community-submitted content warnings`
+            } else if (aiWarnings.length > 0) {
+              return "AI-generated content warnings for this book"
+            } else if (communityWarnings.length > 0) {
+              return "Community-submitted content warnings for this book"
+            } else {
+              return "Content warnings for this book"
+            }
+          })()}
         </CardDescription>
         
         {/* Summary when collapsed */}
