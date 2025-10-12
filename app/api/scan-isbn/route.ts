@@ -43,9 +43,53 @@ export async function POST(request: NextRequest) {
     let bookId: string
 
     if (existingBook) {
-      // Book exists, just record the scan
+      // Book exists, check if it has content warnings
       console.log('Using existing book ID:', existingBook.id)
       bookId = existingBook.id
+      
+      // Check if this book has any content warnings
+      const { data: existingWarnings, error: warningsError } = await supabaseAdmin
+        .from('content_warnings')
+        .select('id')
+        .eq('book_id', bookId)
+        .limit(1)
+      
+      if (warningsError) {
+        console.error('Error checking existing warnings:', warningsError)
+      } else if (!existingWarnings || existingWarnings.length === 0) {
+        // No content warnings exist, generate them with AI
+        console.log('No content warnings found for existing book, generating with AI...')
+        try {
+          const { findBookAndGenerateWarnings } = await import('@/lib/content-warning-agent')
+          
+          const result = await findBookAndGenerateWarnings(cleanIsbn)
+          
+          if (result.content_warnings && result.content_warnings.length > 0) {
+            const warningsToInsert = result.content_warnings.map(warning => ({
+              book_id: bookId,
+              category: warning.category,
+              description: warning.description,
+              severity: warning.severity,
+              user_id: null // AI-generated warnings don't have a user_id
+            }))
+            
+            const { error: insertError } = await supabaseAdmin
+              .from('content_warnings')
+              .insert(warningsToInsert)
+            
+            if (!insertError) {
+              contentWarningsGenerated = true
+              console.log(`Generated ${result.content_warnings.length} content warnings for existing book`)
+            } else {
+              console.error('Failed to insert AI-generated warnings for existing book:', insertError)
+            }
+          }
+        } catch (warningError) {
+          console.error('Error generating warnings for existing book:', warningError)
+        }
+      } else {
+        console.log('Book already has content warnings, skipping AI generation')
+      }
     } else {
       // Book doesn't exist, fetch from external API
       console.log('Fetching book metadata for ISBN:', cleanIsbn)
@@ -112,9 +156,8 @@ export async function POST(request: NextRequest) {
                 category: warning.category,
                 description: warning.description,
                 severity: warning.severity,
-                is_author_approved: false, // AI-generated warnings are not author-approved
-                source: 'ai_generated', // Mark as AI-generated
-                user_id: null
+                user_id: null // AI-generated warnings don't have a user_id
+                // Note: is_author_approved and source columns will be added via migration
               }))
 
               const { error: insertError } = await supabaseAdmin
