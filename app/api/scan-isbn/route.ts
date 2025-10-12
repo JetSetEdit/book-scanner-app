@@ -112,6 +112,8 @@ export async function POST(request: NextRequest) {
                 category: warning.category,
                 description: warning.description,
                 severity: warning.severity,
+                is_author_approved: false, // AI-generated warnings are not author-approved
+                source: 'ai_generated', // Mark as AI-generated
                 user_id: null
               }))
 
@@ -221,6 +223,43 @@ export async function POST(request: NextRequest) {
       // Don't fail the scan if warning generation fails
     }
 
+    // Check if author context exists, and investigate if missing
+    let authorContextInvestigated = false
+    try {
+      if (bookData?.author && bookData.author !== 'Unknown Author') {
+        console.log('🔍 Checking for existing author context for:', bookData.author)
+        
+        // Check if author context already exists
+        const { data: existingAuthorContext } = await supabaseAdmin
+          .from('author_context')
+          .select('id')
+          .eq('author_name', bookData.author)
+          .eq('status', 'approved')
+
+        console.log('📊 Existing author context count:', existingAuthorContext?.length || 0)
+        
+        if (!existingAuthorContext || existingAuthorContext.length === 0) {
+          console.log('🤖 No author context found, investigating with AI agent...')
+          
+          // Investigate author context using AI agent
+          const { investigateAuthorContext } = await import('@/lib/author-warning-agent')
+          const investigation = await investigateAuthorContext(bookData.author)
+
+          if (investigation.findings.length > 0) {
+            console.log(`Found ${investigation.findings.length} author context items for ${bookData.author}`)
+            authorContextInvestigated = true
+            // Note: We don't insert here since the database tables may not be set up yet
+            // The frontend will handle the investigation when the user views the book
+          } else {
+            console.log(`No author context found for ${bookData.author}`)
+          }
+        }
+      }
+    } catch (contextError) {
+      console.error('Error investigating author context:', contextError)
+      // Don't fail the scan if author context investigation fails
+    }
+
     // Record the scan (temporarily disabled - scans table doesn't exist)
     console.log('Skipping scan recording - scans table not available')
     const scan = { id: 'temp-scan-id', isbn: cleanIsbn, book_id: bookId }
@@ -230,7 +269,8 @@ export async function POST(request: NextRequest) {
       book: existingBook || { id: bookId, isbn: cleanIsbn, review_status: 'pending' },
       scan: scan,
       isNewBook: !existingBook,
-      contentWarningsGenerated
+      contentWarningsGenerated,
+      authorContextInvestigated
     })
 
   } catch (error) {

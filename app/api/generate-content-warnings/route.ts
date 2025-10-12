@@ -87,6 +87,8 @@ export async function POST(request: NextRequest) {
       category: warning.category,
       description: warning.description,
       severity: warning.severity,
+      is_author_approved: false, // AI-generated warnings are not author-approved
+      source: 'ai_generated', // Mark as AI-generated
       user_id: null // AI-generated warnings don't have a user_id
     }))
 

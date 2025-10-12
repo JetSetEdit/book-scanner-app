@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { AlertTriangle, Shield, CheckCircle, Eye, EyeOff, HelpCircle, ChevronDown, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
+import { AIWarningBadge } from "@/components/ai-warning-badge"
 
 interface ContentWarning {
   id: string
@@ -17,6 +18,8 @@ interface ContentWarning {
   helpful_count: number
   not_helpful_count: number
   user_validation?: boolean | null
+  is_author_approved?: boolean
+  source?: string
 }
 
 interface ContentWarningsListProps {
@@ -103,6 +106,10 @@ export function ContentWarningsList({ warnings, isAuthorApproved = false }: Cont
                 Author-Approved
               </Badge>
             )}
+            <AIWarningBadge 
+              count={warnings.filter(w => w.source === 'ai_generated').length} 
+              confidence="high" 
+            />
           </div>
           <Button
             variant="ghost"
@@ -126,7 +133,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved = false }: Cont
         <CardDescription>
           {isAuthorApproved 
             ? "Author-approved content warnings from the publisher" 
-            : "Community-submitted content warnings for this book"
+            : warnings.some(w => w.source === 'ai_generated')
+              ? "AI-generated and community-submitted content warnings for this book"
+              : "Community-submitted content warnings for this book"
           }
         </CardDescription>
         

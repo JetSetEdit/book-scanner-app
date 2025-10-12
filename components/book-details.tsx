@@ -5,11 +5,13 @@ import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AustralianClassification } from "@/components/australian-classification"
 import { AddWarningDialog } from "@/components/add-warning-dialog"
 import { AddSpiceRatingDialog } from "@/components/add-spice-rating-dialog"
+import { AuthorContextDisplay } from "@/components/author-context-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, ArrowLeft } from "lucide-react"
 import { addContentWarning, addSpiceRating } from "@/app/actions/warning-actions"
 import { useRouter } from "next/navigation"
+import { useAuthorContext } from "@/hooks/use-author-context"
 
 interface BookDetailsProps {
   book: {
@@ -51,6 +53,9 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
   // Extract classification rating from categories if not directly available
   const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
   
+  // Get author context information
+  const { contextItems, loading: contextLoading, investigateAuthor } = useAuthorContext(book.author || null)
+  
   const handleAddWarning = async (data: { category: string; description: string; severity: string }) => {
     return await addContentWarning(book.id, data)
   }
@@ -82,7 +87,20 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
         isClickable={false}
       />
 
-      <ContentWarningsList warnings={warnings} isAuthorApproved={true} />
+      <ContentWarningsList 
+        warnings={warnings} 
+        isAuthorApproved={warnings.some(w => w.is_author_approved === true)} 
+      />
+
+      {/* Author Context & Accountability Section */}
+      {book.author && (
+        <AuthorContextDisplay 
+          contextItems={contextItems} 
+          authorName={book.author}
+          loading={contextLoading}
+          onInvestigate={investigateAuthor}
+        />
+      )}
 
       {/* Australian Classification Section */}
       {classificationRating && (
