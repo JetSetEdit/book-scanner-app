@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { BookOpen, Library, Shield, AlertTriangle, Info } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { AustralianClassification } from "@/components/australian-classification"
 
 // Helper function to extract classification rating from categories
 function getClassificationFromCategories(categories?: string[]): string | null {
@@ -194,10 +193,9 @@ export default async function CollectionPage() {
                             return classificationRating && (
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium">Classification:</span>
-                                <AustralianClassification 
-                                  rating={classificationRating as any} 
-                                  size="sm" 
-                                />
+                                <span className="text-xs bg-muted px-2 py-1 rounded">
+                                  {classificationRating}
+                                </span>
                               </div>
                             )
                           })()}
