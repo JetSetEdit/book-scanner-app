@@ -107,7 +107,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved = false }: Cont
               </Badge>
             )}
             <AIWarningBadge 
-              count={warnings.filter(w => w.source === 'ai_generated').length} 
+              count={warnings.filter(w => w.source === 'ai_generated' || w.user_id === null).length} 
               confidence="high" 
             />
           </div>
@@ -133,7 +133,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved = false }: Cont
         <CardDescription>
           {isAuthorApproved 
             ? "Author-approved content warnings from the publisher" 
-            : warnings.some(w => w.source === 'ai_generated')
+            : warnings.some(w => w.source === 'ai_generated' || w.user_id === null)
               ? "AI-generated and community-submitted content warnings for this book"
               : "Community-submitted content warnings for this book"
           }
