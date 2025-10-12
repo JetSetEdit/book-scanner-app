@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button"
 import { ThumbsUp, ThumbsDown } from "lucide-react"
-import { validateWarning } from "@/app/actions/warning-actions"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 
@@ -42,7 +41,11 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
       )
       
       const result = await Promise.race([
-        validateWarning(warningId, isHelpful),
+        fetch('/api/validate-warning', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ warningId, isHelpful })
+        }).then(res => res.json()),
         timeoutPromise
       ])
       

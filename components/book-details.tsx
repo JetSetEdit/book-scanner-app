@@ -1,15 +1,10 @@
 "use client"
 
 import { ContentWarningsList } from "@/components/content-warnings-list"
-import { AustralianClassification } from "@/components/australian-classification"
-import { AddWarningDialog } from "@/components/add-warning-dialog"
-import { AuthorContextDisplay } from "@/components/author-context-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, ArrowLeft } from "lucide-react"
-import { addContentWarning } from "@/app/actions/warning-actions"
 import { useRouter } from "next/navigation"
-import { useAuthorContext } from "@/hooks/use-author-context"
 
 interface BookDetailsProps {
   book: {
@@ -49,12 +44,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
   // Extract classification rating from categories if not directly available
   const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
   
-  // Get author context information
-  const { contextItems, loading: contextLoading, investigateAuthor } = useAuthorContext(book.author || null)
   
-  const handleAddWarning = async (data: { category: string; description: string; severity: string }) => {
-    return await addContentWarning(book.id, data)
-  }
 
 
   const handleBack = () => {
@@ -78,39 +68,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
         isAuthorApproved={warnings.some(w => w.is_author_approved === true)} 
       />
 
-      {/* Author Context & Accountability Section */}
-      {book.author && (
-        <AuthorContextDisplay 
-          contextItems={contextItems} 
-          authorName={book.author}
-          loading={contextLoading}
-          onInvestigate={investigateAuthor}
-        />
-      )}
 
-      {/* Australian Classification Section */}
-      {classificationRating && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AustralianClassification rating={classificationRating as any} size="md" />
-              <span>Australian Classification</span>
-            </CardTitle>
-            <CardDescription>
-              Official classification rating from the Australian Classification Board
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <AustralianClassification 
-                rating={classificationRating as any} 
-                size="lg" 
-                showLabel={true}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
 
       {/* Temporarily hidden - user contribution section */}
@@ -123,7 +81,6 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
           <CardDescription>Help the community by adding content warnings or ratings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <AddWarningDialog bookId={book.id} onSubmit={handleAddWarning} />
         </CardContent>
       </Card> */}
     </div>

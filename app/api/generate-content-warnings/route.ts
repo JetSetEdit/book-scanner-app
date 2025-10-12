@@ -82,13 +82,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert the generated warnings into the database
+    // Note: Only include columns that exist in the current schema
     const warningsToInsert = result.content_warnings.map(warning => ({
       book_id: bookId,
       category: warning.category,
       description: warning.description,
       severity: warning.severity,
-      is_author_approved: false, // AI-generated warnings are not author-approved
-      source: 'ai_generated', // Mark as AI-generated
       user_id: null // AI-generated warnings don't have a user_id
     }))
 

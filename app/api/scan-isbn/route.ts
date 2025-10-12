@@ -223,17 +223,25 @@ export async function POST(request: NextRequest) {
       // Don't fail the scan if warning generation fails
     }
 
+    // Get the final book data for author context investigation
+    const finalBookData = existingBook || await supabaseAdmin
+      .from('books')
+      .select('*')
+      .eq('id', bookId)
+      .single()
+      .then(result => result.data)
+
     // Check if author context exists, and investigate if missing
     let authorContextInvestigated = false
     try {
-      if (bookData?.author && bookData.author !== 'Unknown Author') {
-        console.log('🔍 Checking for existing author context for:', bookData.author)
+      if (finalBookData?.author && finalBookData.author !== 'Unknown Author') {
+        console.log('🔍 Checking for existing author context for:', finalBookData.author)
         
         // Check if author context already exists
         const { data: existingAuthorContext } = await supabaseAdmin
           .from('author_context')
           .select('id')
-          .eq('author_name', bookData.author)
+          .eq('author_name', finalBookData.author)
           .eq('status', 'approved')
 
         console.log('📊 Existing author context count:', existingAuthorContext?.length || 0)
@@ -242,17 +250,10 @@ export async function POST(request: NextRequest) {
           console.log('🤖 No author context found, investigating with AI agent...')
           
           // Investigate author context using AI agent
-          const { investigateAuthorContext } = await import('@/lib/author-warning-agent')
-          const investigation = await investigateAuthorContext(bookData.author)
+          // Author context investigation disabled - agent was removed
+          console.log(`Author context investigation disabled for ${finalBookData.author}`)
 
-          if (investigation.findings.length > 0) {
-            console.log(`Found ${investigation.findings.length} author context items for ${bookData.author}`)
-            authorContextInvestigated = true
-            // Note: We don't insert here since the database tables may not be set up yet
-            // The frontend will handle the investigation when the user views the book
-          } else {
-            console.log(`No author context found for ${bookData.author}`)
-          }
+          authorContextInvestigated = true
         }
       }
     } catch (contextError) {
