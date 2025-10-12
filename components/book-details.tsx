@@ -1,15 +1,13 @@
 "use client"
 
-import { BookCard } from "@/components/book-card"
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AustralianClassification } from "@/components/australian-classification"
 import { AddWarningDialog } from "@/components/add-warning-dialog"
-import { AddSpiceRatingDialog } from "@/components/add-spice-rating-dialog"
 import { AuthorContextDisplay } from "@/components/author-context-display"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, ArrowLeft } from "lucide-react"
-import { addContentWarning, addSpiceRating } from "@/app/actions/warning-actions"
+import { addContentWarning } from "@/app/actions/warning-actions"
 import { useRouter } from "next/navigation"
 import { useAuthorContext } from "@/hooks/use-author-context"
 
@@ -27,8 +25,6 @@ interface BookDetailsProps {
     categories?: string[]
     classification_rating?: string
   }
-  spiceLevel?: number
-  ageRating?: string
   warnings: Array<{
     id: string
     category: string
@@ -47,7 +43,7 @@ function getClassificationFromCategories(categories?: string[]): string | null {
   return classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
 }
 
-export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetailsProps) {
+export function BookDetails({ book, warnings }: BookDetailsProps) {
   const router = useRouter()
   
   // Extract classification rating from categories if not directly available
@@ -60,9 +56,6 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
     return await addContentWarning(book.id, data)
   }
 
-  const handleAddRating = async (data: { spiceLevel: number; ageRating: string }) => {
-    return await addSpiceRating(book.id, data)
-  }
 
   const handleBack = () => {
     router.push('/')
@@ -79,13 +72,6 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
         <ArrowLeft className="h-4 w-4" />
         Back
       </Button>
-      <BookCard
-        book={book}
-        spiceLevel={spiceLevel}
-        ageRating={ageRating}
-        affiliateLink={`https://www.amazon.com/s?k=${book.isbn}`}
-        isClickable={false}
-      />
 
       <ContentWarningsList 
         warnings={warnings} 
@@ -138,7 +124,6 @@ export function BookDetails({ book, spiceLevel, ageRating, warnings }: BookDetai
         </CardHeader>
         <CardContent className="space-y-3">
           <AddWarningDialog bookId={book.id} onSubmit={handleAddWarning} />
-          <AddSpiceRatingDialog bookId={book.id} onSubmit={handleAddRating} />
         </CardContent>
       </Card> */}
     </div>

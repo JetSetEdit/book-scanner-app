@@ -5,112 +5,63 @@
 ```mermaid
 graph TB
     %% User Interface Layer
-    subgraph "Frontend (Next.js 15 + React 19)"
-        UI[Scanner Interface]
-        Admin[Admin Dashboard]
-        Collection[Book Collection]
-        BookDetails[Book Details Page]
-        Demo[Author Context Demo]
-        DevTool[Cover Selection Tool - DEV ONLY]
+    subgraph Frontend["Frontend (Next.js 15 + React 19)"]
+        UI["Scanner Interface"]
+        Collection["Book Collection"]
+        BookDetails["Book Details Page"]
     end
 
     %% API Layer
-    subgraph "API Routes"
-        ScanAPI[/api/scan-isbn]
-        ScanV2API[/api/scan-isbn-v2]
-        AgentChainAPI[/api/scan-isbn-agent-chain]
-        GenerateAPI[/api/generate-content-warnings]
-        AuthorContextAPI[/api/author-context]
-        TestAuthorAPI[/api/test-author-context-simple]
-        TestWebAPI[/api/test-web-search]
-        AdminAPI[/api/admin/*]
-        CoverAPI[/api/update-covers]
-        FetchAPI[/api/fetch-all-covers - DEV]
-        ClearAPI[/api/clear-books - DEV]
-        RestoreAPI[/api/restore-sample-books - DEV]
+    subgraph API["API Routes"]
+        ScanAPI["/api/scan-isbn"]
+        GenerateAPI["/api/generate-content-warnings"]
+        DBStatsAPI["/api/db-stats"]
     end
 
     %% AI Agent Layer
-    subgraph "AI Agents (OpenAI)"
-        ContentAgent[Content Warning Agent]
-        AuthorAgent[Author Context Agent]
-        AgentChain[Agent Chain System]
-        TrainingData[Training Examples & Patterns]
+    subgraph AI["AI Agents (OpenAI)"]
+        ContentAgent["Content Warning Agent"]
+        AgentChain["Agent Chain System"]
+        TrainingData["Training Examples & Patterns"]
     end
 
     %% External APIs
-    subgraph "External APIs"
-        GoogleBooks[Google Books API]
-        OpenLibrary[Open Library API]
-        DuckDuckGo[DuckDuckGo API]
-        GoogleSearch[Google Custom Search - Fallback]
-        StoryGraph[StoryGraph API - Future]
-        Amazon[Amazon API - Future]
+    subgraph External["External APIs"]
+        GoogleBooks["Google Books API"]
+        OpenLibrary["Open Library API"]
     end
 
     %% Database
-    subgraph "Database (Supabase)"
-        BooksTable[(Books Table)]
-        WarningsTable[(Content Warnings)]
-        SpiceTable[(Spice Ratings)]
-        ScansTable[(Scans Table)]
-        AuthorsTable[(Authors Table)]
-        AuthorContextTable[(Author Context)]
-        AuthorAuditTable[(Author Context Audit)]
-    end
-
-    %% File System
-    subgraph "File Storage"
-        CoverFiles[public/book-covers/]
-        Scripts[scripts/]
-        ClassificationSymbols[public/classification-symbols/]
+    subgraph Database["Database (Supabase)"]
+        BooksTable[("Books Table")]
+        WarningsTable[("Content Warnings")]
+        ValidationsTable[("Warning Validations")]
     end
 
     %% User Interactions
     UI --> ScanAPI
-    BookDetails --> AuthorContextAPI
-    Demo --> TestAuthorAPI
-    Admin --> AdminAPI
-    Collection --> AdminAPI
-    DevTool --> CoverAPI
-    DevTool --> FetchAPI
+    BookDetails --> GenerateAPI
+    Collection --> DBStatsAPI
 
     %% API to AI Agents
     ScanAPI --> ContentAgent
     GenerateAPI --> AgentChain
-    AuthorContextAPI --> AuthorAgent
-    TestAuthorAPI --> AuthorAgent
-
-    %% AI Agent Dependencies
     ContentAgent --> TrainingData
-    AuthorAgent --> DuckDuckGo
-    AuthorAgent --> GoogleSearch
     AgentChain --> TrainingData
 
     %% API to External Services
     ScanAPI --> GoogleBooks
     ScanAPI --> OpenLibrary
-    AuthorAgent --> DuckDuckGo
-    AuthorAgent --> GoogleSearch
-    FetchAPI --> GoogleBooks
-    FetchAPI --> OpenLibrary
 
     %% API to Database
     ScanAPI --> BooksTable
     ScanAPI --> WarningsTable
-    AuthorContextAPI --> AuthorsTable
-    AuthorContextAPI --> AuthorContextTable
-    AdminAPI --> BooksTable
-    AdminAPI --> WarningsTable
-    AdminAPI --> SpiceTable
-    AdminAPI --> ScansTable
+    GenerateAPI --> WarningsTable
+    DBStatsAPI --> WarningsTable
 
     %% Database Relationships
     BooksTable --> WarningsTable
-    BooksTable --> SpiceTable
-    BooksTable --> ScansTable
-    AuthorsTable --> AuthorContextTable
-    AuthorContextTable --> AuthorAuditTable
+    WarningsTable --> ValidationsTable
 
     %% Styling
     classDef frontend fill:#e1f5fe
@@ -118,16 +69,12 @@ graph TB
     classDef ai fill:#ffebee
     classDef external fill:#fff3e0
     classDef database fill:#e8f5e8
-    classDef files fill:#fce4ec
-    classDef dev fill:#ffebee
 
-    class UI,Admin,Collection,BookDetails,Demo,DevTool frontend
-    class ScanAPI,ScanV2API,AgentChainAPI,GenerateAPI,AuthorContextAPI,TestAuthorAPI,TestWebAPI,AdminAPI,CoverAPI,FetchAPI,ClearAPI,RestoreAPI api
-    class ContentAgent,AuthorAgent,AgentChain,TrainingData ai
-    class GoogleBooks,OpenLibrary,DuckDuckGo,GoogleSearch,StoryGraph,Amazon external
-    class BooksTable,WarningsTable,SpiceTable,ScansTable,AuthorsTable,AuthorContextTable,AuthorAuditTable database
-    class CoverFiles,Scripts,ClassificationSymbols files
-    class DevTool,FetchAPI,ClearAPI,RestoreAPI dev
+    class UI,Collection,BookDetails frontend
+    class ScanAPI,GenerateAPI,DBStatsAPI api
+    class ContentAgent,AgentChain,TrainingData ai
+    class GoogleBooks,OpenLibrary external
+    class BooksTable,WarningsTable,ValidationsTable database
 ```
 
 ## 🔄 **Enhanced Data Flow**
@@ -140,9 +87,7 @@ sequenceDiagram
     participant Google as Google Books API
     participant OpenLib as Open Library API
     participant AI as Content Warning Agent
-    participant AuthorAI as Author Context Agent
     participant DB as Supabase Database
-    participant Files as File System
 
     User->>Scanner: Scan ISBN barcode
     Scanner->>API: POST /api/scan-isbn
@@ -156,13 +101,10 @@ sequenceDiagram
         API->>Google: Search by ISBN
         Google-->>API: Return book metadata
         
-        alt Google has cover
-            API->>Files: Download cover image
-            Files-->>API: Return local path
+        alt Google fails
+            API->>OpenLib: Fallback search
+            OpenLib-->>API: Return metadata
         end
-        
-        API->>OpenLib: Fallback search
-        OpenLib-->>API: Return metadata
         
         API->>DB: Insert new book
         DB-->>API: Confirm insertion
@@ -174,14 +116,7 @@ sequenceDiagram
         API->>DB: Insert AI-generated warnings
     end
     
-    alt Author context not found
-        API->>AuthorAI: Investigate author context
-        AuthorAI->>AuthorAI: Web search for controversies
-        AuthorAI-->>API: Return context findings
-        API->>DB: Insert author context (if any)
-    end
-    
-    API-->>Scanner: Return book with warnings & context
+    API-->>Scanner: Return book with warnings
     Scanner-->>User: Display book with AI badges
 ```
 
@@ -233,7 +168,6 @@ erDiagram
         date published_date
         int page_count
         text[] categories
-        string classification_rating
         timestamp created_at
         timestamp updated_at
     }
@@ -245,103 +179,54 @@ erDiagram
         text description
         string severity
         int user_id FK
-        timestamp created_at
-    }
-
-    SPICE_RATINGS {
-        uuid id PK
-        uuid book_id FK
-        string spice_level
-        string age_rating
-        timestamp created_at
-    }
-
-    SCANS {
-        uuid id PK
-        uuid book_id FK
-        string isbn
-        timestamp scanned_at
-        json metadata
-    }
-
-    AUTHORS {
-        uuid id PK
-        string name UK
-        text bio
-        string website
-        boolean verified
+        boolean is_author_approved
+        string source
+        int helpful_count
+        int not_helpful_count
         timestamp created_at
         timestamp updated_at
     }
 
-    AUTHOR_CONTEXT {
+    WARNING_VALIDATIONS {
         uuid id PK
-        uuid author_id FK
-        string category
-        string title
-        text description
-        string severity
-        string source_url
-        boolean source_verified
-        boolean community_submitted
-        string status
-        string verified_by
-        timestamp source_published_at
-        timestamp last_reviewed_at
+        uuid warning_id FK
+        uuid user_id FK
+        boolean is_helpful
         timestamp created_at
-        timestamp updated_at
-    }
-
-    AUTHOR_CONTEXT_AUDIT {
-        serial id PK
-        uuid context_id FK
-        string action
-        string actor
-        jsonb old_values
-        jsonb new_values
-        timestamp timestamp
     }
 
     BOOKS ||--o{ CONTENT_WARNINGS : has
-    BOOKS ||--o{ SPICE_RATINGS : has
-    BOOKS ||--o{ SCANS : has
-    AUTHORS ||--o{ AUTHOR_CONTEXT : has
-    AUTHOR_CONTEXT ||--o{ AUTHOR_CONTEXT_AUDIT : has
+    CONTENT_WARNINGS ||--o{ WARNING_VALIDATIONS : has
 ```
 
 ## 🎯 **Key Features**
 
-### **Production Features**
+### **Core Features**
 - **ISBN/Barcode Scanning** - Camera-based scanning with ZXing
 - **Book Metadata Fetching** - Google Books and Open Library APIs
 - **AI Content Warning Generation** - Automated content analysis with training data
-- **Author Context & Accountability** - Automated author controversy investigation
-- **Spice Rating System** - Age-appropriate content ratings
-- **Admin Dashboard** - Book management and review workflow
-- **Book Collection** - Browse and search books
-- **Australian Classification** - Official classification display
+- **Book Collection** - Browse and search books with content warnings
+- **User Feedback System** - Thumbs up/down on content warnings
 
 ### **AI Agent Features**
 - **Agent Chain System** - Specialized micro-agents for different tasks
 - **Training Data Integration** - 14+ author-approved content warning examples
 - **Theme Pattern Recognition** - Structured trigger word detection
-- **Web Search Integration** - Real-time information gathering
 - **Structured Output** - Consistent JSON response format
 - **Confidence Scoring** - AI self-assessment of results
+- **Source Tracking** - Distinguish between AI-generated and user-submitted warnings
 
-### **Development Tools (DEV ONLY)**
-- **Cover Selection Tool** - Visual interface for choosing covers
-- **API Cover Fetching** - Comprehensive multi-API cover search
-- **Database Management** - Clear and restore sample data
-- **Quality Assessment** - File size and source-based quality indicators
-- **Agent Testing Endpoints** - Isolated testing of AI components
+### **Database Features**
+- **Source Tracking** - Track warning sources (AI, user, author, publisher)
+- **Author Approval** - Mark author-approved warnings
+- **User Validation** - Track helpful/not helpful feedback
+- **Migration Support** - Database schema migration scripts
 
 ### **Security & Environment**
-- **Development Mode Protection** - Dev tools only work in development
 - **Environment Variables** - Secure API key management
 - **Row Level Security** - Supabase RLS policies
 - **Input Validation** - ISBN validation and sanitization
-- **Audit Logging** - Complete audit trail for author context changes
+- **Type Safety** - Full TypeScript implementation
 
 ## 🔧 **Technology Stack**
 
@@ -379,41 +264,45 @@ erDiagram
 - ✅ **Training Data Integration** - 14+ real content warning examples
 - ✅ **Theme Pattern Recognition** - Structured trigger word detection
 - ✅ **Category Guidelines** - Detailed severity and categorization rules
-- ✅ **Web Search Integration** - Real-time information gathering
+- ✅ **Source Tracking** - Distinguish AI vs user-generated warnings
 
-### **Author Context System**
-- ✅ **Database Schema** - Authors, author_context, and audit tables
-- ✅ **AI Investigation Agent** - Automated controversy detection
-- ✅ **Web Search Fallback** - DuckDuckGo + Google Custom Search
-- ✅ **Audit Logging** - Complete change tracking
+### **Database Improvements**
+- ✅ **Source Column** - Track warning sources (AI, user, author, publisher)
+- ✅ **Author Approval** - Mark author-approved warnings
+- ✅ **Migration Scripts** - Database schema migration support
 - ✅ **RLS Policies** - Secure data access
-- ✅ **Auto-verification** - Trusted source auto-approval
+- ✅ **User Validation** - Track helpful/not helpful feedback
 
 ### **UI/UX Improvements**
-- ✅ **Author Context Display** - New component for author information
-- ✅ **Demo Page** - Interactive testing interface
+- ✅ **AI Warning Badge** - Visual indicator for AI-generated warnings
+- ✅ **Source Display** - Show warning source in UI
 - ✅ **Loading States** - Better user feedback
 - ✅ **Error Handling** - Graceful failure management
+- ✅ **Codebase Cleanup** - Removed 100+ legacy files
 
-## 🔮 **Current Issues & Next Steps**
+## 🔮 **Current Status**
 
-### **Known Issues**
-- ❌ **Web Search Not Working** - DuckDuckGo API returns empty results
-- ❌ **Google API Keys Not Set** - Fallback search unavailable
-- ❌ **Recent Information Missed** - Neil Gaiman allegations not found
+### **Working Features**
+- ✅ **ISBN Scanning** - Camera-based barcode scanning
+- ✅ **Book Metadata** - Google Books and Open Library integration
+- ✅ **AI Content Warnings** - Automated warning generation
+- ✅ **Source Tracking** - Database tracks warning sources
+- ✅ **User Feedback** - Thumbs up/down system
+- ✅ **Clean Architecture** - Minimal, focused codebase
 
-### **Immediate Next Steps**
-1. **Fix Web Search** - Implement working search API
-2. **Add Google API Keys** - Enable fallback search
-3. **Test Author Context** - Verify controversy detection
-4. **Database Migration** - Ensure all tables are created
+### **Ready for Production**
+- ✅ **Core Functionality** - All essential features working
+- ✅ **Database Migration** - Schema migration scripts available
+- ✅ **Type Safety** - Full TypeScript implementation
+- ✅ **Security** - RLS policies and input validation
+- ✅ **Clean Codebase** - Minimal, maintainable structure
 
 ### **Future Enhancements**
-1. **Multiple Search Sources** - Bing, SerpAPI, etc.
+1. **Performance Optimization** - Response time improvements
 2. **Caching Layer** - Redis for API responses
 3. **Rate Limiting** - Proper API rate management
 4. **Error Monitoring** - Comprehensive logging
-5. **Performance Optimization** - Response time improvements
+5. **Advanced Analytics** - Warning accuracy tracking
 
 ---
 

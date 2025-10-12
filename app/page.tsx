@@ -10,7 +10,7 @@ export default function HomePage() {
           <div className="text-center mb-8">
             <h2 className="text-4xl font-bold mb-3 text-balance">Know Before You Read</h2>
             <p className="text-muted-foreground text-lg text-pretty">
-              Scan any book to see content warnings, spice ratings, and age-appropriate classifications before you start
+              Scan any book to see content warnings and age-appropriate classifications before you start
               reading
             </p>
           </div>
@@ -25,13 +25,6 @@ export default function HomePage() {
               </div>
               <h3 className="font-semibold">Content Warnings</h3>
               <p className="text-sm text-muted-foreground">Community-submitted warnings for sensitive content</p>
-            </div>
-            <div className="text-center space-y-2">
-              <div className="flex justify-center">
-                <BookOpen className="h-8 w-8 text-primary" />
-              </div>
-              <h3 className="font-semibold">Spice Ratings</h3>
-              <p className="text-sm text-muted-foreground">Clear ratings from mild to extremely hot</p>
             </div>
             <div className="text-center space-y-2">
               <div className="flex justify-center">

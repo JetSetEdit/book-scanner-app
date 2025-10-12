@@ -21,30 +21,6 @@ export default async function BookPage({ params }: BookPageProps) {
     notFound()
   }
 
-  // Fetch spice ratings
-  const { data: spiceRatings } = await supabase
-    .from("spice_ratings")
-    .select("spice_level, age_rating")
-    .eq("book_id", book.id)
-
-  // Calculate average spice level
-  const avgSpiceLevel =
-    spiceRatings && spiceRatings.length > 0
-      ? Math.round(spiceRatings.reduce((sum, r) => sum + r.spice_level, 0) / spiceRatings.length)
-      : undefined
-
-  // Get most common age rating
-  const ageRating =
-    spiceRatings && spiceRatings.length > 0
-      ? spiceRatings
-          .map((r) => r.age_rating)
-          .filter(Boolean)
-          .sort(
-            (a, b) =>
-              spiceRatings.filter((r) => r.age_rating === b).length -
-              spiceRatings.filter((r) => r.age_rating === a).length,
-          )[0]
-      : undefined
 
   // Fetch content warnings
   const { data: warnings } = await supabase
@@ -62,8 +38,6 @@ export default async function BookPage({ params }: BookPageProps) {
         <div className="max-w-4xl mx-auto">
           <BookDetails
             book={book}
-            spiceLevel={avgSpiceLevel}
-            ageRating={ageRating}
             warnings={warningsWithValidations}
           />
         </div>
