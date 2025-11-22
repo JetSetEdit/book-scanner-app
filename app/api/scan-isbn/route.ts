@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase/admin'
-import { fetchBookByISBN } from '@/lib/book-api'
-import { validateISBN, validateISBNWithChecksum, normalizeISBN } from '@/lib/isbn-validation'
+import { validateISBN } from '@/lib/isbn-validation'
+import { processIsbnScan } from '@/lib/services/scan-service'
 
 export async function POST(request: NextRequest) {
   try {
     console.log('Scan ISBN API called')
     
-    const { isbn, notes } = await request.json()
+    const { isbn, stream, selectedCandidate } = await request.json()
     console.log('Processing ISBN:', isbn)
-
+    
     if (!isbn) {
       return NextResponse.json({ error: 'ISBN is required' }, { status: 400 })
     }
 
-    // Validate ISBN format and checksum
+    // Validate ISBN format
     if (!validateISBN(isbn)) {
       console.log('Invalid ISBN format:', isbn)
       return NextResponse.json({ 
@@ -22,303 +21,39 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Clean ISBN (remove hyphens, spaces)
-    const cleanIsbn = normalizeISBN(isbn)
-
-    // Check if book already exists
-    console.log('Checking for existing book with ISBN:', cleanIsbn)
-    const { data: existingBook, error: fetchError } = await supabaseAdmin
-      .from('books')
-      .select('*')
-      .eq('isbn', cleanIsbn)
-      .single()
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('Error fetching existing book:', JSON.stringify(fetchError, null, 2))
-      throw fetchError
-    }
-    
-    console.log('Existing book found:', !!existingBook)
-
-    let bookId: string
-
-    if (existingBook) {
-      // Book exists, check if it has content warnings
-      console.log('Using existing book ID:', existingBook.id)
-      bookId = existingBook.id
+    if (stream) {
+      // Return a streaming response
+      const encoder = new TextEncoder()
       
-      // Check if this book has any content warnings
-      const { data: existingWarnings, error: warningsError } = await supabaseAdmin
-        .from('content_warnings')
-        .select('id')
-        .eq('book_id', bookId)
-        .limit(1)
-      
-      if (warningsError) {
-        console.error('Error checking existing warnings:', warningsError)
-      } else if (!existingWarnings || existingWarnings.length === 0) {
-        // No content warnings exist, generate them with AI
-        console.log('No content warnings found for existing book, generating with AI...')
-        try {
-          const { findBookAndGenerateWarnings } = await import('@/lib/content-warning-agent')
-          
-          const result = await findBookAndGenerateWarnings(cleanIsbn)
-          
-          if (result.content_warnings && result.content_warnings.length > 0) {
-            const warningsToInsert = result.content_warnings.map(warning => ({
-              book_id: bookId,
-              category: warning.category,
-              description: warning.description,
-              severity: warning.severity,
-              user_id: null, // AI-generated warnings don't have a user_id
-              reasoning: warning.reasoning // AI reasoning for the warning
-            }))
-            
-            const { error: insertError } = await supabaseAdmin
-              .from('content_warnings')
-              .insert(warningsToInsert)
-            
-            if (!insertError) {
-              contentWarningsGenerated = true
-              console.log(`Generated ${result.content_warnings.length} content warnings for existing book`)
-            } else {
-              console.error('Failed to insert AI-generated warnings for existing book:', insertError)
-            }
+      const customStream = new ReadableStream({
+        async start(controller) {
+          const sendUpdate = (message: string) => {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`))
           }
-        } catch (warningError) {
-          console.error('Error generating warnings for existing book:', warningError)
+
+          try {
+            const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate)
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
+          } catch (error) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`))
+          } finally {
+            controller.close()
+          }
         }
-      } else {
-        console.log('Book already has content warnings, skipping AI generation')
-      }
+      })
+
+      return new NextResponse(customStream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      })
     } else {
-      // Book doesn't exist, fetch from external API
-      console.log('Fetching book metadata for ISBN:', cleanIsbn)
-      const bookData = await fetchBookByISBN(cleanIsbn)
-
-      if (!bookData) {
-        console.log('Book not found in external APIs, creating minimal record and asking AI agent...')
-        
-        // Create a minimal book record with just the ISBN
-        const { data: newBook, error: insertError } = await supabaseAdmin
-          .from('books')
-          .insert({
-            isbn: cleanIsbn,
-            title: `Unknown Book (ISBN: ${cleanIsbn})`,
-            author: 'Unknown Author',
-            cover_url: null,
-            description: null,
-            publisher: null,
-            published_date: null,
-            page_count: null,
-            categories: null
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          console.error('Error creating minimal book record:', JSON.stringify(insertError, null, 2))
-          throw insertError
-        }
-
-        console.log('Minimal book record created with ID:', newBook.id)
-        bookId = newBook.id
-        
-        // Try AI agent to find book information via web search
-        console.log('Asking AI agent to find book information via web search...')
-        try {
-          const { findBookAndGenerateWarnings } = await import('@/lib/content-warning-agent')
-          
-          const result = await findBookAndGenerateWarnings(cleanIsbn)
-
-          if (result.book_found) {
-            // Update the book record with AI-found information
-            const { error: updateError } = await supabaseAdmin
-              .from('books')
-              .update({
-                title: result.book_title,
-                author: result.book_author,
-                description: result.book_description,
-                categories: result.book_categories,
-                cover_url: result.book_cover_url
-              })
-              .eq('id', bookId)
-
-            if (updateError) {
-              console.error('Failed to update book with AI-found data:', updateError)
-            } else {
-              console.log('Updated book record with AI-found information')
-            }
-
-            // Insert the generated warnings
-            if (result.content_warnings.length > 0) {
-              const warningsToInsert = result.content_warnings.map(warning => ({
-                book_id: bookId,
-                category: warning.category,
-                description: warning.description,
-                severity: warning.severity,
-                user_id: null, // AI-generated warnings don't have a user_id
-                reasoning: warning.reasoning // AI reasoning for the warning
-                // Note: is_author_approved and source columns will be added via migration
-              }))
-
-              const { error: insertError } = await supabaseAdmin
-                .from('content_warnings')
-                .insert(warningsToInsert)
-
-              if (!insertError) {
-                contentWarningsGenerated = true
-                console.log(`Generated ${result.content_warnings.length} content warnings via AI web search`)
-              } else {
-                console.error('Failed to insert AI-generated warnings:', insertError)
-              }
-            }
-          } else {
-            console.log('AI agent could not find book information via web search')
-          }
-        } catch (warningError) {
-          console.error('Error with AI agent book search:', warningError)
-        }
-      } else {
-
-      // Insert book with real metadata
-      console.log('Creating new book record with metadata:', bookData.title)
-      const { data: newBook, error: insertError } = await supabaseAdmin
-        .from('books')
-        .insert({
-          isbn: bookData.isbn,
-          title: bookData.title,
-          author: bookData.author,
-          cover_url: bookData.cover_url,
-          description: bookData.description,
-          publisher: bookData.publisher,
-          published_date: bookData.published_date,
-          page_count: bookData.page_count,
-          categories: bookData.categories
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
-        throw insertError
-      }
-
-      console.log('New book created with ID:', newBook.id)
-      bookId = newBook.id
-      }
+      // Standard JSON response
+      const result = await processIsbnScan(isbn, undefined, selectedCandidate)
+      return NextResponse.json(result)
     }
-
-    // Check if book has content warnings, and generate them if missing
-    let contentWarningsGenerated = false
-    try {
-      console.log('🔍 Checking for existing content warnings for book ID:', bookId)
-      const { data: existingWarnings } = await supabaseAdmin
-        .from('content_warnings')
-        .select('id')
-        .eq('book_id', bookId)
-
-      console.log('📊 Existing warnings count:', existingWarnings?.length || 0)
-      if (!existingWarnings || existingWarnings.length === 0) {
-        console.log('🤖 No content warnings found, generating with AI agent...')
-        
-        // Generate content warnings using AI agent
-        const { generateContentWarnings } = await import('@/lib/content-warning-agent')
-        const bookData = existingBook || await supabaseAdmin
-          .from('books')
-          .select('*')
-          .eq('id', bookId)
-          .single()
-          .then(result => result.data)
-
-        if (bookData) {
-          const result = await generateContentWarnings({
-            book_title: bookData.title,
-            book_author: bookData.author || 'Unknown',
-            book_description: bookData.description,
-            book_categories: bookData.categories,
-            book_isbn: bookData.isbn
-          })
-
-          if (result.content_warnings.length > 0) {
-            // Insert the generated warnings
-            const warningsToInsert = result.content_warnings.map(warning => ({
-              book_id: bookId,
-              category: warning.category,
-              description: warning.description,
-              severity: warning.severity,
-              user_id: null,
-              reasoning: warning.reasoning // AI reasoning for the warning
-            }))
-
-            const { error: insertError } = await supabaseAdmin
-              .from('content_warnings')
-              .insert(warningsToInsert)
-
-            if (!insertError) {
-              contentWarningsGenerated = true
-              console.log(`Generated ${result.content_warnings.length} content warnings`)
-            } else {
-              console.error('Failed to insert AI-generated warnings:', insertError)
-            }
-          }
-        }
-      }
-    } catch (warningError) {
-      console.error('Error generating content warnings:', warningError)
-      // Don't fail the scan if warning generation fails
-    }
-
-    // Get the final book data for author context investigation
-    const finalBookData = existingBook || await supabaseAdmin
-      .from('books')
-      .select('*')
-      .eq('id', bookId)
-      .single()
-      .then(result => result.data)
-
-    // Check if author context exists, and investigate if missing
-    let authorContextInvestigated = false
-    try {
-      if (finalBookData?.author && finalBookData.author !== 'Unknown Author') {
-        console.log('🔍 Checking for existing author context for:', finalBookData.author)
-        
-        // Check if author context already exists
-        const { data: existingAuthorContext } = await supabaseAdmin
-          .from('author_context')
-          .select('id')
-          .eq('author_name', finalBookData.author)
-          .eq('status', 'approved')
-
-        console.log('📊 Existing author context count:', existingAuthorContext?.length || 0)
-        
-        if (!existingAuthorContext || existingAuthorContext.length === 0) {
-          console.log('🤖 No author context found, investigating with AI agent...')
-          
-          // Investigate author context using AI agent
-          // Author context investigation disabled - agent was removed
-          console.log(`Author context investigation disabled for ${finalBookData.author}`)
-
-          authorContextInvestigated = true
-        }
-      }
-    } catch (contextError) {
-      console.error('Error investigating author context:', contextError)
-      // Don't fail the scan if author context investigation fails
-    }
-
-    // Record the scan (temporarily disabled - scans table doesn't exist)
-    console.log('Skipping scan recording - scans table not available')
-    const scan = { id: 'temp-scan-id', isbn: cleanIsbn, book_id: bookId }
-
-    return NextResponse.json({
-      success: true,
-      book: existingBook || { id: bookId, isbn: cleanIsbn, review_status: 'pending' },
-      scan: scan,
-      isNewBook: !existingBook,
-      contentWarningsGenerated,
-      authorContextInvestigated
-    })
 
   } catch (error) {
     console.error('Scan ISBN error:', JSON.stringify(error, null, 2))
@@ -329,5 +64,3 @@ export async function POST(request: NextRequest) {
     }, { status: 500 })
   }
 }
-
-

@@ -3,13 +3,13 @@ import { createClient } from "@/lib/supabase/server"
 import { notFound } from "next/navigation"
 
 interface BookPageProps {
-  params: Promise<{
+  params: {
     isbn: string
-  }>
+  }
 }
 
 export default async function BookPage({ params }: BookPageProps) {
-  const { isbn } = await params
+  const { isbn } = params
   const supabase = await createClient()
 
   // No authentication required

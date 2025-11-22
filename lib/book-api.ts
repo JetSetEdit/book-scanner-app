@@ -25,6 +25,81 @@ interface BookData {
   categories?: string[]
 }
 
+export interface BookCandidate extends BookData {
+  source: 'openlibrary' | 'googlebooks';
+  source_id?: string;
+}
+
+export async function fetchCandidatesByISBN(isbn: string): Promise<BookCandidate[]> {
+  const cleanIsbn = isbn.replace(/[-\s]/g, "")
+  console.log(`[Book API] Fetching candidates for ISBN: ${cleanIsbn}`)
+
+  const candidates: BookCandidate[] = []
+
+  // 1. Open Library
+  const openLibResult = await fetchFromOpenLibrary(cleanIsbn)
+  if (openLibResult) {
+    candidates.push({ ...openLibResult, source: 'openlibrary' })
+  }
+
+  // 2. Google Books (Always fetch to see if there are alternatives)
+  const googleCandidates = await fetchCandidatesFromGoogleBooks(cleanIsbn)
+  candidates.push(...googleCandidates)
+
+  // Deduplicate by title and author (simple normalization)
+  const uniqueCandidates: BookCandidate[] = []
+  const seen = new Set<string>()
+
+  for (const candidate of candidates) {
+    const key = `${candidate.title.toLowerCase().trim()}|${candidate.author?.toLowerCase().trim() || ''}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      uniqueCandidates.push(candidate)
+    }
+  }
+
+  return uniqueCandidates
+}
+
+async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandidate[]> {
+  try {
+    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`, {
+      next: { revalidate: 86400 },
+      headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
+    })
+
+    if (!response.ok) return []
+
+    const data = await response.json()
+    if (!data.items || data.items.length === 0) return []
+
+    // Map top 3 results
+    return data.items.slice(0, 3).map((item: any) => {
+      const book = item.volumeInfo
+      return {
+        isbn,
+        title: book.title || 'Unknown Title',
+        author: book.authors?.[0],
+        cover_url: book.imageLinks?.large?.replace("http:", "https:") || 
+                   book.imageLinks?.medium?.replace("http:", "https:") || 
+                   book.imageLinks?.small?.replace("http:", "https:") || 
+                   book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") || 
+                   book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
+        description: book.description,
+        publisher: book.publisher,
+        published_date: book.publishedDate,
+        page_count: book.pageCount,
+        categories: book.categories?.slice(0, 5),
+        source: 'googlebooks',
+        source_id: item.id
+      }
+    }).filter((b: BookCandidate) => b.title !== 'Unknown Title')
+  } catch (error) {
+    console.error("[Book API] Google Books candidates error:", error)
+    return []
+  }
+}
+
 export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
   // Clean ISBN (remove hyphens and spaces)
   const cleanIsbn = isbn.replace(/[-\s]/g, "")
@@ -79,8 +154,13 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
       isbn,
       title: bookData.title,
       author: bookData.authors?.[0]?.name,
-      cover_url: `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
-      description: bookData.excerpts?.[0]?.text,
+      // Use the dedicated covers API if the key exists
+      cover_url: bookData.cover?.large 
+        ? bookData.cover.large 
+        : (bookData.cover?.medium 
+             ? bookData.cover.medium 
+             : `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`),
+      description: typeof bookData.excerpts?.[0]?.text === 'string' ? bookData.excerpts[0].text : undefined,
       publisher: bookData.publishers?.[0]?.name,
       published_date: bookData.publish_date,
       page_count: bookData.number_of_pages,
@@ -117,15 +197,31 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       return null
     }
 
+    // Helper to prioritize higher quality images and ensure HTTPS
+    const getBestCover = (imageLinks: any) => {
+        if (!imageLinks) return undefined;
+        
+        const candidates = [
+            imageLinks.extraLarge,
+            imageLinks.large,
+            imageLinks.medium,
+            imageLinks.small,
+            imageLinks.thumbnail,
+            imageLinks.smallThumbnail
+        ];
+
+        // Return the first valid URL found
+        for (const url of candidates) {
+            if (url) return url.replace("http:", "https:").replace("&edge=curl", "");
+        }
+        return undefined;
+    }
+
     return {
       isbn,
       title: book.title,
       author: book.authors?.[0],
-      cover_url: book.imageLinks?.large?.replace("http:", "https:") || 
-                 book.imageLinks?.medium?.replace("http:", "https:") || 
-                 book.imageLinks?.small?.replace("http:", "https:") || 
-                 book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") || 
-                 book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
+      cover_url: getBestCover(book.imageLinks),
       description: book.description,
       publisher: book.publisher,
       published_date: book.publishedDate,
