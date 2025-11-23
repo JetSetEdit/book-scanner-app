@@ -265,7 +265,9 @@ export async function processIsbnScan(
               description: warning.description,
               severity: warning.severity,
               user_id: null, // AI-generated warnings don't have a user_id
-              reasoning: warning.reasoning || null
+              reasoning: warning.reasoning || null,
+              is_author_verified: warning.is_author_verified || false,
+              source_url: warning.source_url || null
             }))
 
             const { error: insertError } = await supabaseAdmin
@@ -336,6 +338,8 @@ export async function processIsbnScan(
   }
 
   // At this point, we have a bookId and currentBook (unless something went wrong)
+  // Track if this is an existing book (vs newly created) for warning generation strategy
+  const isExistingBook = !!existingBook && currentBook?.id === existingBook.id;
   
   // Check if book has content warnings, and generate them if missing
   if (!contentWarningsGenerated) {
@@ -354,18 +358,28 @@ export async function processIsbnScan(
           onProgress?.('No warnings found. Analyzing book content with AI...');
           
           if (currentBook) {
-            // Double check if the description is thin before asking AI to just "generate"
+            // RESTORED LOGIC: For existing books, always use web search (more thorough, finds official content notes)
+            // For new books, use metadata-based generation first (more efficient), then verify
             const isThinDescription = !currentBook.description || currentBook.description.length < 150;
             
             let result;
             let usedSearch = false;
             let classificationRating: string | null = null;
             
-            if (isThinDescription) {
-                 onProgress?.('Book description is brief. AI performing web search for deeper analysis...');
-                 // Use the search-enabled agent function
+            // Strategy: Use web search if:
+            // 1. Book already exists in DB (restored old behavior - more thorough)
+            // 2. Description is thin (needs web search anyway)
+            // Otherwise: Try metadata-based generation first, then verify with web search
+            if (isExistingBook || isThinDescription) {
+                 // Always use web search for existing books (can find official author content notes)
+                 // or if metadata is thin
+                 onProgress?.(isExistingBook 
+                   ? 'Book found in database. Performing comprehensive web search for content warnings...'
+                   : 'Book description is brief. AI performing web search for deeper analysis...');
+                 
                  const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
                  usedSearch = true;
+                 
                  // Map the result format
                  result = {
                      content_warnings: searchResult.content_warnings,
@@ -375,7 +389,10 @@ export async function processIsbnScan(
                  };
                  classificationRating = (searchResult as any).classification_rating || null;
             } else {
-                 // Use the standard generator
+                 // For new books with good metadata: Use metadata-based generation first (faster)
+                 // Then verify with web search if no warnings found (catches false negatives)
+                 onProgress?.('Analyzing book metadata for content warnings...');
+                 
                  result = await generateContentWarnings({
                     book_title: currentBook.title,
                     book_author: currentBook.author || 'Unknown',
