@@ -23,48 +23,80 @@ const webSearchTool = tool({
   },
   execute: async ({ query }) => {
     try {
-      // IMPROVED SEARCH STRATEGY:
-      // 1. Try DuckDuckGo (Instant Answers - weak but sometimes has official summaries)
-      // 2. Try Google Books API (Rich metadata - strong fallback)
-      
       const results = [];
 
-      // 1. DuckDuckGo
-      try {
-          const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
-          const data = await response.json();
-          if (data.Abstract) {
-              results.push(`Source: DuckDuckGo\nSummary: ${data.Abstract}`);
-          }
-      } catch (e) { /* Ignore DDG errors */ }
+      // Check if query contains an ISBN (10 or 13 digits)
+      const isbnMatch = query.match(/\b\d{10,13}\b/);
+      const isbn = isbnMatch ? isbnMatch[0] : null;
 
-      // 2. Google Books (Simulating a "search" by querying volumes)
-      // We clean the query to just key terms to improve hit rate
-      const cleanQuery = query.replace(/content warnings|plot summary|official|notes/gi, "").trim();
+      // Helper for fetch with timeout
+      const fetchWithTimeout = async (url: string, timeout = 10000) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(id);
+          return response;
+        } catch (error) {
+          clearTimeout(id);
+          throw error;
+        }
+      };
+
+      // 1. Google Books API - Try ISBN search first if we have an ISBN
       try {
-          const gbResponse = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=3`);
-          const gbData = await gbResponse.json();
-          
-          if (gbData.items) {
-              gbData.items.forEach((item: any) => {
-                  const info = item.volumeInfo;
-                  results.push(`Source: Google Books (${info.title})\nDescription: ${info.description || "No description"}\nCategories: ${info.categories?.join(", ")}`);
-              });
+        let gbResponse;
+        if (isbn) {
+          // Direct ISBN search (most reliable)
+          gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=3`);
+        } else {
+          // Clean the query to just key terms (remove search-specific terms)
+          const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
+          if (cleanQuery.length > 0) {
+            gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=3`);
           }
-      } catch (e) { /* Ignore Google Books errors */ }
+        }
+
+        if (gbResponse) {
+          const gbData = await gbResponse.json();
+
+          if (gbData.items && gbData.items.length > 0) {
+            gbData.items.forEach((item: any) => {
+              const info = item.volumeInfo;
+              const description = info.description || "No description available";
+              const categories = info.categories?.join(", ") || "No categories";
+              results.push(`Source: Google Books\nTitle: ${info.title}\nAuthor: ${info.authors?.join(", ") || "Unknown"}\nDescription: ${description}\nCategories: ${categories}\nPublisher: ${info.publisher || "Unknown"}\nPublished: ${info.publishedDate || "Unknown"}`);
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Google Books API error:", e);
+      }
+
+      // 2. DuckDuckGo (as fallback, but usually not useful for books)
+      if (results.length === 0) {
+        try {
+          const response = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+          const data = await response.json();
+          if (data.Abstract && data.Abstract.length > 20) {
+            results.push(`Source: DuckDuckGo\nSummary: ${data.Abstract}`);
+          }
+        } catch (e) { /* Ignore DDG errors */ }
+      }
 
       if (results.length === 0) {
-          return {
-              results: "Search tool returned no results. Please rely on your internal knowledge base for this book.",
-              source: "None"
-          };
+        return {
+          results: "Search tool returned no results. Please rely on your internal knowledge base for this book.",
+          source: "None"
+        };
       }
 
       return {
         results: results.join("\n\n---\n\n"),
-        source: "Composite (DuckDuckGo + Google Books)"
+        source: isbn ? "Google Books (ISBN search)" : "Google Books"
       };
     } catch (error) {
+      console.error("Web search tool error:", error);
       return {
         results: "Web search unavailable. Please rely on your internal knowledge base.",
         source: "Error"
@@ -75,7 +107,9 @@ const webSearchTool = tool({
 
 const contentWarningAgent = new Agent({
   name: "Book Information Finder & Content Warning Generator",
-  instructions: `You are a specialized AI assistant that can find book information and generate content warnings. You have two main tasks:
+  instructions: `**CRITICAL: You MUST return ONLY valid JSON. Do NOT include any markdown formatting, explanatory text, or commentary. Your entire response must be a single valid JSON object.**
+
+You are a specialized AI assistant that can find book information and generate content warnings. You have two main tasks:
 
 ## Task 1: Find Book Information (when given only an ISBN)
 If you're given only an ISBN, use web search to find:
@@ -206,15 +240,24 @@ Base this on the severity of warnings:
 - abuse: Physical, emotional, or sexual abuse
 - discrimination: Racism, sexism, homophobia, etc.
 - other: Any other potentially triggering content
+- relationships: Family conflict, divorce, infidelity, toxic relationships
+- language: Coarse language, profanity
 
 **REMEMBER**: 
 1. If the description is short or missing, ALWAYS use web search to find the full plot summary.
 2. **CRITICAL: Use Your Internal Knowledge**: If the web search returns limited results or "no results", **YOU MUST use your internal training data** to fill in the gaps. You know about popular books like "Twisted Love" (dark romance, abuse themes), "The Catcher in the Rye" (mental health, language), "1984" (violence, torture), etc. DO NOT say "no warnings" just because the search tool failed.
-3. **Well-Known Books**: For books you recognize from your training (especially popular romance, YA, thrillers), generate warnings based on what you know about them, even if the provided description is vague.
-4. If you generate a warning without a reasoning field, it will be rejected.
-5. Always provide reasoning for every warning you generate.
-6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
-7. Err on the side of caution - better to warn than to miss important content.
+3. **CRITICAL: Romance/Fantasy Books**: Romance and fantasy romance books (especially those with "Fae", "Alchemy", "Deluxe", "Limited Edition", "Pucking" in the title, or by authors like Callie Hart, Ana Huang, Lauren Landish, Colleen Hoover, etc.) typically contain sexual content, violence, and mature themes. Even if web search fails, you MUST generate appropriate warnings based on genre conventions. These books are typically rated M or MA15+.
+4. **Well-Known Books**: For books you recognize from your training (especially popular romance, YA, thrillers), generate warnings based on what you know about them, even if the provided description is vague.
+5. **When Web Search Fails**: If web search returns no results but you have a book title and author, you MUST still generate warnings based on:
+   - Genre conventions (romance = sexual content, fantasy = violence, etc.)
+   - Author's typical content (if you know the author)
+   - Title keywords (e.g., "Fae", "Alchemy", "Dark", "Blood", "Pucking" suggest mature content)
+   - DO NOT return book_found: false just because search failed - use what you know!
+6. **Pre-Release Books**: If a book is not found in Google Books, it may be a pre-release title. Use the author's previous works and genre to infer warnings. For example, Lauren Landish writes steamy contemporary romance (M/MA15+).
+6. If you generate a warning without a reasoning field, it will be rejected.
+7. Always provide reasoning for every warning you generate.
+8. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
+9. Err on the side of caution - better to warn than to miss important content.
 
 If no content warnings are needed after thorough analysis (including web search if needed), return an empty array: []`,
   model: "gpt-4o",
@@ -224,7 +267,7 @@ If no content warnings are needed after thorough analysis (including web search 
   tools: [webSearchTool]
 });
 
-type WorkflowInput = { 
+type WorkflowInput = {
   book_title: string;
   book_author: string;
   book_description?: string;
@@ -234,30 +277,30 @@ type WorkflowInput = {
 
 // Zod schemas for validation
 const ContentWarningSchema = z.object({
-  category: z.enum(['violence', 'sexual_content', 'substance_abuse', 'mental_health', 'death', 'abuse', 'discrimination', 'other']),
+  category: z.enum(['violence', 'sexual_content', 'substance_abuse', 'mental_health', 'death', 'abuse', 'discrimination', 'relationships', 'language', 'other']),
   description: z.string(),
   severity: z.enum(['mild', 'moderate', 'severe']),
-  reasoning: z.string().optional(),
+  reasoning: z.string().optional().nullable(),
   is_author_verified: z.boolean().optional().default(false),
-  source_url: z.string().optional(),
+  source_url: z.string().optional().nullable(),
 });
 
 const FindBookOutputSchema = z.object({
   book_found: z.boolean(),
-  book_title: z.string().optional(),
-  book_author: z.string().optional(),
-  book_description: z.string().optional(),
-  book_categories: z.array(z.string()).optional(),
-  book_cover_url: z.string().optional(),
+  book_title: z.string().optional().nullable(),
+  book_author: z.string().optional().nullable(),
+  book_description: z.string().optional().nullable(),
+  book_categories: z.array(z.string()).optional().nullable(),
+  book_cover_url: z.string().optional().nullable(),
   content_warnings: z.array(ContentWarningSchema).optional().default([]),
-  classification_rating: z.enum(['G', 'PG', 'M', 'MA15+', 'R18+']).optional(),
+  classification_rating: z.enum(['G', 'PG', 'M', 'MA15+', 'R18+']).optional().nullable(),
   confidence: z.enum(['low', 'medium', 'high']).optional().default('medium'),
   reasoning: z.string().optional().default("AI-found book information and generated warnings")
 });
 
 const WorkflowOutputSchema = z.object({
   content_warnings: z.array(ContentWarningSchema),
-  classification_rating: z.enum(['G', 'PG', 'M', 'MA15+', 'R18+']).optional(),
+  classification_rating: z.enum(['G', 'PG', 'M', 'MA15+', 'R18+']).optional().nullable(),
   confidence: z.enum(['low', 'medium', 'high']).optional().default('medium'),
   reasoning: z.string().optional().default("AI-generated content warnings based on book metadata")
 });
@@ -284,12 +327,19 @@ export const findBookAndGenerateWarnings = async (isbn: string): Promise<{
   const inputText = `
 I need you to find information about a book with ISBN: ${isbn}
 
-Please use web search to:
-1. Find the book's title, author, and description
-2. Generate appropriate content warnings based on what you find
+**SEARCH STRATEGY:**
+1. Use web search with the ISBN directly: "${isbn}" or "isbn ${isbn}" - the search tool will automatically detect ISBNs and search Google Books
+2. Also try searching for variations like "ISBN ${isbn} book" or "${isbn} book title author"
+3. Once you find the book, search for content warnings: "[Book Title] [Author] content warnings" or "[Book Title] content notes"
 
-If you can't find the book, return book_found: false.
-If you find the book, return book_found: true along with the book information and content warnings.
+**IMPORTANT**: Even if web search fails, you should still:
+- Use your internal knowledge about books, genres, and authors
+- Generate warnings based on genre conventions (romance/fantasy books typically have sexual content, violence, etc.)
+- Return book_found: true if you can infer reasonable information from the ISBN or if you have any knowledge about the book
+- Only return book_found: false if you truly cannot determine anything about the book
+
+If you find the book or can infer information, return book_found: true along with the book information and content warnings.
+Only return book_found: false as a last resort if you have absolutely no information.
 `;
 
   const conversationHistory = [
@@ -313,14 +363,15 @@ If you find the book, return book_found: true along with the book information an
     }
 
     const responseText = agentResult.finalOutput;
-    
+    console.log("DEBUG: Raw AI Response:", responseText);
+
     try {
       // Try to parse JSON response
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         const result = FindBookOutputSchema.parse(parsed);
-        
+
         if (result.book_found === false) {
           return {
             book_found: false,
@@ -333,36 +384,36 @@ If you find the book, return book_found: true along with the book information an
         // Infer classification rating if not provided
         let classificationRating = result.classification_rating;
         if (!classificationRating && result.book_categories) {
-            const classificationTag = result.book_categories.find(c => c.startsWith('CLASSIFICATION:'));
-            if (classificationTag) {
-                classificationRating = classificationTag.replace('CLASSIFICATION:', '') as any;
-            }
+          const classificationTag = result.book_categories.find(c => c.startsWith('CLASSIFICATION:'));
+          if (classificationTag) {
+            classificationRating = classificationTag.replace('CLASSIFICATION:', '') as any;
+          }
         }
         if (!classificationRating) {
-            if (result.content_warnings.length === 0) {
-                classificationRating = 'G';
+          if (result.content_warnings.length === 0) {
+            classificationRating = 'G';
+          } else {
+            const hasSevere = result.content_warnings.some((w: any) => w.severity === 'severe');
+            const hasModerate = result.content_warnings.some((w: any) => w.severity === 'moderate');
+            if (hasSevere) {
+              classificationRating = 'MA15+';
+            } else if (hasModerate) {
+              classificationRating = 'M';
             } else {
-                const hasSevere = result.content_warnings.some((w: any) => w.severity === 'severe');
-                const hasModerate = result.content_warnings.some((w: any) => w.severity === 'moderate');
-                if (hasSevere) {
-                    classificationRating = 'MA15+';
-                } else if (hasModerate) {
-                    classificationRating = 'M';
-                } else {
-                    classificationRating = 'PG';
-                }
+              classificationRating = 'PG';
             }
+          }
         }
 
         return {
           book_found: true,
-          book_title: result.book_title,
-          book_author: result.book_author,
-          book_description: result.book_description,
-          book_categories: result.book_categories,
-          book_cover_url: result.book_cover_url,
+          book_title: result.book_title || undefined,
+          book_author: result.book_author || undefined,
+          book_description: result.book_description || undefined,
+          book_categories: result.book_categories || undefined,
+          book_cover_url: result.book_cover_url || undefined,
           content_warnings: result.content_warnings,
-          classification_rating: classificationRating,
+          classification_rating: classificationRating || undefined,
           confidence: result.confidence,
           reasoning: result.reasoning
         };
@@ -393,7 +444,7 @@ If you find the book, return book_found: true along with the book information an
 export const generateContentWarnings = async (workflow: WorkflowInput): Promise<WorkflowOutput> => {
   // Check if description is thin (less than 150 chars or just a quote)
   const isThinDescription = !workflow.book_description || workflow.book_description.length < 150;
-  
+
   // Prepare the input text for the agent with explicit instructions
   const inputText = `
 Book Information:
@@ -441,7 +492,8 @@ Consider the genre, target audience, and any content that might be triggering or
 
     // Parse the agent's response
     const responseText = agentResult.finalOutput;
-    
+    console.log("DEBUG: Raw AI Response:", responseText);
+
     // Try to extract JSON from the response
     let contentWarnings: ContentWarning[] = [];
     let confidence: 'low' | 'medium' | 'high' = 'medium';
@@ -452,7 +504,7 @@ Consider the genre, target audience, and any content that might be triggering or
       // Look for JSON in the response - try full object first, then array
       const objectMatch = responseText.match(/\{[\s\S]*\}/);
       const arrayMatch = responseText.match(/\[[\s\S]*\]/);
-      
+
       let parsedData: any;
 
       if (objectMatch) {
@@ -460,56 +512,56 @@ Consider the genre, target audience, and any content that might be triggering or
         // If it's an object, try to parse with WorkflowOutputSchema or handle direct array
         const validationResult = WorkflowOutputSchema.safeParse(parsedData);
         if (validationResult.success) {
-            contentWarnings = validationResult.data.content_warnings;
-            confidence = validationResult.data.confidence;
-            reasoning = validationResult.data.reasoning;
-            classificationRating = validationResult.data.classification_rating;
+          contentWarnings = validationResult.data.content_warnings;
+          confidence = validationResult.data.confidence;
+          reasoning = validationResult.data.reasoning;
+          classificationRating = validationResult.data.classification_rating || undefined;
         } else {
-             // Maybe it just returned { content_warnings: [...] } without other fields matching exactly or extra fields
-             if (parsedData.content_warnings && Array.isArray(parsedData.content_warnings)) {
-                 const warningsValidation = z.array(ContentWarningSchema).safeParse(parsedData.content_warnings);
-                 if (warningsValidation.success) {
-                     contentWarnings = warningsValidation.data;
-                     confidence = parsedData.confidence || confidence;
-                     reasoning = parsedData.reasoning || reasoning;
-                     classificationRating = parsedData.classification_rating;
-                 }
-             }
+          // Maybe it just returned { content_warnings: [...] } without other fields matching exactly or extra fields
+          if (parsedData.content_warnings && Array.isArray(parsedData.content_warnings)) {
+            const warningsValidation = z.array(ContentWarningSchema).safeParse(parsedData.content_warnings);
+            if (warningsValidation.success) {
+              contentWarnings = warningsValidation.data;
+              confidence = parsedData.confidence || confidence;
+              reasoning = parsedData.reasoning || reasoning;
+              classificationRating = parsedData.classification_rating;
+            }
+          }
         }
 
       } else if (arrayMatch) {
         parsedData = JSON.parse(arrayMatch[0]);
         const validationResult = z.array(ContentWarningSchema).safeParse(parsedData);
         if (validationResult.success) {
-            contentWarnings = validationResult.data;
+          contentWarnings = validationResult.data;
         }
       }
-      
+
       // Infer classification rating from warnings if not provided
       if (!classificationRating) {
-          if (contentWarnings.length === 0) {
-              classificationRating = 'G';
+        if (contentWarnings.length === 0) {
+          classificationRating = 'G';
+        } else {
+          const hasSevere = contentWarnings.some(w => w.severity === 'severe');
+          const hasModerate = contentWarnings.some(w => w.severity === 'moderate');
+          if (hasSevere) {
+            classificationRating = 'MA15+';
+          } else if (hasModerate) {
+            classificationRating = 'M';
           } else {
-              const hasSevere = contentWarnings.some(w => w.severity === 'severe');
-              const hasModerate = contentWarnings.some(w => w.severity === 'moderate');
-              if (hasSevere) {
-                  classificationRating = 'MA15+';
-              } else if (hasModerate) {
-                  classificationRating = 'M';
-              } else {
-                  classificationRating = 'PG';
-              }
+            classificationRating = 'PG';
           }
+        }
       }
-      
+
       // Ensure reasoning exists - if missing, generate a default one
       contentWarnings = contentWarnings.map(warning => {
-          if (!warning.reasoning || warning.reasoning.trim() === '') {
-            console.warn(`Warning missing reasoning field: ${warning.category} - ${warning.description}`);
-            // Generate a default reasoning based on available information
-            warning.reasoning = `Generated based on book metadata: ${workflow.book_description ? 'description available' : 'no description'}, ${workflow.book_categories ? `categories: ${workflow.book_categories.join(', ')}` : 'no categories'}`;
-          }
-          return warning;
+        if (!warning.reasoning || warning.reasoning.trim() === '') {
+          console.warn(`Warning missing reasoning field: ${warning.category} - ${warning.description}`);
+          // Generate a default reasoning based on available information
+          warning.reasoning = `Generated based on book metadata: ${workflow.book_description ? 'description available' : 'no description'}, ${workflow.book_categories ? `categories: ${workflow.book_categories.join(', ')}` : 'no categories'}`;
+        }
+        return warning;
       });
 
       // If no warnings were generated, ensure we have a detailed reasoning explaining why
@@ -519,7 +571,7 @@ Consider the genre, target audience, and any content that might be triggering or
           const hasDescription = workflow.book_description && workflow.book_description.length >= 150;
           const hasCategories = workflow.book_categories && workflow.book_categories.length > 0;
           const isThinDesc = !workflow.book_description || workflow.book_description.length < 150;
-          
+
           if (isThinDesc) {
             reasoning = `After performing web search for "${workflow.book_title}" by ${workflow.book_author}, the AI analysis determined that this book does not contain content that requires warnings. The book appears to be appropriate for general audiences without specific sensitive themes.`;
           } else if (hasDescription && hasCategories) {

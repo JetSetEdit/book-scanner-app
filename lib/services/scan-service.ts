@@ -63,7 +63,7 @@ async function logAuditDecision(params: {
 }
 
 export async function processIsbnScan(
-  isbn: string, 
+  isbn: string,
   onProgress?: ProgressCallback,
   selectedCandidate?: BookCandidate
 ): Promise<ScanResult> {
@@ -75,25 +75,28 @@ export async function processIsbnScan(
   let contentWarningsGenerated = false
   let usedSelectedCandidate = !!selectedCandidate
 
+  // Store the result of any web search we perform so we don't do it twice
+  let cachedWebSearchResult: any = null;
+
   // Check if book already exists
   console.log('Checking for existing book with ISBN:', cleanIsbn)
   let existingBook = null
-  
+
   // Only check DB if we aren't forcing a candidate
   if (!usedSelectedCandidate) {
-      const { data, error: fetchError } = await supabaseAdmin
-        .from('books')
-        .select('*')
-        .eq('isbn', cleanIsbn)
-        .single()
-        
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching existing book:', JSON.stringify(fetchError, null, 2))
-        throw fetchError
-      }
-      existingBook = data
+    const { data, error: fetchError } = await supabaseAdmin
+      .from('books')
+      .select('*')
+      .eq('isbn', cleanIsbn)
+      .single()
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Error fetching existing book:', JSON.stringify(fetchError, null, 2))
+      throw fetchError
+    }
+    existingBook = data
   }
-  
+
   console.log('Existing book found:', !!existingBook)
 
   let bookId: string
@@ -102,42 +105,42 @@ export async function processIsbnScan(
   if (!currentBook) {
     // Book doesn't exist, fetch from external API
     let bookData: BookCandidate | null = selectedCandidate || null
-    
-    if (!bookData) {
-        console.log('Fetching book candidates for ISBN:', cleanIsbn)
-        onProgress?.('Book not found locally. Fetching metadata from external libraries...');
-        
-        const candidates = await fetchCandidatesByISBN(cleanIsbn)
-        
-        if (candidates.length > 1) {
-             console.log(`Found ${candidates.length} candidates for ISBN ${cleanIsbn}, returning ambiguity.`)
-             onProgress?.(`Found ${candidates.length} possible matches. Please select the correct book.`);
-             
-             // Create ambiguous entry
-             const { data: ambiguousScan } = await (supabaseAdmin as any)
-                 .from('ambiguous_scans')
-                 .insert({
-                     isbn: cleanIsbn,
-                     candidates: candidates as any
-                 })
-                 .select()
-                 .single()
 
-             return {
-                 success: true,
-                 status: 'ambiguous',
-                 candidates,
-                 ambiguousScanId: ambiguousScan?.id,
-                 scan: { id: 'temp-ambiguous', isbn: cleanIsbn },
-                 isNewBook: true,
-                 contentWarningsGenerated: false,
-                 authorContextInvestigated: false
-             }
+    if (!bookData) {
+      console.log('Fetching book candidates for ISBN:', cleanIsbn)
+      onProgress?.('Book not found locally. Fetching metadata from external libraries...');
+
+      const candidates = await fetchCandidatesByISBN(cleanIsbn)
+
+      if (candidates.length > 1) {
+        console.log(`Found ${candidates.length} candidates for ISBN ${cleanIsbn}, returning ambiguity.`)
+        onProgress?.(`Found ${candidates.length} possible matches. Please select the correct book.`);
+
+        // Create ambiguous entry
+        const { data: ambiguousScan } = await (supabaseAdmin as any)
+          .from('ambiguous_scans')
+          .insert({
+            isbn: cleanIsbn,
+            candidates: candidates as any
+          })
+          .select()
+          .single()
+
+        return {
+          success: true,
+          status: 'ambiguous',
+          candidates,
+          ambiguousScanId: ambiguousScan?.id,
+          scan: { id: 'temp-ambiguous', isbn: cleanIsbn },
+          isNewBook: true,
+          contentWarningsGenerated: false,
+          authorContextInvestigated: false
         }
-        
-        if (candidates.length === 1) {
-            bookData = candidates[0]
-        }
+      }
+
+      if (candidates.length === 1) {
+        bookData = candidates[0]
+      }
     }
 
     // Flag if the metadata is "thin" (likely to cause AI failure)
@@ -145,15 +148,10 @@ export async function processIsbnScan(
 
     if (!bookData || isThinMetadata) {
       console.log('Book not found in external APIs or metadata is thin, asking AI agent...')
-      onProgress?.(isThinMetadata 
-        ? 'Metadata found is insufficient. Initiating deep AI web search...' 
+      onProgress?.(isThinMetadata
+        ? 'Metadata found is insufficient. Initiating deep AI web search...'
         : 'Book not found in standard libraries. Initiating AI web search...');
-      
-      // Log metadata thin decision
-      if (isThinMetadata && bookData) {
-        // We'll log this after we have a bookId
-      }
-      
+
       // Create a minimal book record with just the ISBN (or the thin data we have)
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
@@ -179,7 +177,7 @@ export async function processIsbnScan(
       console.log('Minimal book record created with ID:', newBook.id)
       currentBook = newBook
       bookId = newBook.id
-      
+
       // Log thin metadata if applicable
       if (isThinMetadata && bookData) {
         await logAuditDecision({
@@ -195,38 +193,39 @@ export async function processIsbnScan(
           usedWebSearch: true
         })
       }
-      
+
       // Try AI agent to find book information via web search
       console.log('Asking AI agent to find book information via web search...')
       try {
-        const result = await findBookAndGenerateWarnings(cleanIsbn)
+        // Perform the search and CACHE the result
+        cachedWebSearchResult = await findBookAndGenerateWarnings(cleanIsbn)
 
-        if (result.book_found) {
-          onProgress?.(`AI found book: "${result.book_title}". Analyzing content...`);
-          
+        if (cachedWebSearchResult.book_found) {
+          onProgress?.(`AI found book: "${cachedWebSearchResult.book_title}". Analyzing content...`);
+
           // Log search performed
           await logAuditDecision({
             bookId,
             isbn: cleanIsbn,
             decisionType: 'search_performed',
-            warningsCount: result.content_warnings.length,
-            aiReasoning: result.reasoning || 'AI performed web search to find book information',
-            confidenceLevel: result.confidence,
-            bookTitle: result.book_title || null,
-            bookAuthor: result.book_author || null,
+            warningsCount: cachedWebSearchResult.content_warnings.length,
+            aiReasoning: cachedWebSearchResult.reasoning || 'AI performed web search to find book information',
+            confidenceLevel: cachedWebSearchResult.confidence,
+            bookTitle: cachedWebSearchResult.book_title || null,
+            bookAuthor: cachedWebSearchResult.book_author || null,
             usedWebSearch: true,
-            rawAiResponse: result
+            rawAiResponse: cachedWebSearchResult
           })
-          
+
           // Update the book record with AI-found information
           const { data: updatedBook, error: updateError } = await supabaseAdmin
             .from('books')
             .update({
-              title: result.book_title || `Unknown Book (ISBN: ${cleanIsbn})`,
-              author: result.book_author || 'Unknown Author',
-              description: result.book_description || null,
-              categories: result.book_categories || null,
-              cover_url: result.book_cover_url || null
+              title: cachedWebSearchResult.book_title || `Unknown Book (ISBN: ${cleanIsbn})`,
+              author: cachedWebSearchResult.book_author || 'Unknown Author',
+              description: cachedWebSearchResult.book_description || null,
+              categories: cachedWebSearchResult.book_categories || null,
+              cover_url: cachedWebSearchResult.book_cover_url || null
             })
             .eq('id', bookId)
             .select()
@@ -237,29 +236,29 @@ export async function processIsbnScan(
           } else {
             console.log('Updated book record with AI-found information')
             if (updatedBook) {
-                currentBook = updatedBook
+              currentBook = updatedBook
             }
           }
 
           // Insert the generated warnings
-          if (result.content_warnings && result.content_warnings.length > 0) {
-            onProgress?.(`Generated ${result.content_warnings.length} content warnings via AI.`);
-            
+          if (cachedWebSearchResult.content_warnings && cachedWebSearchResult.content_warnings.length > 0) {
+            onProgress?.(`Generated ${cachedWebSearchResult.content_warnings.length} content warnings via AI.`);
+
             // Log warnings generated
             await logAuditDecision({
               bookId,
               isbn: cleanIsbn,
               decisionType: 'warnings_generated',
-              warningsCount: result.content_warnings.length,
-              aiReasoning: `Generated ${result.content_warnings.length} warnings via AI web search. ${result.reasoning || 'Analysis based on web search results.'}`,
-              confidenceLevel: result.confidence,
-              bookTitle: result.book_title || null,
-              bookAuthor: result.book_author || null,
+              warningsCount: cachedWebSearchResult.content_warnings.length,
+              aiReasoning: `Generated ${cachedWebSearchResult.content_warnings.length} warnings via AI web search. ${cachedWebSearchResult.reasoning || 'Analysis based on web search results.'}`,
+              confidenceLevel: cachedWebSearchResult.confidence,
+              bookTitle: cachedWebSearchResult.book_title || null,
+              bookAuthor: cachedWebSearchResult.book_author || null,
               usedWebSearch: true,
-              rawAiResponse: result
+              rawAiResponse: cachedWebSearchResult
             })
-            
-            const warningsToInsert: ContentWarningInsert[] = result.content_warnings.map(warning => ({
+
+            const warningsToInsert: ContentWarningInsert[] = cachedWebSearchResult.content_warnings.map((warning: any) => ({
               book_id: bookId,
               category: warning.category,
               description: warning.description,
@@ -276,7 +275,7 @@ export async function processIsbnScan(
 
             if (!insertError) {
               contentWarningsGenerated = true
-              console.log(`Generated ${result.content_warnings.length} content warnings via AI web search`)
+              console.log(`Generated ${cachedWebSearchResult.content_warnings.length} content warnings via AI web search`)
             } else {
               console.error('Failed to insert AI-generated warnings:', insertError)
             }
@@ -287,12 +286,12 @@ export async function processIsbnScan(
               isbn: cleanIsbn,
               decisionType: 'no_warnings',
               warningsCount: 0,
-              aiReasoning: result.reasoning || 'AI web search found book but determined no content warnings are needed based on analysis.',
-              confidenceLevel: result.confidence,
-              bookTitle: result.book_title || null,
-              bookAuthor: result.book_author || null,
+              aiReasoning: cachedWebSearchResult.reasoning || 'AI web search found book but determined no content warnings are needed based on analysis.',
+              confidenceLevel: cachedWebSearchResult.confidence,
+              bookTitle: cachedWebSearchResult.book_title || null,
+              bookAuthor: cachedWebSearchResult.book_author || null,
               usedWebSearch: true,
-              rawAiResponse: result
+              rawAiResponse: cachedWebSearchResult
             })
           }
         } else {
@@ -303,223 +302,242 @@ export async function processIsbnScan(
         console.error('Error with AI agent book search:', warningError)
       }
     } else {
-        // Insert book with real metadata
-        console.log('Creating new book record with metadata:', bookData.title)
-        onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
-        
-        const { data: newBook, error: insertError } = await supabaseAdmin
-          .from('books')
-          .insert({
-            isbn: bookData.isbn,
-            title: bookData.title,
-            author: bookData.author || null,
-            cover_url: bookData.cover_url || null,
-            description: bookData.description || null,
-            publisher: bookData.publisher || null,
-            published_date: bookData.published_date || null,
-            page_count: bookData.page_count || null,
-            categories: bookData.categories || null
-          })
-          .select()
-          .single()
+      // Insert book with real metadata
+      console.log('Creating new book record with metadata:', bookData.title)
+      onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
 
-        if (insertError) {
-          console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
-          throw insertError
-        }
+      const { data: newBook, error: insertError } = await supabaseAdmin
+        .from('books')
+        .insert({
+          isbn: bookData.isbn,
+          title: bookData.title,
+          author: bookData.author || null,
+          cover_url: bookData.cover_url || null,
+          description: bookData.description || null,
+          publisher: bookData.publisher || null,
+          published_date: bookData.published_date || null,
+          page_count: bookData.page_count || null,
+          categories: bookData.categories || null
+        })
+        .select()
+        .single()
 
-        console.log('New book created with ID:', newBook.id)
-        currentBook = newBook
-        bookId = newBook.id
+      if (insertError) {
+        console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
+        throw insertError
+      }
+
+      console.log('New book created with ID:', newBook.id)
+      currentBook = newBook
+      bookId = newBook.id
     }
   } else {
-      bookId = currentBook.id
-      onProgress?.('Book found in local database.');
+    bookId = currentBook.id
+    onProgress?.('Book found in local database.');
   }
 
   // At this point, we have a bookId and currentBook (unless something went wrong)
   // Track if this is an existing book (vs newly created) for warning generation strategy
   const isExistingBook = !!existingBook && currentBook?.id === existingBook.id;
-  
+
   // Check if book has content warnings, and generate them if missing
   if (!contentWarningsGenerated) {
-      try {
-        console.log('🔍 Checking for existing content warnings for book ID:', bookId)
-        onProgress?.('Checking for existing content warnings...');
-        
-        const { data: existingWarnings } = await supabaseAdmin
-          .from('content_warnings')
-          .select('id')
-          .eq('book_id', bookId)
+    try {
+      console.log('🔍 Checking for existing content warnings for book ID:', bookId)
+      onProgress?.('Checking for existing content warnings...');
 
-        console.log('📊 Existing warnings count:', existingWarnings?.length || 0)
-        if (!existingWarnings || existingWarnings.length === 0) {
-          console.log('🤖 No content warnings found, generating with AI agent...')
-          onProgress?.('No warnings found. Analyzing book content with AI...');
-          
-          if (currentBook) {
-            // RESTORED LOGIC: For existing books, always use web search (more thorough, finds official content notes)
-            // For new books, use metadata-based generation first (more efficient), then verify
-            const isThinDescription = !currentBook.description || currentBook.description.length < 150;
-            
-            let result;
-            let usedSearch = false;
-            let classificationRating: string | null = null;
-            
-            // Strategy: Use web search if:
-            // 1. Book already exists in DB (restored old behavior - more thorough)
-            // 2. Description is thin (needs web search anyway)
-            // Otherwise: Try metadata-based generation first, then verify with web search
-            if (isExistingBook || isThinDescription) {
-                 // Always use web search for existing books (can find official author content notes)
-                 // or if metadata is thin
-                 onProgress?.(isExistingBook 
-                   ? 'Book found in database. Performing comprehensive web search for content warnings...'
-                   : 'Book description is brief. AI performing web search for deeper analysis...');
-                 
-                 const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
-                 usedSearch = true;
-                 
-                 // Map the result format
-                 result = {
-                     content_warnings: searchResult.content_warnings,
-                     confidence: searchResult.confidence,
-                     reasoning: searchResult.reasoning,
-                     classification_rating: (searchResult as any).classification_rating
-                 };
-                 classificationRating = (searchResult as any).classification_rating || null;
+      const { data: existingWarnings } = await supabaseAdmin
+        .from('content_warnings')
+        .select('id')
+        .eq('book_id', bookId)
+
+      console.log('📊 Existing warnings count:', existingWarnings?.length || 0)
+      if (!existingWarnings || existingWarnings.length === 0) {
+        console.log('🤖 No content warnings found, generating with AI agent...')
+        onProgress?.('No warnings found. Analyzing book content with AI...');
+
+        if (currentBook) {
+          // RESTORED LOGIC: For existing books, always use web search (more thorough, finds official content notes)
+          // For new books, use metadata-based generation first (more efficient), then verify
+          const isThinDescription = !currentBook.description || currentBook.description.length < 150;
+
+          let result;
+          let usedSearch = false;
+          let classificationRating: string | null = null;
+
+          // Strategy: Use web search if:
+          // 1. Book already exists in DB (restored old behavior - more thorough)
+          // 2. Description is thin (needs web search anyway)
+          // Otherwise: Try metadata-based generation first, then verify with web search
+          if (isExistingBook || isThinDescription) {
+            // Check if we already have a cached result from the first step
+            if (cachedWebSearchResult) {
+              console.log("Using cached web search result from initial lookup");
+              onProgress?.('Using previously retrieved web search data...');
+
+              // Use the cached result directly
+              const searchResult = cachedWebSearchResult;
+              usedSearch = true;
+
+              // Map the result format
+              result = {
+                content_warnings: searchResult.content_warnings,
+                confidence: searchResult.confidence,
+                reasoning: searchResult.reasoning,
+                classification_rating: (searchResult as any).classification_rating
+              };
+              classificationRating = (searchResult as any).classification_rating || null;
             } else {
-                 // For new books with good metadata: Use metadata-based generation first (faster)
-                 // Then verify with web search if no warnings found (catches false negatives)
-                 onProgress?.('Analyzing book metadata for content warnings...');
-                 
-                 result = await generateContentWarnings({
-                    book_title: currentBook.title,
-                    book_author: currentBook.author || 'Unknown',
-                    book_description: currentBook.description || undefined,
-                    book_categories: currentBook.categories || undefined,
-                    book_isbn: currentBook.isbn
-                 });
-                 classificationRating = (result as any).classification_rating || null;
+              // Always use web search for existing books (can find official author content notes)
+              // or if metadata is thin
+              onProgress?.(isExistingBook
+                ? 'Book found in database. Performing comprehensive web search for content warnings...'
+                : 'Book description is brief. AI performing web search for deeper analysis...');
 
-                 // DOUBLE CHECK: If standard analysis says "Safe" (no warnings),
-                 // force a web search verification to avoid false negatives.
-                 if (result.content_warnings.length === 0) {
-                    console.log("Initial analysis found no warnings. Performing deep search verification...");
-                    onProgress?.("Initial text analysis safe. Verifying with web search...");
-                    
-                    const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
-                    
-                    // Handle "Book Not Found" in Deep Search
-                    if (!searchResult.book_found) {
-                        console.log("Deep search failed to find book info.");
-                        onProgress?.("⚠️ Deep search could not verify book details.");
-                        
-                        // If we have local metadata, we keep the "Safe" verdict but with Low confidence and a warning in reasoning
-                        result.confidence = 'low';
-                        result.reasoning = `${result.reasoning} (Note: Deep web search could not confirm this safety rating due to lack of online results. Manual review recommended.)`;
-                        usedSearch = true;
-                    } 
-                    // If search found something, OVERRIDE the initial result
-                    else if (searchResult.content_warnings.length > 0) {
-                        console.log("Deep search found warnings that initial analysis missed!");
-                        onProgress?.(`Deep search found ${searchResult.content_warnings.length} hidden warnings.`);
-                        
-                        result = {
-                            content_warnings: searchResult.content_warnings,
-                            confidence: searchResult.confidence,
-                            reasoning: `Initial text analysis missed triggers. Web search correction: ${searchResult.reasoning}`,
-                            classification_rating: (searchResult as any).classification_rating
-                        };
-                        classificationRating = (searchResult as any).classification_rating || null;
-                        usedSearch = true;
-                    } else {
-                        // If search ALSO found nothing, update reasoning to show we double checked
-                        result.reasoning = `${result.reasoning} (Web search verification confirmed no significant warnings found).`;
-                        usedSearch = true; 
-                    }
-                 }
+              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
+              usedSearch = true;
+
+              // Map the result format
+              result = {
+                content_warnings: searchResult.content_warnings,
+                confidence: searchResult.confidence,
+                reasoning: searchResult.reasoning,
+                classification_rating: (searchResult as any).classification_rating
+              };
+              classificationRating = (searchResult as any).classification_rating || null;
             }
-            
-            // Update book with classification rating if we got one
-            if (classificationRating && currentBook) {
-                const categories = currentBook.categories || [];
-                const hasClassification = categories.some(c => c.startsWith('CLASSIFICATION:'));
-                if (!hasClassification) {
-                    categories.push(`CLASSIFICATION:${classificationRating}`);
-                    await supabaseAdmin
-                        .from('books')
-                        .update({ categories })
-                        .eq('id', bookId);
-                }
-            }
+          } else {
+            // For new books with good metadata: Use metadata-based generation first (faster)
+            // Then verify with web search if no warnings found (catches false negatives)
+            onProgress?.('Analyzing book metadata for content warnings...');
 
-            // Log the decision
-            const decisionType = result.content_warnings.length > 0 ? 'warnings_generated' : 'no_warnings';
-            await logAuditDecision({
-              bookId,
-              isbn: cleanIsbn,
-              decisionType,
-              warningsCount: result.content_warnings.length,
-              aiReasoning: result.reasoning || (result.content_warnings.length > 0 
-                ? `Generated ${result.content_warnings.length} content warnings based on book analysis.`
-                : 'AI analysis determined no content warnings are needed for this book.'),
-              confidenceLevel: result.confidence,
-              bookTitle: currentBook.title,
-              bookAuthor: currentBook.author || null,
-              descriptionLength: currentBook.description?.length || null,
-              hadThinMetadata: isThinDescription,
-              usedWebSearch: usedSearch,
-              rawAiResponse: result
-            })
+            result = await generateContentWarnings({
+              book_title: currentBook.title,
+              book_author: currentBook.author || 'Unknown',
+              book_description: currentBook.description || undefined,
+              book_categories: currentBook.categories || undefined,
+              book_isbn: currentBook.isbn
+            });
+            classificationRating = (result as any).classification_rating || null;
 
-            if (result.content_warnings.length > 0) {
-              // Insert the generated warnings
-              onProgress?.(`AI analysis complete. Saving ${result.content_warnings.length} warnings...`);
-              
-              const warningsToInsert: ContentWarningInsert[] = result.content_warnings.map(warning => ({
-                book_id: bookId,
-                category: warning.category,
-                description: warning.description,
-                severity: warning.severity,
-                user_id: null,
-                reasoning: warning.reasoning || null,
-                is_author_verified: warning.is_author_verified || false,
-                source_url: warning.source_url || null
-              }))
+            // DOUBLE CHECK: If standard analysis says "Safe" (no warnings),
+            // force a web search verification to avoid false negatives.
+            if (result.content_warnings.length === 0) {
+              console.log("Initial analysis found no warnings. Performing deep search verification...");
+              onProgress?.("Initial text analysis safe. Verifying with web search...");
 
-              const { error: insertError } = await supabaseAdmin
-                .from('content_warnings')
-                .insert(warningsToInsert)
+              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
 
-              if (!insertError) {
-                contentWarningsGenerated = true
-                console.log(`Generated ${result.content_warnings.length} content warnings`)
-              } else {
-                console.error('Failed to insert AI-generated warnings:', insertError)
+              // Handle "Book Not Found" in Deep Search
+              if (!searchResult.book_found) {
+                console.log("Deep search failed to find book info.");
+                onProgress?.("⚠️ Deep search could not verify book details.");
+
+                // If we have local metadata, we keep the "Safe" verdict but with Low confidence and a warning in reasoning
+                result.confidence = 'low';
+                result.reasoning = `${result.reasoning} (Note: Deep web search could not confirm this safety rating due to lack of online results. Manual review recommended.)`;
+                usedSearch = true;
               }
-            } else {
-                onProgress?.('AI analysis complete. No specific warnings generated.');
+              // If search found something, OVERRIDE the initial result
+              else if (searchResult.content_warnings.length > 0) {
+                console.log("Deep search found warnings that initial analysis missed!");
+                onProgress?.(`Deep search found ${searchResult.content_warnings.length} hidden warnings.`);
+
+                result = {
+                  content_warnings: searchResult.content_warnings,
+                  confidence: searchResult.confidence,
+                  reasoning: `Initial text analysis missed triggers. Web search correction: ${searchResult.reasoning}`,
+                  classification_rating: (searchResult as any).classification_rating
+                };
+                classificationRating = (searchResult as any).classification_rating || null;
+                usedSearch = true;
+              } else {
+                // If search ALSO found nothing, update reasoning to show we double checked
+                result.reasoning = `${result.reasoning} (Web search verification confirmed no significant warnings found).`;
+                usedSearch = true;
+              }
             }
           }
-        } else {
-             onProgress?.(`Found ${existingWarnings.length} existing content warnings.`);
+
+          // Update book with classification rating if we got one
+          if (classificationRating && currentBook) {
+            const categories = currentBook.categories || [];
+            const hasClassification = categories.some(c => c.startsWith('CLASSIFICATION:'));
+            if (!hasClassification) {
+              categories.push(`CLASSIFICATION:${classificationRating}`);
+              await supabaseAdmin
+                .from('books')
+                .update({ categories })
+                .eq('id', bookId);
+            }
+          }
+
+          // Log the decision
+          const decisionType = result.content_warnings.length > 0 ? 'warnings_generated' : 'no_warnings';
+          await logAuditDecision({
+            bookId,
+            isbn: cleanIsbn,
+            decisionType,
+            warningsCount: result.content_warnings.length,
+            aiReasoning: result.reasoning || (result.content_warnings.length > 0
+              ? `Generated ${result.content_warnings.length} content warnings based on book analysis.`
+              : 'AI analysis determined no content warnings are needed for this book.'),
+            confidenceLevel: result.confidence,
+            bookTitle: currentBook.title,
+            bookAuthor: currentBook.author || null,
+            descriptionLength: currentBook.description?.length || null,
+            hadThinMetadata: isThinDescription,
+            usedWebSearch: usedSearch,
+            rawAiResponse: result
+          })
+
+          if (result.content_warnings.length > 0) {
+            // Insert the generated warnings
+            onProgress?.(`AI analysis complete. Saving ${result.content_warnings.length} warnings...`);
+
+            const warningsToInsert: ContentWarningInsert[] = result.content_warnings.map((warning: any) => ({
+              book_id: bookId,
+              category: warning.category,
+              description: warning.description,
+              severity: warning.severity,
+              user_id: null,
+              reasoning: warning.reasoning || null,
+              is_author_verified: warning.is_author_verified || false,
+              source_url: warning.source_url || null
+            }))
+
+            const { error: insertError } = await supabaseAdmin
+              .from('content_warnings')
+              .insert(warningsToInsert)
+
+            if (!insertError) {
+              contentWarningsGenerated = true
+              console.log(`Generated ${result.content_warnings.length} content warnings`)
+            } else {
+              console.error('Failed to insert AI-generated warnings:', insertError)
+            }
+          } else {
+            onProgress?.('AI analysis complete. No specific warnings generated.');
+          }
         }
-      } catch (warningError) {
-        console.error('Error generating content warnings:', warningError)
-        // Don't fail the scan if warning generation fails
+      } else {
+        onProgress?.(`Found ${existingWarnings.length} existing content warnings.`);
       }
+    } catch (warningError) {
+      console.error('Error generating content warnings:', warningError)
+      // Don't fail the scan if warning generation fails
+    }
   }
 
   // Get the final book data for author context investigation (refresh in case of updates)
-  const finalBookData = currentBook 
+  const finalBookData = currentBook
 
   // Check if author context exists, and investigate if missing
   let authorContextInvestigated = false
   try {
     if (finalBookData?.author && finalBookData.author !== 'Unknown Author') {
       console.log('🔍 Checking for existing author context for:', finalBookData.author)
-      
+
       // Check if author context already exists
       const { data: existingAuthorContext } = await supabaseAdmin
         .from('author_context')
@@ -528,7 +546,7 @@ export async function processIsbnScan(
         .eq('status', 'approved')
 
       console.log('📊 Existing author context count:', existingAuthorContext?.length || 0)
-      
+
       if (!existingAuthorContext || existingAuthorContext.length === 0) {
         console.log('🤖 No author context found, investigating with AI agent...')
         console.log(`Author context investigation disabled for ${finalBookData.author}`)

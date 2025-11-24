@@ -5,10 +5,10 @@ import { processIsbnScan } from '@/lib/services/scan-service'
 export async function POST(request: NextRequest) {
   try {
     console.log('Scan ISBN API called')
-    
+
     const { isbn, stream, selectedCandidate } = await request.json()
     console.log('Processing ISBN:', isbn)
-    
+
     if (!isbn) {
       return NextResponse.json({ error: 'ISBN is required' }, { status: 400 })
     }
@@ -16,15 +16,15 @@ export async function POST(request: NextRequest) {
     // Validate ISBN format
     if (!validateISBN(isbn)) {
       console.log('Invalid ISBN format:', isbn)
-      return NextResponse.json({ 
-        error: 'Invalid ISBN format. Please enter a valid 10 or 13 digit ISBN.' 
+      return NextResponse.json({
+        error: 'Invalid ISBN format. Please enter a valid 10 or 13 digit ISBN.'
       }, { status: 400 })
     }
 
     if (stream) {
       // Return a streaming response
       const encoder = new TextEncoder()
-      
+
       const customStream = new ReadableStream({
         async start(controller) {
           const sendUpdate = (message: string) => {
@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
             const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate)
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
           } catch (error) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`))
+            const errorMessage = error instanceof Error ? error.message : (error as any)?.message || 'Unknown error';
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMessage })}\n\n`))
           } finally {
             controller.close()
           }
@@ -57,9 +58,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Scan ISBN error:', JSON.stringify(error, null, 2))
+    const errorMessage = error instanceof Error ? error.message : (error as any)?.message || 'Unknown error';
     return NextResponse.json({
       error: 'Failed to process ISBN scan',
-      details: error instanceof Error ? error.message : 'Unknown error',
+      details: errorMessage,
       debug: process.env.NODE_ENV === 'development' ? error : undefined
     }, { status: 500 })
   }
