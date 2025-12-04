@@ -1,62 +1,46 @@
 
-import fs from 'fs';
-import path from 'path';
+import { config } from 'dotenv';
+import { resolve } from 'path';
 
-async function testAgent(isbn: string) {
-    // 1. Manually load env vars FIRST
-    const envPath = path.resolve(process.cwd(), '.env.local');
-    if (fs.existsSync(envPath)) {
-        const envConfig = fs.readFileSync(envPath, 'utf8');
-        envConfig.split('\n').forEach(line => {
-            const [key, value] = line.split('=');
-            if (key && value) {
-                process.env[key.trim()] = value.trim();
-            }
-        });
-    } else {
-        console.error("Could not find .env.local");
-        process.exit(1);
-    }
+// Load environment variables BEFORE importing the agent
+config({ path: resolve(process.cwd(), '.env.local') });
+console.log('Loading env from:', resolve(process.cwd(), '.env.local'));
 
-    // 2. Dynamically import the agent AFTER env vars are set
-    const { findBookAndGenerateWarnings } = await import('../lib/content-warning-agent');
-
-    console.log(`🧪 Testing AI Agent for ISBN: ${isbn}`);
-    console.log('----------------------------------------');
+async function runTest() {
+    const isbn = process.argv[2] || '9781101904220'; // Default to "Dark Matter" or similar if not provided
+    console.log(`Running test for ISBN: ${isbn}`);
 
     try {
-        const startTime = Date.now();
+        // Dynamic import to ensure env vars are loaded first
+        const { findBookAndGenerateWarnings } = await import('../lib/content-warning-agent');
+
         const result = await findBookAndGenerateWarnings(isbn);
-        const endTime = Date.now();
 
-        console.log(`\n✅ Agent Finished in ${(endTime - startTime) / 1000}s`);
-        console.log('----------------------------------------');
-
+        console.log('\n--- RESULT ---');
         console.log(`Book Found: ${result.book_found}`);
-        if (result.book_found) {
-            console.log(`Title: ${result.book_title}`);
-            console.log(`Author: ${result.book_author}`);
-            console.log(`Description: ${result.book_description?.substring(0, 100)}...`);
-            console.log(`Categories: ${result.book_categories}`);
+        console.log(`Title: ${result.book_title}`);
+        console.log(`Author: ${result.book_author}`);
+        console.log(`Confidence: ${result.confidence}`);
+        console.log(`Classification: ${result.classification_rating}`);
+        console.log(`Reasoning: ${result.reasoning}`);
 
-            console.log(`\n⚠️ Content Warnings (${result.content_warnings.length}):`);
-            result.content_warnings.forEach(w => {
-                console.log(`- [${w.severity}] ${w.category}: ${w.description}`);
-                console.log(`  Reasoning: ${w.reasoning}`);
-            });
-
-            console.log(`\n📊 Classification: ${result.classification_rating}`);
-            console.log(`Confidence: ${result.confidence}`);
-            console.log(`Reasoning: ${result.reasoning}`);
+        console.log('\n--- WARNINGS ---');
+        if (result.content_warnings.length === 0) {
+            console.log('No warnings generated.');
         } else {
-            console.log('❌ Book not found by agent.');
-            console.log(`Reasoning: ${result.reasoning}`);
+            result.content_warnings.forEach((w, i) => {
+                console.log(`\n[${i + 1}] ${w.category.toUpperCase()} (${w.severity})`);
+                console.log(`    Description: ${w.description}`);
+                console.log(`    Reasoning: ${w.reasoning}`);
+                if (w.is_author_verified) {
+                    console.log(`    ✅ VERIFIED SOURCE: ${w.source_url}`);
+                }
+            });
         }
 
     } catch (error) {
-        console.error('❌ Agent Crashed:', error);
+        console.error('Test failed:', error);
     }
 }
 
-const isbn = process.argv[2] || '9781542016414';
-testAgent(isbn);
+runTest();

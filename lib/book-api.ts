@@ -23,6 +23,7 @@ interface BookData {
   published_date?: string
   page_count?: number
   categories?: string[]
+  classification_rating?: string
 }
 
 export interface BookCandidate extends BookData {
@@ -80,11 +81,11 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
         isbn,
         title: book.title || 'Unknown Title',
         author: book.authors?.[0],
-        cover_url: book.imageLinks?.large?.replace("http:", "https:") || 
-                   book.imageLinks?.medium?.replace("http:", "https:") || 
-                   book.imageLinks?.small?.replace("http:", "https:") || 
-                   book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") || 
-                   book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
+        cover_url: book.imageLinks?.large?.replace("http:", "https:") ||
+          book.imageLinks?.medium?.replace("http:", "https:") ||
+          book.imageLinks?.small?.replace("http:", "https:") ||
+          book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") ||
+          book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
         description: book.description,
         publisher: book.publisher,
         published_date: book.publishedDate,
@@ -130,7 +131,7 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
   try {
     const response = await fetch(
       `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`,
-      { 
+      {
         next: { revalidate: 86400 }, // Cache for 24 hours
         headers: {
           'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
@@ -155,11 +156,20 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
       title: bookData.title,
       author: bookData.authors?.[0]?.name,
       // Use the dedicated covers API if the key exists
-      cover_url: bookData.cover?.large 
-        ? bookData.cover.large 
-        : (bookData.cover?.medium 
-             ? bookData.cover.medium 
-             : `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`),
+      cover_url: await (async () => {
+        const candidates = [
+          bookData.cover?.large,
+          bookData.cover?.medium,
+          `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`
+        ];
+
+        for (const url of candidates) {
+          if (url && await validateImageUrl(url)) {
+            return url;
+          }
+        }
+        return undefined;
+      })(),
       description: typeof bookData.excerpts?.[0]?.text === 'string' ? bookData.excerpts[0].text : undefined,
       publisher: bookData.publishers?.[0]?.name,
       published_date: bookData.publish_date,
@@ -198,30 +208,35 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
     }
 
     // Helper to prioritize higher quality images and ensure HTTPS
-    const getBestCover = (imageLinks: any) => {
-        if (!imageLinks) return undefined;
-        
-        const candidates = [
-            imageLinks.extraLarge,
-            imageLinks.large,
-            imageLinks.medium,
-            imageLinks.small,
-            imageLinks.thumbnail,
-            imageLinks.smallThumbnail
-        ];
+    const getBestCover = async (imageLinks: any) => {
+      if (!imageLinks) return undefined;
 
-        // Return the first valid URL found
-        for (const url of candidates) {
-            if (url) return url.replace("http:", "https:").replace("&edge=curl", "");
+      const candidates = [
+        imageLinks.extraLarge,
+        imageLinks.large,
+        imageLinks.medium,
+        imageLinks.small,
+        imageLinks.thumbnail,
+        imageLinks.smallThumbnail
+      ];
+
+      // Return the first valid URL found
+      for (const url of candidates) {
+        if (url) {
+          const secureUrl = url.replace("http:", "https:").replace("&edge=curl", "");
+          if (await validateImageUrl(secureUrl)) {
+            return secureUrl;
+          }
         }
-        return undefined;
+      }
+      return undefined;
     }
 
     return {
       isbn,
       title: book.title,
       author: book.authors?.[0],
-      cover_url: getBestCover(book.imageLinks),
+      cover_url: await getBestCover(book.imageLinks),
       description: book.description,
       publisher: book.publisher,
       published_date: book.publishedDate,
@@ -231,5 +246,49 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
   } catch (error) {
     console.error("[Book API] Google Books error:", error)
     return null
+  }
+}
+
+// Helper function to validate if an image URL is accessible and is an image
+async function validateImageUrl(url: string): Promise<boolean> {
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Book-Scanner-App/1.0'
+      },
+      redirect: 'follow' // Explicitly follow redirects
+    });
+
+    clearTimeout(id);
+
+    if (!response.ok) return false;
+
+    const contentType = response.headers.get('content-type');
+    const contentLength = response.headers.get('content-length');
+
+    // Check if it's an image
+    if (contentType && !contentType.startsWith('image/')) {
+      return false;
+    }
+
+    // Check for tiny images (likely tracking pixels or empty placeholders)
+    // < 1000 bytes is suspicious for a book cover
+    if (contentLength) {
+      const size = parseInt(contentLength);
+      if (size < 1000) return false;
+
+      // Block specific Google Books "Image Not Available" placeholder size
+      // We observed this exact size (15567 bytes) for multiple placeholder images
+      if (size === 15567) return false;
+    }
+
+    return true;
+  } catch (error) {
+    return false;
   }
 }

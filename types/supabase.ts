@@ -54,6 +54,34 @@ export interface Database {
         }
         Relationships: []
       }
+      scans: {
+        Row: {
+          id: string
+          isbn: string
+          book_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          isbn: string
+          book_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          isbn?: string
+          book_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scans_book_id_fkey"
+            columns: ["book_id"]
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       content_warnings: {
         Row: {
           id: string

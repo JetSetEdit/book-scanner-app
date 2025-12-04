@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scanBook } from '@/lib/services/scan-service';
+import { processIsbnScan } from '@/lib/services/scan-service';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
                     await writer.write(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`));
                 };
 
-                const result = await scanBook(isbn, undefined, onProgress);
+                const result = await processIsbnScan(isbn, onProgress);
 
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`));
             } catch (error) {

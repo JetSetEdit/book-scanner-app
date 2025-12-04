@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateContentWarnings } from '@/lib/agent-chain'
+import { generateContentWarnings } from '@/lib/content-warning-agent'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         .from('content_warnings')
         .delete()
         .eq('book_id', bookId)
-      
+
       if (deleteError) {
         console.error('Error deleting existing warnings:', deleteError)
         return NextResponse.json(
@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     const result = await generateContentWarnings({
       book_title: book.title,
       book_author: book.author || 'Unknown',
-      book_description: book.description,
-      book_categories: book.categories,
+      book_description: book.description || undefined,
+      book_categories: book.categories || undefined,
       book_isbn: book.isbn
     })
 
@@ -84,14 +84,16 @@ export async function POST(request: NextRequest) {
     // Insert the generated warnings into the database
     // Note: reasoning is now always included (parsing logic ensures it exists)
     // If the column doesn't exist, the insert will fail gracefully
+    const validCategories = ['violence', 'sexual_content', 'substance_abuse', 'mental_health', 'death', 'abuse', 'discrimination', 'other'];
+
     const warningsToInsert = result.content_warnings.map(warning => ({
       book_id: bookId,
-      category: warning.category,
-      description: warning.description,
+      category: validCategories.includes(warning.category) ? warning.category : 'other',
+      description: warning.category === 'relationships' || warning.category === 'language' ? `[${warning.category.toUpperCase()}] ${warning.description}` : warning.description,
       severity: warning.severity,
       user_id: null, // AI-generated warnings don't have a user_id
       reasoning: warning.reasoning || null // Always include reasoning (parsing ensures it exists)
-    }))
+    })) as any[]
 
     const { data: insertedWarnings, error: insertError } = await supabaseAdmin
       .from('content_warnings')

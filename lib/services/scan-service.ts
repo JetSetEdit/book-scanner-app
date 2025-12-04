@@ -65,7 +65,8 @@ async function logAuditDecision(params: {
 export async function processIsbnScan(
   isbn: string,
   onProgress?: ProgressCallback,
-  selectedCandidate?: BookCandidate
+  selectedCandidate?: BookCandidate,
+  forceRefresh: boolean = false
 ): Promise<ScanResult> {
   console.log('Processing ISBN scan:', isbn)
   onProgress?.('Validating ISBN and checking local database...');
@@ -143,8 +144,8 @@ export async function processIsbnScan(
       }
     }
 
-    // Flag if the metadata is "thin" (likely to cause AI failure)
-    const isThinMetadata = bookData && (!bookData.description || bookData.description.length < 150);
+    // Flag if the metadata is "thin" (likely to cause AI failure) or missing cover
+    const isThinMetadata = bookData && (!bookData.description || bookData.description.length < 150 || !bookData.cover_url);
 
     if (!bookData || isThinMetadata) {
       console.log('Book not found in external APIs or metadata is thin, asking AI agent...')
@@ -185,7 +186,7 @@ export async function processIsbnScan(
           isbn: cleanIsbn,
           decisionType: 'metadata_thin',
           warningsCount: 0,
-          aiReasoning: `Metadata retrieved from external APIs was insufficient (description length: ${bookData.description?.length || 0} chars). Triggering AI web search for deeper analysis.`,
+          aiReasoning: `Metadata retrieved from external APIs was insufficient (description length: ${bookData.description?.length || 0} chars, cover: ${bookData.cover_url ? 'found' : 'missing'}). Triggering AI web search for deeper analysis.`,
           bookTitle: bookData.title,
           bookAuthor: bookData.author || null,
           descriptionLength: bookData.description?.length || null,
@@ -340,11 +341,17 @@ export async function processIsbnScan(
   // Track if this is an existing book (vs newly created) for warning generation strategy
   const isExistingBook = !!existingBook && currentBook?.id === existingBook.id;
 
-  // Check if book has content warnings, and generate them if missing
-  if (!contentWarningsGenerated) {
+  // Check if book has content warnings, and generate them if missing (or if forced)
+  if (!contentWarningsGenerated || forceRefresh) {
     try {
       console.log('🔍 Checking for existing content warnings for book ID:', bookId)
       onProgress?.('Checking for existing content warnings...');
+
+      // If forcing refresh, delete existing warnings first
+      if (forceRefresh && existingBook) {
+        console.log('Force refresh requested. Clearing existing warnings...');
+        await supabaseAdmin.from('content_warnings').delete().eq('book_id', bookId);
+      }
 
       const { data: existingWarnings } = await supabaseAdmin
         .from('content_warnings')
@@ -352,34 +359,33 @@ export async function processIsbnScan(
         .eq('book_id', bookId)
 
       console.log('📊 Existing warnings count:', existingWarnings?.length || 0)
-      if (!existingWarnings || existingWarnings.length === 0) {
-        console.log('🤖 No content warnings found, generating with AI agent...')
-        onProgress?.('No warnings found. Analyzing book content with AI...');
+
+      // If we have no warnings (or we just deleted them), generate new ones
+      if (!existingWarnings || existingWarnings.length === 0 || forceRefresh) {
+        console.log('🤖 Generating content warnings with AI agent...')
+        onProgress?.('Analyzing book content with AI...');
 
         if (currentBook) {
           // RESTORED LOGIC: For existing books, always use web search (more thorough, finds official content notes)
           // For new books, use metadata-based generation first (more efficient), then verify
-          const isThinDescription = !currentBook.description || currentBook.description.length < 150;
+          const isThinMetadata = !currentBook.description || currentBook.description.length < 150 || !currentBook.cover_url;
 
           let result;
           let usedSearch = false;
           let classificationRating: string | null = null;
+          let foundCoverUrl: string | null = null;
 
           // Strategy: Use web search if:
           // 1. Book already exists in DB (restored old behavior - more thorough)
           // 2. Description is thin (needs web search anyway)
+          // 3. Force Refresh is on
           // Otherwise: Try metadata-based generation first, then verify with web search
-          if (isExistingBook || isThinDescription) {
-            // Check if we already have a cached result from the first step
-            if (cachedWebSearchResult) {
-              console.log("Using cached web search result from initial lookup");
-              onProgress?.('Using previously retrieved web search data...');
-
-              // Use the cached result directly
+          if (isExistingBook || isThinMetadata || forceRefresh) {
+            // Check if we already have a cached result from the first step (only if NOT forcing refresh)
+            if (cachedWebSearchResult && !forceRefresh) {
+              console.log("Using cached web search result");
               const searchResult = cachedWebSearchResult;
               usedSearch = true;
-
-              // Map the result format
               result = {
                 content_warnings: searchResult.content_warnings,
                 confidence: searchResult.confidence,
@@ -387,11 +393,12 @@ export async function processIsbnScan(
                 classification_rating: (searchResult as any).classification_rating
               };
               classificationRating = (searchResult as any).classification_rating || null;
+              foundCoverUrl = (searchResult as any).book_cover_url || null;
             } else {
               // Always use web search for existing books (can find official author content notes)
               // or if metadata is thin
-              onProgress?.(isExistingBook
-                ? 'Book found in database. Performing comprehensive web search for content warnings...'
+              onProgress?.(isExistingBook || forceRefresh
+                ? 'Performing comprehensive web search for content warnings...'
                 : 'Book description is brief. AI performing web search for deeper analysis...');
 
               const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
@@ -405,6 +412,7 @@ export async function processIsbnScan(
                 classification_rating: (searchResult as any).classification_rating
               };
               classificationRating = (searchResult as any).classification_rating || null;
+              foundCoverUrl = (searchResult as any).book_cover_url || null;
             }
           } else {
             // For new books with good metadata: Use metadata-based generation first (faster)
@@ -450,6 +458,7 @@ export async function processIsbnScan(
                   classification_rating: (searchResult as any).classification_rating
                 };
                 classificationRating = (searchResult as any).classification_rating || null;
+                foundCoverUrl = (searchResult as any).book_cover_url || null;
                 usedSearch = true;
               } else {
                 // If search ALSO found nothing, update reasoning to show we double checked
@@ -459,17 +468,28 @@ export async function processIsbnScan(
             }
           }
 
-          // Update book with classification rating if we got one
-          if (classificationRating && currentBook) {
+          // Update book with classification rating AND COVER if we got one
+          const updates: any = {};
+
+          if (classificationRating) {
             const categories = currentBook.categories || [];
             const hasClassification = categories.some(c => c.startsWith('CLASSIFICATION:'));
             if (!hasClassification) {
               categories.push(`CLASSIFICATION:${classificationRating}`);
-              await supabaseAdmin
-                .from('books')
-                .update({ categories })
-                .eq('id', bookId);
+              updates.categories = categories;
             }
+          }
+
+          // Update cover if we found one and the current one is missing
+          if (foundCoverUrl && !currentBook.cover_url && foundCoverUrl !== "No cover available") {
+            console.log(`Found new cover URL from AI: ${foundCoverUrl}`);
+            updates.cover_url = foundCoverUrl;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await supabaseAdmin.from('books').update(updates).eq('id', bookId);
+            // Update currentBook in memory as well
+            currentBook = { ...currentBook, ...updates };
           }
 
           // Log the decision
@@ -483,10 +503,10 @@ export async function processIsbnScan(
               ? `Generated ${result.content_warnings.length} content warnings based on book analysis.`
               : 'AI analysis determined no content warnings are needed for this book.'),
             confidenceLevel: result.confidence,
-            bookTitle: currentBook.title,
-            bookAuthor: currentBook.author || null,
-            descriptionLength: currentBook.description?.length || null,
-            hadThinMetadata: isThinDescription,
+            bookTitle: currentBook!.title,
+            bookAuthor: currentBook!.author || null,
+            descriptionLength: currentBook!.description?.length || null,
+            hadThinMetadata: isThinMetadata,
             usedWebSearch: usedSearch,
             rawAiResponse: result
           })
@@ -558,10 +578,32 @@ export async function processIsbnScan(
     // Don't fail the scan if author context investigation fails
   }
 
-  // Record the scan (temporarily disabled - scans table doesn't exist)
-  console.log('Skipping scan recording - scans table not available')
+  // Record the scan
+  let scan = null;
+  try {
+    console.log('Recording scan...')
+    const { data: scanData, error: scanError } = await supabaseAdmin
+      .from('scans')
+      .insert({
+        isbn: cleanIsbn,
+        book_id: bookId
+      })
+      .select()
+      .single()
+
+    if (scanError) {
+      console.warn('Failed to record scan (scans table might be missing):', scanError.message)
+      // Fallback for UI if table missing
+      scan = { id: 'temp-scan-id', isbn: cleanIsbn, book_id: bookId }
+    } else {
+      scan = scanData
+    }
+  } catch (e) {
+    console.warn('Exception recording scan:', e)
+    scan = { id: 'temp-scan-id', isbn: cleanIsbn, book_id: bookId }
+  }
+
   onProgress?.('Scan completed successfully.');
-  const scan = { id: 'temp-scan-id', isbn: cleanIsbn, book_id: bookId }
 
   return {
     success: true,

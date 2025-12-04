@@ -1,47 +1,97 @@
-import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = "https://tawolulyrlnpxjyyxpdw.supabase.co"
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhd29sdWx5cmxucHhqeXl4cGR3Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTQ5NDM5NywiZXhwIjoyMDc1MDcwMzk3fQ.ige4kgvZav25IO9cINTl6mPgg-ACHDsG8t-hLBiGqSM"
+import { createClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
+import { resolve } from 'path';
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Load environment variables
+config({ path: resolve(process.cwd(), '.env.local') });
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+async function validateImageUrl(url: string): Promise<boolean> {
+    try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+        const response = await fetch(url, {
+            method: 'HEAD',
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+            redirect: 'follow'
+        });
+
+        clearTimeout(id);
+
+        if (!response.ok) return false;
+
+        const contentType = response.headers.get('content-type');
+        const contentLength = response.headers.get('content-length');
+
+        if (contentType && !contentType.startsWith('image/')) return false;
+        if (contentLength) {
+            const size = parseInt(contentLength);
+            if (size < 1000) return false;
+            if (size === 15567) return false; // Block Google Books placeholder
+        }
+
+        return true;
+    } catch (error) {
+        return false;
+    }
+}
 
 async function checkCovers() {
-    const { data: books } = await supabase
-        .from('books')
-        .select('title, isbn, cover_url')
-        .order('title', { ascending: true });
+    console.log("🔍 Auditing Book Covers...");
 
-    if (!books) {
-        console.log('No books found');
+    const { data: books, error } = await supabase
+        .from('books')
+        .select('id, title, isbn, cover_url');
+
+    if (error) {
+        console.error("Error fetching books:", error);
         return;
     }
 
-    console.log(`\n📚 Cover Status for ${books.length} Books:\n`);
+    console.log(`Found ${books.length} books in database.`);
 
-    let hasRealCover = 0;
-    let noCover = 0;
+    let missingCount = 0;
+    let brokenCount = 0;
+    let validCount = 0;
 
-    books.forEach(book => {
-        const status = book.cover_url ? '✅ HAS COVER' : '❌ NO COVER';
-        const coverPreview = book.cover_url ? book.cover_url.substring(0, 60) + '...' : 'null';
-
-        console.log(`${status} - ${book.title}`);
-        console.log(`   ISBN: ${book.isbn}`);
-        console.log(`   Cover: ${coverPreview}`);
-        console.log('');
-
-        if (book.cover_url) {
-            hasRealCover++;
+    for (const book of books) {
+        if (!book.cover_url) {
+            console.log(`[MISSING] ${book.title} (ISBN: ${book.isbn})`);
+            missingCount++;
         } else {
-            noCover++;
-        }
-    });
+            console.log(`[CHECKING] ${book.title} - URL: ${book.cover_url}`);
+            const isValid = await validateImageUrl(book.cover_url);
+            if (!isValid) {
+                console.log(`[BROKEN]  ${book.title} (ISBN: ${book.isbn}) - URL: ${book.cover_url}`);
+                console.log(`   ↳ Clearing broken cover URL...`);
 
-    console.log('═══════════════════════════════════════');
-    console.log(`✅ Books with covers: ${hasRealCover}`);
-    console.log(`❌ Books without covers: ${noCover}`);
-    console.log(`📊 Total: ${books.length}`);
-    console.log('═══════════════════════════════════════');
+                const { error: updateError } = await supabase
+                    .from('books')
+                    .update({ cover_url: null })
+                    .eq('id', book.id);
+
+                if (updateError) {
+                    console.error(`   ❌ Failed to clear cover: ${updateError.message}`);
+                } else {
+                    console.log(`   ✅ Cover cleared.`);
+                }
+                brokenCount++;
+            } else {
+                validCount++;
+            }
+        }
+    }
+
+    console.log("\n--- Summary ---");
+    console.log(`✅ Valid Covers: ${validCount}`);
+    console.log(`❌ Missing Covers: ${missingCount}`);
+    console.log(`⚠️ Broken Covers: ${brokenCount}`);
 }
 
 checkCovers();

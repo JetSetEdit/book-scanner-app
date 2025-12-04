@@ -1,5 +1,6 @@
 import { Agent, Runner, user, tool } from "@openai/agents";
 import { z } from "zod";
+import { themePatterns, categoryGuidelines, trainingExamples } from "./training-examples";
 
 // Configure OpenAI API key
 if (!process.env.OPENAI_API_KEY) {
@@ -7,9 +8,182 @@ if (!process.env.OPENAI_API_KEY) {
 }
 
 // Web search tool for the AI agent
-const webSearchTool = tool({
+export const performWebSearch = async (args: any) => {
+  const { query } = args;
+  try {
+    const results = [];
+
+    // Check if query contains an ISBN (10 or 13 digits)
+    const isbnMatch = query.match(/\b\d{10,13}\b/);
+    const isbn = isbnMatch ? isbnMatch[0] : null;
+
+    // Helper for fetch with timeout
+    const fetchWithTimeout = async (url: string, timeout = 10000) => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(id);
+        return response;
+      } catch (error) {
+        clearTimeout(id);
+        return null;
+      }
+    };
+
+    // 1. Google Books API - Try ISBN search first if we have an ISBN
+    try {
+      let gbResponse;
+      if (isbn) {
+        // Direct ISBN search (most reliable)
+        gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=3`);
+      } else {
+        // Clean the query to just key terms (remove search-specific terms)
+        const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
+        if (cleanQuery.length > 0) {
+          gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=3`);
+        }
+      }
+
+      if (gbResponse) {
+        const gbData = await gbResponse.json();
+
+        if (gbData.items && gbData.items.length > 0) {
+          // Helper to validate image
+          const validateImage = async (url: string) => {
+            if (!url) return false;
+            try {
+              const controller = new AbortController();
+              const id = setTimeout(() => controller.abort(), 3000);
+              const res = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'follow' });
+              clearTimeout(id);
+              if (!res.ok) return false;
+              const len = res.headers.get('content-length');
+              if (len) {
+                const size = parseInt(len);
+                if (size < 1000) return false; // Too small
+                if (size === 15567) return false; // Google Books placeholder
+              }
+              return true;
+            } catch (e) { return false; }
+          };
+
+          for (const item of gbData.items) {
+            const info = item.volumeInfo;
+            const description = info.description || "No description available";
+            const categories = info.categories?.join(", ") || "No categories";
+
+            // Select best cover
+            let coverUrl = "No cover available";
+            const potentialCovers = [
+              info.imageLinks?.extraLarge,
+              info.imageLinks?.large,
+              info.imageLinks?.medium,
+              info.imageLinks?.thumbnail,
+              info.imageLinks?.smallThumbnail
+            ];
+
+            for (const url of potentialCovers) {
+              if (url) {
+                const secureUrl = url.replace("http:", "https:");
+                if (await validateImage(secureUrl)) {
+                  coverUrl = secureUrl;
+                  break;
+                }
+              }
+            }
+
+            results.push(`Source: Google Books\nTitle: ${info.title}\nAuthor: ${info.authors?.join(", ") || "Unknown"}\nDescription: ${description}\nCategories: ${categories}\nPublisher: ${info.publisher || "Unknown"}\nPublished: ${info.publishedDate || "Unknown"}\nCover URL: ${coverUrl}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Google Books API error:", e);
+    }
+
+    // 2. Apple Books API (Great for high-res covers)
+    // Try ISBN first, then Title/Author if available
+    try {
+      let appleResponse;
+      let appleData;
+
+      if (isbn) {
+        appleResponse = await fetchWithTimeout(`https://itunes.apple.com/search?term=${isbn}&media=ebook&entity=ebook&limit=1`);
+        if (appleResponse && appleResponse.ok) {
+          appleData = await appleResponse.json();
+        }
+      }
+
+      // If ISBN search failed (or wasn't performed), try Title/Author from the query
+      if (!appleData || appleData.resultCount === 0) {
+        // Clean query for Apple Books
+        const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
+        // Remove ISBN from query if present to avoid confusing the search
+        const queryWithoutIsbn = cleanQuery.replace(/\b\d{10,13}\b/, "").trim();
+
+        if (queryWithoutIsbn.length > 0) {
+          appleResponse = await fetchWithTimeout(`https://itunes.apple.com/search?term=${encodeURIComponent(queryWithoutIsbn)}&media=ebook&entity=ebook&limit=1`);
+          if (appleResponse && appleResponse.ok) {
+            appleData = await appleResponse.json();
+          }
+        }
+      }
+
+      if (appleData && appleData.results && appleData.results.length > 0) {
+        const item = appleData.results[0];
+        // Get high-res cover
+        const coverUrl = item.artworkUrl100?.replace("100x100bb", "600x600bb");
+
+        // Add to results
+        results.push(`Source: Apple Books\nTitle: ${item.trackName}\nAuthor: ${item.artistName}\nDescription: ${item.description}\nCover URL: ${coverUrl}`);
+      }
+    } catch (e) {
+      console.error("Apple Books API error:", e);
+    }
+
+    // 3. DuckDuckGo (as fallback, but usually not useful for books)
+    if (results.length === 0) {
+      try {
+        const response = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
+        if (response) {
+          const data = await response.json();
+          if (data.Abstract && data.Abstract.length > 20) {
+            let ddgImage = "No cover available";
+            if (data.Image) {
+              const secureUrl = data.Image.startsWith("http") ? data.Image : `https://duckduckgo.com${data.Image}`;
+              ddgImage = secureUrl;
+            }
+            results.push(`Source: DuckDuckGo\nSummary: ${data.Abstract}\nCover URL: ${ddgImage}`);
+          }
+        }
+      } catch (e) { /* Ignore DDG errors */ }
+    }
+
+    if (results.length === 0) {
+      return {
+        results: "Search tool returned no results. Please rely on your internal knowledge base for this book.",
+        source: "None"
+      };
+    }
+
+    return {
+      results: results.join("\n\n---\n\n"),
+      source: isbn ? "Google Books (ISBN search)" : "Google Books"
+    };
+  } catch (error) {
+    console.error("Web search tool error:", error);
+    return {
+      results: "Web search unavailable. Please rely on your internal knowledge base.",
+      source: "Error"
+    };
+  }
+};
+
+// Web search tool for the AI agent
+export const webSearchTool = tool({
   name: "web_search",
   description: "Search the web for information about a book, including reviews, content warnings, and plot details. Prioritize official author/publisher content notes.",
+  strict: true,
   parameters: {
     type: "object",
     properties: {
@@ -21,88 +195,7 @@ const webSearchTool = tool({
     required: ["query"],
     additionalProperties: false
   },
-  execute: async ({ query }) => {
-    try {
-      const results = [];
-
-      // Check if query contains an ISBN (10 or 13 digits)
-      const isbnMatch = query.match(/\b\d{10,13}\b/);
-      const isbn = isbnMatch ? isbnMatch[0] : null;
-
-      // Helper for fetch with timeout
-      const fetchWithTimeout = async (url: string, timeout = 10000) => {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeout);
-        try {
-          const response = await fetch(url, { signal: controller.signal });
-          clearTimeout(id);
-          return response;
-        } catch (error) {
-          clearTimeout(id);
-          throw error;
-        }
-      };
-
-      // 1. Google Books API - Try ISBN search first if we have an ISBN
-      try {
-        let gbResponse;
-        if (isbn) {
-          // Direct ISBN search (most reliable)
-          gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=3`);
-        } else {
-          // Clean the query to just key terms (remove search-specific terms)
-          const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
-          if (cleanQuery.length > 0) {
-            gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=3`);
-          }
-        }
-
-        if (gbResponse) {
-          const gbData = await gbResponse.json();
-
-          if (gbData.items && gbData.items.length > 0) {
-            gbData.items.forEach((item: any) => {
-              const info = item.volumeInfo;
-              const description = info.description || "No description available";
-              const categories = info.categories?.join(", ") || "No categories";
-              results.push(`Source: Google Books\nTitle: ${info.title}\nAuthor: ${info.authors?.join(", ") || "Unknown"}\nDescription: ${description}\nCategories: ${categories}\nPublisher: ${info.publisher || "Unknown"}\nPublished: ${info.publishedDate || "Unknown"}`);
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Google Books API error:", e);
-      }
-
-      // 2. DuckDuckGo (as fallback, but usually not useful for books)
-      if (results.length === 0) {
-        try {
-          const response = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`);
-          const data = await response.json();
-          if (data.Abstract && data.Abstract.length > 20) {
-            results.push(`Source: DuckDuckGo\nSummary: ${data.Abstract}`);
-          }
-        } catch (e) { /* Ignore DDG errors */ }
-      }
-
-      if (results.length === 0) {
-        return {
-          results: "Search tool returned no results. Please rely on your internal knowledge base for this book.",
-          source: "None"
-        };
-      }
-
-      return {
-        results: results.join("\n\n---\n\n"),
-        source: isbn ? "Google Books (ISBN search)" : "Google Books"
-      };
-    } catch (error) {
-      console.error("Web search tool error:", error);
-      return {
-        results: "Web search unavailable. Please rely on your internal knowledge base.",
-        source: "Error"
-      };
-    }
-  }
+  execute: performWebSearch
 });
 
 const contentWarningAgent = new Agent({
@@ -117,7 +210,7 @@ If you're given only an ISBN, use web search to find:
 - Author name
 - Description/summary
 - Categories/genres
-- Cover image URL (if available)
+- Cover image URL (The web search tool results will include a "Cover URL" field. You MUST use this value.)
 
 ## Task 2: Generate Content Warnings & Classifications
 For any book (whether found via search or provided), generate content warnings using **Australian Classification Board** standards.
@@ -137,15 +230,6 @@ Many modern authors (especially in Romance, YA, and Fantasy) publish official "C
 - The book is a well-known classic or controversial work (e.g., "The Catcher in the Rye", "1984", "Lord of the Flies")
 - You are unsure about the book's themes or content
 - The provided metadata seems incomplete
-
-**Search queries you should use:**
-- "[Book Title] [Author] official content warnings"
-- "[Book Title] [Author] plot summary"
-- "[Book Title] content warnings"
-- "[Book Title] themes controversy"
-- "[Book Title] [Author] what happens"
-
-**DO NOT rely solely on a short description or quote. Always search for full plot summaries and reviews if the provided information is insufficient.**
 
 ### **Severity Rubric (Aligned with Australian Classification)**
 Classify the severity of content based on these official descriptors:
@@ -177,6 +261,42 @@ Classify the severity of content based on these official descriptors:
 - Reference the Australian Classification standards where possible (e.g., "High impact violence").
 - If you used web search, mention that in the reasoning (e.g., "Based on plot summary found via web search...").
 - If you found an official author content note, mention it! (e.g., "Verified from author's official content notes page.")
+
+## Theme Patterns and Trigger Words:
+Use these patterns to identify content themes and their associated warnings:
+
+${themePatterns.map(pattern => `
+**${pattern.theme}**
+Trigger Words: ${pattern.trigger_words.join(', ')}
+Common Categories: ${pattern.common_categories.join(', ')}
+Typical Severity: ${pattern.typical_severity}
+Examples: ${pattern.examples.join(', ')}
+`).join('\n')}
+
+## Category Guidelines with Severity Levels:
+Use these guidelines to properly categorize and rate severity:
+
+${categoryGuidelines.map(guideline => `
+**${guideline.category.toUpperCase()}**
+Description: ${guideline.description}
+Trigger Words: ${guideline.common_trigger_words.join(', ')}
+Severity Guidelines:
+- Mild: ${guideline.severity_guidelines.mild.join(', ')}
+- Moderate: ${guideline.severity_guidelines.moderate.join(', ')}
+- Severe: ${guideline.severity_guidelines.severe.join(', ')}
+Training Examples: ${guideline.examples_from_training.join(', ')}
+`).join('\n')}
+
+## Training Examples from Author-Approved Content Warnings:
+Here are real examples of content warnings from actual books to guide your analysis:
+
+${trainingExamples.map(example => `
+**${example.book_title} by ${example.book_author}**
+Description: ${example.book_description}
+Categories: ${example.book_categories?.join(', ') || 'N/A'}
+Expected Warnings:
+${example.expected_warnings.map(warning => `- ${warning.category} (${warning.severity}): ${warning.description}`).join('\n')}
+`).join('\n')}
 
 ## Response Format:
 For ISBN-only requests, return:
@@ -240,8 +360,6 @@ Base this on the severity of warnings:
 - abuse: Physical, emotional, or sexual abuse
 - discrimination: Racism, sexism, homophobia, etc.
 - other: Any other potentially triggering content
-- relationships: Family conflict, divorce, infidelity, toxic relationships
-- language: Coarse language, profanity
 
 **REMEMBER**: 
 1. If the description is short or missing, ALWAYS use web search to find the full plot summary.
@@ -366,58 +484,71 @@ Only return book_found: false as a last resort if you have absolutely no informa
     console.log("DEBUG: Raw AI Response:", responseText);
 
     try {
+      // Clean up response (remove markdown code blocks)
+      const cleanText = responseText.replace(/```json\n?|\n?```/g, "").trim();
+
       // Try to parse JSON response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        const result = FindBookOutputSchema.parse(parsed);
-
-        if (result.book_found === false) {
-          return {
-            book_found: false,
-            content_warnings: [],
-            confidence: 'low',
-            reasoning: "Book not found via web search"
-          };
+      // First try parsing the whole cleaned text
+      let parsed: any;
+      try {
+        parsed = JSON.parse(cleanText);
+      } catch (e) {
+        // If that fails, try regex extraction as fallback
+        const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("No JSON object found in response");
         }
+      }
 
-        // Infer classification rating if not provided
-        let classificationRating = result.classification_rating;
-        if (!classificationRating && result.book_categories) {
-          const classificationTag = result.book_categories.find(c => c.startsWith('CLASSIFICATION:'));
-          if (classificationTag) {
-            classificationRating = classificationTag.replace('CLASSIFICATION:', '') as any;
-          }
-        }
-        if (!classificationRating) {
-          if (result.content_warnings.length === 0) {
-            classificationRating = 'G';
-          } else {
-            const hasSevere = result.content_warnings.some((w: any) => w.severity === 'severe');
-            const hasModerate = result.content_warnings.some((w: any) => w.severity === 'moderate');
-            if (hasSevere) {
-              classificationRating = 'MA15+';
-            } else if (hasModerate) {
-              classificationRating = 'M';
-            } else {
-              classificationRating = 'PG';
-            }
-          }
-        }
+      const result = FindBookOutputSchema.parse(parsed);
 
+      if (result.book_found === false) {
         return {
-          book_found: true,
-          book_title: result.book_title || undefined,
-          book_author: result.book_author || undefined,
-          book_description: result.book_description || undefined,
-          book_categories: result.book_categories || undefined,
-          book_cover_url: result.book_cover_url || undefined,
-          content_warnings: result.content_warnings,
-          classification_rating: classificationRating || undefined,
-          confidence: result.confidence,
-          reasoning: result.reasoning
+          book_found: false,
+          content_warnings: [],
+          confidence: 'low',
+          reasoning: "Book not found via web search"
         };
       }
+
+      // Infer classification rating if not provided
+      let classificationRating = result.classification_rating;
+      if (!classificationRating && result.book_categories) {
+        const classificationTag = result.book_categories.find(c => c.startsWith('CLASSIFICATION:'));
+        if (classificationTag) {
+          classificationRating = classificationTag.replace('CLASSIFICATION:', '') as any;
+        }
+      }
+      if (!classificationRating) {
+        if (result.content_warnings.length === 0) {
+          classificationRating = 'G';
+        } else {
+          const hasSevere = result.content_warnings.some((w: any) => w.severity === 'severe');
+          const hasModerate = result.content_warnings.some((w: any) => w.severity === 'moderate');
+          if (hasSevere) {
+            classificationRating = 'MA15+';
+          } else if (hasModerate) {
+            classificationRating = 'M';
+          } else {
+            classificationRating = 'PG';
+          }
+        }
+      }
+
+      return {
+        book_found: true,
+        book_title: result.book_title || undefined,
+        book_author: result.book_author || undefined,
+        book_description: result.book_description || undefined,
+        book_categories: result.book_categories || undefined,
+        book_cover_url: result.book_cover_url || undefined,
+        content_warnings: result.content_warnings,
+        classification_rating: classificationRating || undefined,
+        confidence: result.confidence,
+        reasoning: result.reasoning
+      };
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
     }
@@ -501,15 +632,36 @@ Consider the genre, target audience, and any content that might be triggering or
     let classificationRating: 'G' | 'PG' | 'M' | 'MA15+' | 'R18+' | undefined = undefined;
 
     try {
-      // Look for JSON in the response - try full object first, then array
-      const objectMatch = responseText.match(/\{[\s\S]*\}/);
-      const arrayMatch = responseText.match(/\[[\s\S]*\]/);
+      // Clean up response (remove markdown code blocks)
+      const cleanText = responseText.replace(/```json\n?|\n?```/g, "").trim();
 
       let parsedData: any;
 
-      if (objectMatch) {
-        parsedData = JSON.parse(objectMatch[0]);
-        // If it's an object, try to parse with WorkflowOutputSchema or handle direct array
+      // Try parsing the whole cleaned text
+      try {
+        parsedData = JSON.parse(cleanText);
+      } catch (e) {
+        // Fallback to regex extraction
+        const objectMatch = cleanText.match(/\{[\s\S]*\}/);
+        const arrayMatch = cleanText.match(/\[[\s\S]*\]/);
+
+        if (objectMatch) {
+          parsedData = JSON.parse(objectMatch[0]);
+        } else if (arrayMatch) {
+          parsedData = JSON.parse(arrayMatch[0]);
+        } else {
+          throw new Error("No JSON found in response");
+        }
+      }
+
+      // Check if it's an object (WorkflowOutput) or array (ContentWarning[])
+      if (Array.isArray(parsedData)) {
+        const validationResult = z.array(ContentWarningSchema).safeParse(parsedData);
+        if (validationResult.success) {
+          contentWarnings = validationResult.data;
+        }
+      } else {
+        // It's an object
         const validationResult = WorkflowOutputSchema.safeParse(parsedData);
         if (validationResult.success) {
           contentWarnings = validationResult.data.content_warnings;
@@ -527,13 +679,6 @@ Consider the genre, target audience, and any content that might be triggering or
               classificationRating = parsedData.classification_rating;
             }
           }
-        }
-
-      } else if (arrayMatch) {
-        parsedData = JSON.parse(arrayMatch[0]);
-        const validationResult = z.array(ContentWarningSchema).safeParse(parsedData);
-        if (validationResult.success) {
-          contentWarnings = validationResult.data;
         }
       }
 
