@@ -3,9 +3,9 @@ import { z } from "zod";
 import { WARNING_CATEGORIES, SEVERITY_MAPPING, getSeverityFromScore } from "./config/taxonomy";
 
 // Configure OpenAI API key
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('OPENAI_API_KEY environment variable is required');
-}
+// Configure OpenAI API key
+// Note: We don't check for OPENAI_API_KEY here to avoid build-time errors.
+// The Agent class will handle missing keys or we can check inside the function.
 
 // Web search tool for the AI agent
 export const performWebSearch = async (args: any) => {
@@ -429,8 +429,7 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
 `;
 
   try {
-    const runner = new Runner(agent);
-    await runner.run(inputText, {});
+    await run(agent, inputText, {});
 
     if (!capturedOutput) {
       throw new Error("Agent did not call submit_warnings tool");
