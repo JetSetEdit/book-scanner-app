@@ -88,6 +88,8 @@ export interface Database {
           book_id: string
           user_id: string | null
           category: 'violence' | 'sexual_content' | 'substance_abuse' | 'mental_health' | 'death' | 'abuse' | 'discrimination' | 'other'
+          category_id: string | null
+          confidence_score: number | null
           description: string
           severity: 'mild' | 'moderate' | 'severe'
           helpful_count: number
@@ -103,6 +105,8 @@ export interface Database {
           book_id: string
           user_id?: string | null
           category: 'violence' | 'sexual_content' | 'substance_abuse' | 'mental_health' | 'death' | 'abuse' | 'discrimination' | 'other'
+          category_id?: string | null
+          confidence_score?: number | null
           description: string
           severity: 'mild' | 'moderate' | 'severe'
           helpful_count?: number
@@ -118,6 +122,8 @@ export interface Database {
           book_id?: string
           user_id?: string | null
           category?: 'violence' | 'sexual_content' | 'substance_abuse' | 'mental_health' | 'death' | 'abuse' | 'discrimination' | 'other'
+          category_id?: string | null
+          confidence_score?: number | null
           description?: string
           severity?: 'mild' | 'moderate' | 'severe'
           helpful_count?: number
@@ -217,6 +223,9 @@ export interface Database {
           had_thin_metadata: boolean
           used_web_search: boolean
           raw_ai_response: Json | null
+          model_version: string | null
+          taxonomy_version: string | null
+          pipeline_path: string | null
           created_at: string
         }
         Insert: {
@@ -234,6 +243,9 @@ export interface Database {
           had_thin_metadata?: boolean
           used_web_search?: boolean
           raw_ai_response?: Json | null
+          model_version?: string | null
+          taxonomy_version?: string | null
+          pipeline_path?: string | null
           created_at?: string
         }
         Update: {
@@ -251,6 +263,9 @@ export interface Database {
           had_thin_metadata?: boolean
           used_web_search?: boolean
           raw_ai_response?: Json | null
+          model_version?: string | null
+          taxonomy_version?: string | null
+          pipeline_path?: string | null
           created_at?: string
         }
         Relationships: [

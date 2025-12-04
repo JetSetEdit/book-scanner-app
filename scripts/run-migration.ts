@@ -26,8 +26,8 @@ async function runMigration() {
         await client.connect();
         console.log('✅ Connected to database');
 
-        const sqlPath = path.join(process.cwd(), 'supabase/migrations/20251204_create_author_context_table.sql');
-        const sql = fs.readFileSync(sqlPath, 'utf8');
+        const migrationFile = path.join(process.cwd(), 'supabase/migrations/20251205_enhance_content_warnings.sql');
+        const sql = fs.readFileSync(migrationFile, 'utf8');
 
         console.log('🚀 Running migration...');
         await client.query(sql);
