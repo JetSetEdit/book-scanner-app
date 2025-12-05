@@ -6,31 +6,31 @@ import { useState } from "react"
 import { BookOpen, Library, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-  const navigation = [
-    {
-      name: "Home",
-      href: "/",
-      icon: BookOpen,
-    },
-    {
-      name: "Book Database",
-      href: "/collection",
-      icon: Library,
-    },
-  ]
+const navigation = [
+  {
+    name: "Home",
+    href: "/",
+    icon: BookOpen,
+  },
+  {
+    name: "Book Database",
+    href: "/collection",
+    icon: Library,
+  },
+]
 
 export function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <nav className="border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <BookOpen className="h-6 w-6" />
-            <span className="text-xl font-bold">Book Scanner</span>
+          <Link href="/" className="flex items-center gap-3">
+            <img src="/logo.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
+            <span className="text-2xl font-serif font-bold tracking-tight text-slate-900">Subtext</span>
           </Link>
 
           {/* Navigation Links */}

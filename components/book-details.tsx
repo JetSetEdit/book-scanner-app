@@ -2,210 +2,147 @@
 
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, BookOpen, Calendar, Layers, Printer, Barcode, ChevronDown, ChevronUp } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface BookDetailsProps {
-  book: {
-    id: string
-    isbn: string
-    title: string
-    author?: string
-    cover_url?: string
-    description?: string
-    publisher?: string
-    published_date?: string
-    page_count?: number
-    categories?: string[]
-    classification_rating?: string
-  }
-  warnings: Array<{
-    id: string
-    category: string
-    description: string
-    severity: "mild" | "moderate" | "severe"
-    helpful_count: number
-    not_helpful_count: number
-    user_validation?: boolean | null
-    is_author_approved?: boolean
-    source?: string
-    reasoning?: string | null
-    is_author_verified?: boolean
-    source_url?: string | null
-  }>
-}
-
-// Helper function to extract classification rating from categories
-function getClassificationFromCategories(categories?: string[]): string | null {
-  if (!categories) return null
-  const classificationTag = categories.find(cat => cat.startsWith('CLASSIFICATION:'))
-  return classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+  book: any
+  warnings: any[]
 }
 
 export function BookDetails({ book, warnings }: BookDetailsProps) {
   const router = useRouter()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
 
-  const classificationRating = book.classification_rating || getClassificationFromCategories(book.categories)
-
-  const handleBack = () => {
-    router.back()
-  }
-
   return (
-    <div className="space-y-8 animate-fade-in pb-12">
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="ghost"
-          onClick={handleBack}
-          className="group flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors pl-0"
-        >
-          <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-          Back to Collection
-        </Button>
-      </div>
-
-      <div className="grid lg:grid-cols-[350px_1fr] gap-10 items-start">
-        {/* Left Column: Cover & Metadata Sidebar */}
-        <div className="space-y-6">
-          {/* Cover Image */}
-          <div className="relative aspect-[2/3] w-full overflow-hidden rounded-xl shadow-2xl bg-muted ring-1 ring-border/50">
-            {book.cover_url ? (
-              <img
-                src={book.cover_url}
-                alt={`Cover of ${book.title}`}
-                className="object-cover w-full h-full"
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground p-6 text-center">
-                <BookOpen className="h-16 w-16 mb-4 opacity-20" />
-                <span className="text-sm font-medium">No Cover Available</span>
-              </div>
-            )}
-
-            {/* Classification Badge Overlay */}
-            {classificationRating && (
-              <div className="absolute top-4 right-4">
-                <Badge className="text-lg font-bold px-3 py-1 shadow-lg backdrop-blur-md bg-background/90 text-foreground border-input">
-                  {classificationRating}
-                </Badge>
-              </div>
-            )}
+    <div className="min-h-screen bg-white text-slate-950 font-sans selection:bg-slate-950 selection:text-white">
+      <div className="container mx-auto px-4 py-12 max-w-6xl">
+        {/* Navigation */}
+        <div className="mb-12 flex items-center justify-between border-b border-slate-200 pb-4">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="text-slate-500 hover:text-slate-950 hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
+          >
+            ← Back to Collection
+          </Button>
+          <div className="text-xs font-bold tracking-widest uppercase text-slate-400">
+            Book Scanner v1.0
           </div>
-
-          {/* Book Metadata Card */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <BookOpen className="h-4 w-4 text-primary" />
-                Book Details
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 text-sm">
-              <div className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  <Barcode className="h-4 w-4" /> ISBN
-                </span>
-                <span className="font-mono font-medium">{book.isbn}</span>
-              </div>
-
-              {book.publisher && (
-                <div className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <Printer className="h-4 w-4" /> Publisher
-                  </span>
-                  <span className="font-medium text-right truncate max-w-[180px]" title={book.publisher}>
-                    {book.publisher}
-                  </span>
-                </div>
-              )}
-
-              {book.published_date && (
-                <div className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <Calendar className="h-4 w-4" /> Published
-                  </span>
-                  <span className="font-medium">{book.published_date}</span>
-                </div>
-              )}
-
-              {book.page_count && (
-                <div className="flex items-center justify-between py-1 border-b border-border/50 last:border-0">
-                  <span className="text-muted-foreground flex items-center gap-2">
-                    <Layers className="h-4 w-4" /> Pages
-                  </span>
-                  <span className="font-medium">{book.page_count}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Right Column: Main Content */}
-        <div className="space-y-10">
-          {/* Header Section */}
-          <div className="space-y-4">
-            <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-balance leading-tight">
-              {book.title}
-            </h1>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-lg text-muted-foreground">
-              <p>
-                by <span className="font-semibold text-foreground">{book.author || 'Unknown Author'}</span>
-              </p>
+        <div className="grid lg:grid-cols-[380px_1fr] gap-16 items-start">
+          {/* Left Column: Cover & Specs */}
+          <div className="space-y-8 sticky top-8">
+            {/* Cover Image - Sharp, elegant shadow */}
+            <div className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-slate-100">
+              {book.cover_url ? (
+                <img
+                  src={book.cover_url}
+                  alt={`Cover of ${book.title}`}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400 font-serif italic">
+                  No Cover
+                </div>
+              )}
             </div>
 
-            {/* Categories */}
-            {book.categories && book.categories.length > 0 && (
-              <div className="flex flex-wrap gap-2 pt-2">
-                {book.categories
-                  .filter(c => !c.startsWith('CLASSIFICATION:') && !c.startsWith('nyt:'))
-                  .map((category, i) => (
-                    <Badge
-                      key={i}
-                      variant="secondary"
-                      className="px-3 py-1 text-sm font-medium bg-secondary/50 hover:bg-secondary transition-colors"
-                    >
-                      {category}
-                    </Badge>
-                  ))}
+            {/* Specs Table - Clean, Modernist lines */}
+            <div className="border-t-2 border-slate-950 pt-6">
+              <h3 className="font-sans text-xs font-bold uppercase tracking-widest mb-6 text-slate-400">
+                Specifications
+              </h3>
+              <div className="space-y-4 font-sans text-sm">
+                <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
+                  <span className="font-medium text-slate-500">ISBN</span>
+                  <span className="font-mono text-slate-950">{book.isbn}</span>
+                </div>
+                {book.publisher && (
+                  <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
+                    <span className="font-medium text-slate-500">Publisher</span>
+                    <span className="text-slate-950 text-right">{book.publisher}</span>
+                  </div>
+                )}
+                {book.published_date && (
+                  <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
+                    <span className="font-medium text-slate-500">Released</span>
+                    <span className="text-slate-950">{book.published_date}</span>
+                  </div>
+                )}
+                {book.page_count && (
+                  <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
+                    <span className="font-medium text-slate-500">Length</span>
+                    <span className="text-slate-950">{book.page_count} pages</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Content */}
+          <div className="space-y-12">
+            {/* Header */}
+            <div className="space-y-6">
+              {/* Categories as Modernist Pills */}
+              {book.categories && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {book.categories
+                    .filter((c: string) => !c.startsWith('CLASSIFICATION:') && !c.startsWith('nyt:'))
+                    .map((category: string, i: number) => (
+                      <span
+                        key={i}
+                        className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-slate-200 text-slate-500 rounded-full bg-white"
+                      >
+                        {category}
+                      </span>
+                    ))}
+                </div>
+              )}
+
+              <h1 className="text-5xl md:text-7xl font-serif font-medium tracking-tight text-slate-950 leading-[1.1]">
+                {book.title}
+              </h1>
+              <div className="text-xl md:text-2xl font-serif italic text-slate-500 border-l-2 border-slate-950 pl-6 py-1">
+                by {book.author || 'Unknown Author'}
+              </div>
+            </div>
+
+            {/* Synopsis */}
+            {book.description && (
+              <div className="prose prose-slate prose-lg max-w-none">
+                <p className="text-slate-600 leading-relaxed text-lg">
+                  {book.description.replace(/<[^>]*>?/gm, '')}
+                </p>
               </div>
             )}
-          </div>
 
-          {/* Synopsis */}
-          {book.description && (
-            <div className="prose prose-stone dark:prose-invert max-w-none">
-              <h3 className="text-xl font-semibold mb-3">Synopsis</h3>
-              <div className="text-muted-foreground leading-relaxed text-lg">
-                {book.description.replace(/<[^>]*>?/gm, '')}
+            {/* Content Warnings - The "Feature" Block */}
+            <div className="mt-16">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="h-px bg-slate-200 flex-1"></div>
+                <h3 className="font-serif text-2xl text-slate-950 italic">Content Analysis</h3>
+                <div className="h-px bg-slate-200 flex-1"></div>
               </div>
+
+              <ContentWarningsList
+                warnings={warnings}
+                isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
+              />
             </div>
-          )}
 
-          {/* Content Warnings Section */}
-          <div className="border-t pt-8">
-            <h3 className="text-2xl font-bold mb-6 flex items-center gap-2">
-              Content Analysis
-            </h3>
-            <ContentWarningsList
-              warnings={warnings}
-              isAuthorApproved={warnings.some(w => w.is_author_approved === true)}
-            />
-          </div>
-
-          {/* Collapsible Audit History */}
-          <div className="border-t pt-8">
-            <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen} className="w-full space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-muted-foreground">AI Analysis Logs</h3>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="sm" className="w-9 p-0">
+            {/* Collapsible Audit History - Integrated into new design */}
+            <div className="mt-12 border-t border-slate-100 pt-8">
+              <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen} className="w-full space-y-4">
+                <div className="flex items-center justify-between group cursor-pointer" onClick={() => setIsAuditOpen(!isAuditOpen)}>
+                  <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">
+                    System Logs & Audit Trail
+                  </h3>
+                  <Button variant="ghost" size="sm" className="w-9 p-0 text-slate-400 group-hover:text-slate-600">
                     {isAuditOpen ? (
                       <ChevronUp className="h-4 w-4" />
                     ) : (
@@ -213,14 +150,14 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                     )}
                     <span className="sr-only">Toggle Audit Logs</span>
                   </Button>
-                </CollapsibleTrigger>
-              </div>
-              <CollapsibleContent className="space-y-2 animate-accordion-down">
-                <div className="bg-muted/30 rounded-lg p-4 border">
-                  <AuditHistory bookId={book.id} />
                 </div>
-              </CollapsibleContent>
-            </Collapsible>
+                <CollapsibleContent className="space-y-2">
+                  <div className="bg-slate-50 rounded-lg p-6 border border-slate-100 font-mono text-sm">
+                    <AuditHistory bookId={book.id} />
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </div>
           </div>
         </div>
       </div>
