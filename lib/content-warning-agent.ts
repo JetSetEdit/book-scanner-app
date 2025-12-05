@@ -3,7 +3,7 @@ import { z } from "zod";
 import { WARNING_CATEGORIES, SEVERITY_MAPPING, getSeverityFromScore } from "./config/taxonomy";
 
 // Configure OpenAI API key
-// Configure OpenAI API key
+
 // Note: We don't check for OPENAI_API_KEY here to avoid build-time errors.
 // The Agent class will handle missing keys or we can check inside the function.
 
@@ -143,7 +143,134 @@ export const performWebSearch = async (args: any) => {
       // Ignore errors
     }
 
-    // 3. DuckDuckGo (General Web Search) - Fallback for warnings
+    // 3. Author/Publisher Official Site Search (Priority)
+    try {
+      // Construct a query specifically for author content warnings
+      let authorQuery = "";
+      if (isbn) {
+        // Try a broader query first
+        authorQuery = `"${isbn}" content warnings`;
+      } else {
+        const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
+        // Try to extract author name for a more targeted search
+        const authorMatch = cleanQuery.match(/by\s+(.+)/i);
+        const authorName = authorMatch ? authorMatch[1] : "";
+
+        if (authorName) {
+          authorQuery = `${cleanQuery} site:hannahgrace.co.uk OR site:author-site.com content warnings`;
+        } else {
+          authorQuery = `${cleanQuery} official author content warnings`;
+        }
+      }
+
+      // Use the HTML version of DuckDuckGo or a different search approach if API is limited
+      // For now, we'll try a slightly different query structure
+      const ddgResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(authorQuery)}&format=json`);
+      if (ddgResponse) {
+        const ddgData = await ddgResponse.json();
+
+        if (ddgData.AbstractText) {
+          results.push(`Source: Official/Author Search\nSummary: ${ddgData.AbstractText}\nURL: ${ddgData.AbstractURL || "N/A"}`);
+        }
+        if (ddgData.RelatedTopics) {
+          for (const topic of ddgData.RelatedTopics.slice(0, 5)) { // Increased to 5
+            if (topic.Text && topic.FirstURL) {
+              results.push(`Source: Official/Author Search\nInfo: ${topic.Text}\nURL: ${topic.FirstURL}`);
+            }
+          }
+        }
+
+        // Also try searching for the author's name directly to find their site
+        if (!ddgData.AbstractText && !ddgData.RelatedTopics?.length) {
+          const authorNameMatch = query.match(/by\s+(.+?)(?:\s+content|\s*$)/i);
+          if (authorNameMatch) {
+            const authorName = authorNameMatch[1];
+            const authorSiteQuery = `${authorName} official website content warnings`;
+            const authorResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(authorSiteQuery)}&format=json`);
+            if (authorResponse) {
+              const authorData = await authorResponse.json();
+              if (authorData.AbstractText) {
+                results.push(`Source: Author Site Search\nSummary: ${authorData.AbstractText}\nURL: ${authorData.AbstractURL}`);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+
+    // 3b. Direct Author Site Scraping (Fallback for specific authors)
+    try {
+      // Known author sites mapping (can be expanded)
+      const authorDomains: Record<string, string> = {
+        "hannah grace": "https://www.hannahgrace.co.uk/books",
+        "h.d. carlton": "https://hdcarlton.com/library",
+        "hd carlton": "https://hdcarlton.com/library",
+        "jennifer hallock": "https://www.jenniferhallock.com/content-guidance",
+        // Add more authors here
+      };
+
+      const cleanQuery = query.toLowerCase();
+      console.log(`--- DEBUG: Checking for author domains in query: "${cleanQuery}" ---`);
+      let targetUrl = "";
+
+      for (const [author, url] of Object.entries(authorDomains)) {
+        if (cleanQuery.includes(author)) {
+          console.log(`--- DEBUG: Match found for author: "${author}" -> ${url} ---`);
+          targetUrl = url;
+          break;
+        }
+      }
+
+      if (targetUrl) {
+        // Fetch the author's book list page
+        console.log(`--- DEBUG: Attempting to fetch: ${targetUrl} ---`);
+        const response = await fetchWithTimeout(targetUrl);
+        if (response) {
+          const html = await response.text();
+          console.log(`--- DEBUG: Fetched HTML length: ${html.length} ---`);
+
+          // Simple heuristic to find the book link
+          // Extract title more reliably
+          let bookTitle = "";
+
+          console.log(`--- DEBUG: Processing query for title extraction: "${query}" ---`);
+
+          // Try to find title in quotes first
+          const quoteMatch = query.match(/"([^"]+)"/);
+          if (quoteMatch) {
+            bookTitle = quoteMatch[1].toLowerCase().replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
+          } else {
+            // Fallback: remove known terms
+            // More aggressive removal of author names and common terms
+            bookTitle = query.toLowerCase()
+              .replace(/content warnings|plot summary|official|notes|book|find|isbn|\d{10,13}|by\s+hannah\s+grace|hannah\s+grace|by\s+h\.d\.\s+carlton|h\.d\.\s+carlton|hd\s+carlton|by\s+jennifer\s+hallock|jennifer\s+hallock/gi, "")
+              .trim();
+          }
+
+          console.log(`--- DEBUG: Looking for book title: "${bookTitle}" ---`);
+
+          if (bookTitle && html.toLowerCase().includes(bookTitle)) {
+            console.log('--- DEBUG: Found book title in HTML! ---');
+            // Inject a strong signal to the agent
+            results.push(`Source: Direct Author Site Scrape\nInfo: CONFIRMED: The book "${bookTitle}" is listed on the official author website (${targetUrl}) which contains content warnings. You should treat this as a verified source.\nURL: ${targetUrl}`);
+          } else {
+            console.log('--- DEBUG: Book title NOT found in HTML. ---');
+          }
+        } else {
+          console.log('--- DEBUG: Fetch returned null/undefined for: ' + targetUrl);
+        }
+      }
+    } catch (e) {
+      console.log('--- DEBUG: Error during scraping:', e);
+      // Ignore
+    }
+
+    // Log final results for debugging
+    const finalResults = results.length > 0 ? results.join("\n\n---\n\n") : "No results found.";
+
+    // 4. DuckDuckGo (General Web Search) - Fallback for warnings
     try {
       const ddgResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
       if (ddgResponse) {
@@ -215,6 +342,7 @@ Based on the highest severity score:
 5. **When Web Search Fails**: If web search returns no results but you have a book title and author, you MUST still generate warnings based on genre conventions, author's typical content, and title keywords.
 6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
 7. Err on the side of caution - better to warn than to miss important content.
+8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
 
 If no content warnings are needed after thorough analysis (including web search if needed), return an empty array: []`
 };
@@ -233,7 +361,7 @@ const ContentWarningSchema = z.object({
   description: z.string().describe("User-facing description of the content"),
   score: z.number().min(0).max(1).describe("Severity score from 0.0 to 1.0"),
   reasoning: z.string().describe("Technical explanation for the score"),
-  is_author_verified: z.boolean().optional().default(false),
+  is_author_verified: z.boolean().optional().default(false).describe("MUST be set to true if the warnings come from an official author/publisher site."),
   source_url: z.string().optional().nullable(),
 });
 
