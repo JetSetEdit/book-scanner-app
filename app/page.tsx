@@ -9,8 +9,8 @@ export default function HomePage() {
       {/* Hero Section */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-24 md:py-32 text-center">
         <div className="max-w-4xl mx-auto space-y-8">
-          <div className="flex justify-center mb-4">
-            <img src="/logo.png" alt="Subtext Logo" className="h-24 w-24 md:h-32 md:w-32 object-contain" />
+          <div className="flex justify-center mb-12">
+            <img src="/logo.png" alt="Subtext Logo" className="h-48 w-48 md:h-64 md:w-64 object-contain" />
           </div>
 
           <div className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-sm font-medium text-slate-600 bg-slate-50">
@@ -18,7 +18,7 @@ export default function HomePage() {
             v1.0 Now Available
           </div>
 
-          <h1 className="font-serif text-6xl md:text-8xl font-bold tracking-tight text-slate-900 leading-[1.1]">
+          <h1 className="font-serif text-4xl md:text-6xl font-bold tracking-tight text-slate-900 leading-[1.1]">
             The hidden context <br className="hidden md:block" />
             <span className="text-slate-500 italic">of every story.</span>
           </h1>
