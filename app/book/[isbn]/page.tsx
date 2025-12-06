@@ -1,16 +1,16 @@
 import { BookDetails } from "@/components/book-details"
-import { createClient } from "@/lib/supabase/server"
+import { supabaseAdmin } from "@/lib/supabase/admin"
 import { notFound } from "next/navigation"
 
 interface BookPageProps {
-  params: {
+  params: Promise<{
     isbn: string
-  }
+  }>
 }
 
 export default async function BookPage({ params }: BookPageProps) {
-  const { isbn } = params
-  const supabase = await createClient()
+  const { isbn } = await params
+  const supabase = supabaseAdmin
 
   // No authentication required
 
