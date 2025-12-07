@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { fetchBookByISBN, fetchCandidatesByISBN, BookCandidate } from '@/lib/book-api'
 import { normalizeISBN } from '@/lib/isbn-validation'
 import { findBookAndGenerateWarnings, generateContentWarnings } from '@/lib/content-warning-agent'
+import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById } from '@/lib/config/taxonomy'
 import { Database } from '@/types/supabase'
 
 type Book = Database['public']['Tables']['books']['Row']
@@ -36,6 +37,9 @@ async function logAuditDecision(params: {
   hadThinMetadata?: boolean
   usedWebSearch?: boolean
   rawAiResponse?: any
+  modelVersion?: string
+  taxonomyVersion?: string
+  pipelinePath?: string
 }) {
   try {
     const auditLog: AuditLogInsert = {
@@ -50,7 +54,10 @@ async function logAuditDecision(params: {
       description_length: params.descriptionLength || null,
       had_thin_metadata: params.hadThinMetadata || false,
       used_web_search: params.usedWebSearch || false,
-      raw_ai_response: params.rawAiResponse || null
+      raw_ai_response: params.rawAiResponse || null,
+      model_version: params.modelVersion || null,
+      taxonomy_version: params.taxonomyVersion || null,
+      pipeline_path: params.pipelinePath || null
     }
 
     await supabaseAdmin
@@ -215,7 +222,10 @@ export async function processIsbnScan(
             bookTitle: cachedWebSearchResult.book_title || null,
             bookAuthor: cachedWebSearchResult.book_author || null,
             usedWebSearch: true,
-            rawAiResponse: cachedWebSearchResult
+            rawAiResponse: cachedWebSearchResult,
+            modelVersion: MODEL_VERSION,
+            taxonomyVersion: TAXONOMY_VERSION,
+            pipelinePath: 'web_search_cached'
           })
 
           // Update the book record with AI-found information
@@ -256,12 +266,17 @@ export async function processIsbnScan(
               bookTitle: cachedWebSearchResult.book_title || null,
               bookAuthor: cachedWebSearchResult.book_author || null,
               usedWebSearch: true,
-              rawAiResponse: cachedWebSearchResult
+              rawAiResponse: cachedWebSearchResult,
+              modelVersion: MODEL_VERSION,
+              taxonomyVersion: TAXONOMY_VERSION,
+              pipelinePath: 'web_search_cached'
             })
 
             const warningsToInsert: ContentWarningInsert[] = cachedWebSearchResult.content_warnings.map((warning: any) => ({
               book_id: bookId,
-              category: warning.category,
+              category: getCategoryById(warning.category_id || warning.category)?.legacyCategory || 'other',
+              category_id: warning.category_id || warning.category,
+              confidence_score: warning.score,
               description: warning.description,
               severity: warning.severity,
               user_id: null, // AI-generated warnings don't have a user_id
@@ -360,8 +375,27 @@ export async function processIsbnScan(
 
       console.log('📊 Existing warnings count:', existingWarnings?.length || 0)
 
+      // Check if existing warnings are stale (old model or taxonomy)
+      let isStale = false;
+      if (existingWarnings && existingWarnings.length > 0 && !forceRefresh) {
+        const { data: latestLog } = await supabaseAdmin
+          .from('ai_audit_logs')
+          .select('model_version, taxonomy_version')
+          .eq('book_id', bookId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (!latestLog || latestLog.model_version !== MODEL_VERSION || latestLog.taxonomy_version !== TAXONOMY_VERSION) {
+          console.log(`⚠️ Existing warnings are stale or legacy. Triggering re-analysis. (Log: ${latestLog?.model_version}/${latestLog?.taxonomy_version} vs Current: ${MODEL_VERSION}/${TAXONOMY_VERSION})`);
+          isStale = true;
+          // Clear stale warnings to make way for new ones
+          await supabaseAdmin.from('content_warnings').delete().eq('book_id', bookId);
+        }
+      }
+
       // If we have no warnings (or we just deleted them), generate new ones
-      if (!existingWarnings || existingWarnings.length === 0 || forceRefresh) {
+      if (!existingWarnings || existingWarnings.length === 0 || forceRefresh || isStale) {
         console.log('🤖 Generating content warnings with AI agent...')
         onProgress?.('Analyzing book content with AI...');
 
@@ -508,7 +542,10 @@ export async function processIsbnScan(
             descriptionLength: currentBook!.description?.length || null,
             hadThinMetadata: isThinMetadata,
             usedWebSearch: usedSearch,
-            rawAiResponse: result
+            rawAiResponse: result,
+            modelVersion: MODEL_VERSION,
+            taxonomyVersion: TAXONOMY_VERSION,
+            pipelinePath: usedSearch ? 'web_search_live' : 'metadata_only'
           })
 
           if (result.content_warnings.length > 0) {
@@ -517,7 +554,9 @@ export async function processIsbnScan(
 
             const warningsToInsert: ContentWarningInsert[] = result.content_warnings.map((warning: any) => ({
               book_id: bookId,
-              category: warning.category,
+              category: getCategoryById(warning.category_id || warning.category)?.legacyCategory || 'other',
+              category_id: warning.category_id || warning.category,
+              confidence_score: warning.score,
               description: warning.description,
               severity: warning.severity,
               user_id: null,

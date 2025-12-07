@@ -26,3 +26,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env*.local
+
+# AI Collaboration Status Files (keep in git for coordination)
+# These files help coordinate work between AI assistants
+# .antigravity-working.md
+# .cursor-working.md
+
+# Work-in-progress directories (exclude from git)
+antigravity-wip/
+cursor-wip/
+node_modules

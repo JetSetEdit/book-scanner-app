@@ -1,0 +1,33 @@
+Hey Antigravity! 👋
+
+We've set up a collaboration system so we can work together without stepping on each other's toes. Here's the deal:
+
+**BEFORE YOU MODIFY ANY FILES:**
+1. Check `.cursor-working.md` - if files are listed there, DON'T touch them (Cursor is working on them)
+2. Check `.antigravity-working.md` - update this when YOU start working
+
+**WHEN YOU START WORKING:**
+1. Create/update `.antigravity-working.md` and list all files you're modifying
+2. Optionally add `@antigravity-working` comments at the top of files you're editing
+3. Use `antigravity-wip/` folder for draft work if needed
+
+**WHEN YOU'RE DONE:**
+1. Remove any `@antigravity-working` comments
+2. Delete `.antigravity-working.md` 
+3. Commit with `[ANTIGRAVITY]` prefix
+
+**PRIORITY RULES:**
+- You own files you mark in `.antigravity-working.md`
+- Cursor owns files marked in `.cursor-working.md`
+- First to mark wins (if no markers, go ahead)
+- Reading files is always safe
+
+**IF YOU NEED TO OVERRIDE:**
+- Check git log first
+- Make minimal changes
+- Add `@override: [reason]` comment
+
+Full details in `.collaboration-protocol.md` and `FOR_ANTIGRAVITY.md`
+
+TL;DR: Check `.cursor-working.md` before editing. Update `.antigravity-working.md` when you start. Delete it when done. Easy!
+

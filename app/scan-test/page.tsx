@@ -1,20 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, ArrowRight } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2 } from "lucide-react"
 import Link from "next/link"
+import { useLocalStorage } from "@/hooks/use-browser-storage"
+import { useScanHistory } from "@/hooks/use-scan-history"
+import { useUserPreferences } from "@/hooks/use-user-preferences"
 
 export default function ScanTestPage() {
+  // Browser storage for last ISBN
+  const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
   const [isbn, setIsbn] = useState("")
+  
+  // Scan history
+  const { history, addScan, clearHistory } = useScanHistory()
+  
+  // User preferences
+  const { preferences } = useUserPreferences()
+  
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [statusUpdates, setStatusUpdates] = useState<string[]>([])
   const [candidates, setCandidates] = useState<any[] | null>(null)
+
+  // Load last ISBN on mount
+  useEffect(() => {
+    if (lastIsbn) {
+      setIsbn(lastIsbn)
+    }
+  }, [lastIsbn])
 
   const performScan = async (isbnToScan: string, selectedCandidate?: any) => {
     setLoading(true)
@@ -73,6 +92,19 @@ export default function ScanTestPage() {
                   } else {
                     setResult(data.result)
                     setCandidates(null)
+                    
+                    // Save to scan history
+                    if (data.result.book) {
+                      addScan({
+                        isbn: data.result.book.isbn,
+                        title: data.result.book.title || "Unknown",
+                        author: data.result.book.author || undefined,
+                        bookId: data.result.book.id,
+                      })
+                    }
+                    
+                    // Save last ISBN
+                    setLastIsbn(isbnToScan)
                   }
                 } else if (data.error) {
                   throw new Error(data.error)
@@ -110,6 +142,44 @@ export default function ScanTestPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Scan History */}
+          {history.length > 0 && (
+            <div className="mb-6 p-4 border rounded-lg bg-muted/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  <span className="text-sm font-medium">Recent Scans</span>
+                  <span className="text-xs text-muted-foreground">({history.length})</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearHistory}
+                  className="h-7 text-xs"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {history.slice(0, 5).map((item) => (
+                  <Button
+                    key={item.isbn}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setIsbn(item.isbn)
+                      performScan(item.isbn)
+                    }}
+                    className="text-xs h-7"
+                  >
+                    {item.title.length > 20 ? `${item.title.substring(0, 20)}...` : item.title}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <form onSubmit={handleScan} className="flex gap-4 mb-6">
             <Input
               placeholder="Enter ISBN..."
@@ -226,12 +296,14 @@ export default function ScanTestPage() {
                     </div>
                  </div>
                  
-                 <div className="mt-4">
-                    <h4 className="text-sm font-semibold mb-2">Raw API Response:</h4>
-                    <pre className="bg-muted p-4 rounded-lg overflow-auto text-xs max-h-[300px]">
-                        {JSON.stringify(result, null, 2)}
-                    </pre>
-                 </div>
+                 {preferences.showRawApiResponse && (
+                   <div className="mt-4">
+                     <h4 className="text-sm font-semibold mb-2">Raw API Response:</h4>
+                     <pre className="bg-muted p-4 rounded-lg overflow-auto text-xs max-h-[300px]">
+                         {JSON.stringify(result, null, 2)}
+                     </pre>
+                   </div>
+                 )}
               </div>
             </div>
           )}
