@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
@@ -43,13 +43,16 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
   const [showAuditTrail, setShowAuditTrail] = useState(false)
+  const [showRefreshButton, setShowRefreshButton] = useState(false)
 
   useEffect(() => {
     setIsDev(isDevMode())
     // Load dev settings from localStorage
     if (isDevMode()) {
-      const saved = localStorage.getItem('dev-show-audit-trail')
-      setShowAuditTrail(saved === 'true')
+      const savedAudit = localStorage.getItem('dev-show-audit-trail')
+      setShowAuditTrail(savedAudit === 'true')
+      const savedRefresh = localStorage.getItem('dev-show-refresh-button')
+      setShowRefreshButton(savedRefresh === 'true')
     }
   }, [])
 
@@ -59,7 +62,17 @@ export function Navbar() {
     localStorage.setItem('dev-show-audit-trail', String(newValue))
     // Update all book detail pages by triggering a custom event
     window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail: newValue } 
+      detail: { showAuditTrail: newValue, showRefreshButton } 
+    }))
+  }
+
+  const toggleRefreshButton = () => {
+    const newValue = !showRefreshButton
+    setShowRefreshButton(newValue)
+    localStorage.setItem('dev-show-refresh-button', String(newValue))
+    // Update all pages by triggering a custom event
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
+      detail: { showAuditTrail, showRefreshButton: newValue } 
     }))
   }
 
@@ -131,6 +144,28 @@ export function Navbar() {
                         : "border-muted-foreground"
                     )}>
                       {showAuditTrail && (
+                        <div className="h-full w-full bg-primary rounded-sm" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={toggleRefreshButton}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <div className="flex-1">
+                      <div className="font-medium">Show Refresh Button</div>
+                      <div className="text-xs text-muted-foreground">
+                        Display refresh button on book cards
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showRefreshButton 
+                        ? "bg-primary border-primary" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showRefreshButton && (
                         <div className="h-full w-full bg-primary rounded-sm" />
                       )}
                     </div>
@@ -212,6 +247,33 @@ export function Navbar() {
                         : "border-muted-foreground"
                     )}>
                       {showAuditTrail && (
+                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      toggleRefreshButton()
+                      setMobileMenuOpen(false)
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
+                      showRefreshButton
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      <span>Show Refresh Button</span>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showRefreshButton 
+                        ? "bg-primary-foreground border-primary-foreground" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showRefreshButton && (
                         <div className="h-full w-full bg-primary-foreground rounded-sm" />
                       )}
                     </div>

@@ -1,10 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Library, Shield, AlertTriangle, Info } from "lucide-react"
+import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
-import { RefreshBookButton } from "@/components/refresh-book-button"
+import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
+import { SeverityMild, SeverityModerate, SeveritySevere } from "@/components/severity-icons"
+import { SeverityLegend } from "@/components/severity-legend"
 
 // Helper function to extract classification rating from categories
 function getClassificationFromCategories(categories?: string[]): string | null {
@@ -75,25 +77,15 @@ export default async function CollectionPage() {
           </p>
 
           {/* Content Warning Legend */}
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Shield className="h-4 w-4" />
-              <span className="text-sm font-medium">Content Warning Legend</span>
+          <div className="mt-8 border-t-2 border-slate-200 pt-6">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="h-px bg-slate-200 flex-1"></div>
+              <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400">
+                Warning Legend
+              </h3>
+              <div className="h-px bg-slate-200 flex-1"></div>
             </div>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span>Severe warnings</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span>Moderate warnings</span>
-              </li>
-              <li className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>Mild warnings</span>
-              </li>
-            </ul>
+            <SeverityLegend />
           </div>
         </div>
 
@@ -158,7 +150,7 @@ export default async function CollectionPage() {
                               <h3 className="font-bold text-lg text-balance mb-1 leading-tight">{book.title}</h3>
                               {book.author && <p className="text-sm text-muted-foreground">by {book.author}</p>}
                             </div>
-                            <RefreshBookButton isbn={book.isbn} />
+                            <RefreshBookButtonWrapper isbn={book.isbn} />
                           </div>
 
                           {/* Content Warnings Summary */}
@@ -171,19 +163,25 @@ export default async function CollectionPage() {
                               <ul className="text-xs space-y-0.5">
                                 {warningSummary.severe > 0 && (
                                   <li className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                                    <div className="p-0.5 rounded-full bg-red-50 text-red-600">
+                                      <SeveritySevere className="h-3 w-3" />
+                                    </div>
                                     <span>{warningSummary.severe} severe</span>
                                   </li>
                                 )}
                                 {warningSummary.moderate > 0 && (
                                   <li className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
+                                    <div className="p-0.5 rounded-full bg-orange-50 text-orange-600">
+                                      <SeverityModerate className="h-3 w-3" />
+                                    </div>
                                     <span>{warningSummary.moderate} moderate</span>
                                   </li>
                                 )}
                                 {warningSummary.mild > 0 && (
                                   <li className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                                    <div className="p-0.5 rounded-full bg-yellow-50 text-yellow-600">
+                                      <SeverityMild className="h-3 w-3" />
+                                    </div>
                                     <span>{warningSummary.mild} mild</span>
                                   </li>
                                 )}
@@ -220,11 +218,13 @@ export default async function CollectionPage() {
                         </div>
                       </div>
 
-                      {/* View Details Button */}
-                      <div className="mt-4 pt-4 border-t">
-                        <Button variant="outline" size="sm" className="w-full">
-                          View Detailed Content Warnings
-                        </Button>
+                      {/* View Book Link */}
+                      <div className="mt-4 pt-4 border-t border-slate-100">
+                        <div className="text-center">
+                          <span className="text-xs font-bold tracking-widest uppercase text-slate-400 hover:text-slate-600 transition-colors">
+                            View Book
+                          </span>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
