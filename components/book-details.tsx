@@ -3,9 +3,9 @@
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { ArrowLeft, ChevronDown, ChevronUp, Code } from "lucide-react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface BookDetailsProps {
@@ -13,9 +13,50 @@ interface BookDetailsProps {
   warnings: any[]
 }
 
+// Check if we're in dev mode (localhost or dev environment)
+function isDevMode(): boolean {
+  if (typeof window === 'undefined') return false
+  return (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    process.env.NODE_ENV === 'development'
+  )
+}
+
 export function BookDetails({ book, warnings }: BookDetailsProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
+  const [isDev, setIsDev] = useState(false)
+  const [showAuditTrail, setShowAuditTrail] = useState(false)
+
+  useEffect(() => {
+    setIsDev(isDevMode())
+    
+    // Load dev settings from localStorage
+    if (isDevMode()) {
+      const saved = localStorage.getItem('dev-show-audit-trail')
+      setShowAuditTrail(saved === 'true')
+      setIsAuditOpen(saved === 'true')
+    }
+    
+    // Check for ?debug=true query param (overrides localStorage)
+    if (searchParams?.get('debug') === 'true') {
+      setShowAuditTrail(true)
+      setIsAuditOpen(true)
+    }
+    
+    // Listen for dev settings changes from navbar
+    const handleDevSettingsChange = (event: CustomEvent) => {
+      setShowAuditTrail(event.detail.showAuditTrail)
+      setIsAuditOpen(event.detail.showAuditTrail)
+    }
+    
+    window.addEventListener('dev-settings-changed', handleDevSettingsChange as EventListener)
+    return () => {
+      window.removeEventListener('dev-settings-changed', handleDevSettingsChange as EventListener)
+    }
+  }, [searchParams])
 
   return (
     <div className="min-h-screen bg-white text-slate-950 font-sans selection:bg-slate-950 selection:text-white">
@@ -27,7 +68,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
             onClick={() => router.back()}
             className="text-slate-500 hover:text-slate-950 hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
           >
-            ← Back to Collection
+            ← Back to Bookshelf
           </Button>
           <div className="text-xs font-bold tracking-widest uppercase text-slate-400">
             Book Scanner v1.0
@@ -135,29 +176,34 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
               />
             </div>
 
-            {/* Collapsible Audit History - Integrated into new design */}
-            <div className="mt-12 border-t border-slate-100 pt-8">
-              <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen} className="w-full space-y-4">
-                <div className="flex items-center justify-between group cursor-pointer" onClick={() => setIsAuditOpen(!isAuditOpen)}>
-                  <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">
-                    System Logs & Audit Trail
-                  </h3>
-                  <Button variant="ghost" size="sm" className="w-9 p-0 text-slate-400 group-hover:text-slate-600">
-                    {isAuditOpen ? (
-                      <ChevronUp className="h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4" />
-                    )}
-                    <span className="sr-only">Toggle Audit Logs</span>
-                  </Button>
-                </div>
-                <CollapsibleContent className="space-y-2">
-                  <div className="bg-slate-50 rounded-lg p-6 border border-slate-100 font-mono text-sm">
-                    <AuditHistory bookId={book.id} />
+            {/* Dev-Only: Collapsible Audit History */}
+            {isDev && showAuditTrail && (
+              <div className="mt-12 border-t border-slate-100 pt-8">
+                <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen} className="w-full space-y-4">
+                  <div className="flex items-center justify-between group cursor-pointer" onClick={() => setIsAuditOpen(!isAuditOpen)}>
+                    <div className="flex items-center gap-2">
+                      <Code className="h-3 w-3 text-slate-400" />
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">
+                        [DEV] System Logs & Audit Trail
+                      </h3>
+                    </div>
+                    <Button variant="ghost" size="sm" className="w-9 p-0 text-slate-400 group-hover:text-slate-600">
+                      {isAuditOpen ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">Toggle Audit Logs</span>
+                    </Button>
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            </div>
+                  <CollapsibleContent className="space-y-2">
+                    <div className="bg-slate-50 rounded-lg p-6 border border-slate-100 font-mono text-sm">
+                      <AuditHistory bookId={book.id} />
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              </div>
+            )}
           </div>
         </div>
       </div>

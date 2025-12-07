@@ -2,9 +2,18 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
-import { BookOpen, Library, Menu, X } from "lucide-react"
+import { useState, useEffect } from "react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
 
 const navigation = [
   {
@@ -13,15 +22,46 @@ const navigation = [
     icon: BookOpen,
   },
   {
-    name: "Book Database",
+    name: "Bookshelf",
     href: "/collection",
     icon: Library,
   },
 ]
 
+// Check if we're in dev mode
+function isDevMode(): boolean {
+  if (typeof window === 'undefined') return false
+  return (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    process.env.NODE_ENV === 'development'
+  )
+}
+
 export function Navbar() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isDev, setIsDev] = useState(false)
+  const [showAuditTrail, setShowAuditTrail] = useState(false)
+
+  useEffect(() => {
+    setIsDev(isDevMode())
+    // Load dev settings from localStorage
+    if (isDevMode()) {
+      const saved = localStorage.getItem('dev-show-audit-trail')
+      setShowAuditTrail(saved === 'true')
+    }
+  }, [])
+
+  const toggleAuditTrail = () => {
+    const newValue = !showAuditTrail
+    setShowAuditTrail(newValue)
+    localStorage.setItem('dev-show-audit-trail', String(newValue))
+    // Update all book detail pages by triggering a custom event
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
+      detail: { showAuditTrail: newValue } 
+    }))
+  }
 
   return (
     <nav className="border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
@@ -53,6 +93,51 @@ export function Navbar() {
                 </Link>
               )
             })}
+            
+            {/* Dev Settings Dropdown */}
+            {isDev && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                  >
+                    <Code className="h-4 w-4" />
+                    <span className="hidden lg:inline">Dev</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="flex items-center gap-2">
+                    <Settings className="h-4 w-4" />
+                    Developer Settings
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={toggleAuditTrail}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <div className="flex-1">
+                      <div className="font-medium">Show Audit Trail</div>
+                      <div className="text-xs text-muted-foreground">
+                        Display system logs on book pages
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showAuditTrail 
+                        ? "bg-primary border-primary" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showAuditTrail && (
+                        <div className="h-full w-full bg-primary rounded-sm" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Mobile menu button */}
@@ -96,6 +181,43 @@ export function Navbar() {
                   </Link>
                 )
               })}
+              
+              {/* Dev Settings in Mobile Menu */}
+              {isDev && (
+                <div className="px-3 py-2 border-t mt-2 pt-2">
+                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <Code className="h-3 w-3" />
+                    Dev Settings
+                  </div>
+                  <button
+                    onClick={() => {
+                      toggleAuditTrail()
+                      setMobileMenuOpen(false)
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      showAuditTrail
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4" />
+                      <span>Show Audit Trail</span>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showAuditTrail 
+                        ? "bg-primary-foreground border-primary-foreground" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showAuditTrail && (
+                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
+                      )}
+                    </div>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

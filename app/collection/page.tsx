@@ -50,7 +50,7 @@ export default async function CollectionPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Library className="h-5 w-5" />
-                Book Database
+                Bookshelf
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -68,7 +68,7 @@ export default async function CollectionPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
             <Library className="h-8 w-8" />
-            Book Database
+            Bookshelf
           </h1>
           <p className="text-muted-foreground">
             {books?.length || 0} books with content warnings available
