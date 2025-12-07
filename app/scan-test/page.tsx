@@ -5,16 +5,22 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2 } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera } from "lucide-react"
 import Link from "next/link"
 import { useLocalStorage } from "@/hooks/use-browser-storage"
 import { useScanHistory } from "@/hooks/use-scan-history"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
+import { startTiming, markStage, endTiming, formatTiming } from "@/lib/utils/timing"
+import { BarcodeScanner } from "@/components/barcode-scanner"
+import { cn } from "@/lib/utils"
 
 export default function ScanTestPage() {
   // Browser storage for last ISBN
   const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
   const [isbn, setIsbn] = useState("")
+  
+  // Show scanner by default, can be hidden
+  const [showScanner, setShowScanner] = useState(true)
   
   // Scan history
   const { history, addScan, clearHistory } = useScanHistory()
@@ -36,6 +42,10 @@ export default function ScanTestPage() {
   }, [lastIsbn])
 
   const performScan = async (isbnToScan: string, selectedCandidate?: any) => {
+    // Start timing
+    const timer = startTiming()
+    markStage('scan-initiated')
+    
     setLoading(true)
     setError(null)
     if (!selectedCandidate) {
@@ -45,6 +55,7 @@ export default function ScanTestPage() {
     }
 
     try {
+      markStage('api-request-sent')
       const body: any = { isbn: isbnToScan, stream: true }
       if (selectedCandidate) {
         body.selectedCandidate = selectedCandidate
@@ -57,6 +68,9 @@ export default function ScanTestPage() {
         },
         body: JSON.stringify(body),
       })
+
+      const responseReceivedTime = performance.now()
+      markStage('api-response-received')
 
       if (!response.ok) {
         const data = await response.json()
@@ -71,9 +85,14 @@ export default function ScanTestPage() {
         throw new Error("Response body is not readable")
       }
 
+      markStage('stream-started')
+
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          markStage('stream-completed')
+          break
+        }
 
         const chunk = decoder.decode(value, { stream: true })
         const lines = chunk.split("\n\n")
@@ -86,12 +105,16 @@ export default function ScanTestPage() {
                 if (data.status) {
                   setStatusUpdates(prev => [...prev, data.status])
                 } else if (data.result) {
+                  markStage('result-received')
+                  
                   if (data.result.status === 'ambiguous') {
                     setCandidates(data.result.candidates)
                     setStatusUpdates(prev => [...prev, "Ambiguous results found. Waiting for selection..."])
                   } else {
                     setResult(data.result)
                     setCandidates(null)
+                    
+                    markStage('result-processed')
                     
                     // Save to scan history
                     if (data.result.book) {
@@ -105,6 +128,20 @@ export default function ScanTestPage() {
                     
                     // Save last ISBN
                     setLastIsbn(isbnToScan)
+                    
+                    // End timing and log
+                    markStage('ui-updated')
+                    const timingResult = endTiming()
+                    if (timingResult) {
+                      // Log to console
+                      console.log('📊 Scan Timing Results:')
+                      console.log(`  Total Duration: ${timingResult.duration.toFixed(0)}ms`)
+                      Object.entries(timingResult.stages).forEach(([stage, duration]) => {
+                        console.log(`  ${stage}: ${duration.toFixed(0)}ms`)
+                      })
+                      // Store timing in result for display
+                      (data.result as any).timing = timingResult
+                    }
                   }
                 } else if (data.error) {
                   throw new Error(data.error)
@@ -131,14 +168,25 @@ export default function ScanTestPage() {
     await performScan(isbn, candidate)
   }
 
+  const handleBarcodeScan = (scannedISBN: string) => {
+    setIsbn(scannedISBN)
+    // Automatically trigger scan
+    performScan(scannedISBN)
+    // Optionally hide scanner after successful scan
+    setShowScanner(false)
+  }
+
+  const handleScannerError = (errorMsg: string) => {
+    setError(errorMsg)
+  }
+
   return (
     <div className="container mx-auto py-12 px-4 max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle>ISBN Scanner Test</CardTitle>
+          <CardTitle>Scan Book</CardTitle>
           <CardDescription>
-            Test the refactored scanning logic and AI generation.
-            Enter an ISBN (e.g., 9780375826696) to trigger the backend service.
+            Scan a book barcode with your camera or enter an ISBN manually.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -169,6 +217,7 @@ export default function ScanTestPage() {
                     size="sm"
                     onClick={() => {
                       setIsbn(item.isbn)
+                      setScanMode("manual")
                       performScan(item.isbn)
                     }}
                     className="text-xs h-7"
@@ -179,25 +228,70 @@ export default function ScanTestPage() {
               </div>
             </div>
           )}
-          
-          <form onSubmit={handleScan} className="flex gap-4 mb-6">
-            <Input
-              placeholder="Enter ISBN..."
-              value={isbn}
-              onChange={(e) => setIsbn(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit" disabled={loading || !isbn}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Scanning
-                </>
-              ) : (
-                "Scan Book"
+
+          {/* Unified Interface: Scanner + Manual Entry */}
+          <div className="space-y-6 mb-6">
+            {/* Barcode Scanner */}
+            {showScanner && (
+              <div>
+                <BarcodeScanner
+                  onScanSuccess={handleBarcodeScan}
+                  onError={handleScannerError}
+                  onClose={() => setShowScanner(false)}
+                />
+              </div>
+            )}
+
+            {/* Divider */}
+            {showScanner && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-slate-500">Or</span>
+                </div>
+              </div>
+            )}
+
+            {/* Manual Entry */}
+            <div>
+              {!showScanner && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowScanner(true)}
+                  className="mb-4"
+                >
+                  <Camera className="h-4 w-4 mr-2" />
+                  Use Camera Scanner
+                </Button>
               )}
-            </Button>
-          </form>
+              <form onSubmit={handleScan} className="flex gap-4">
+                <Input
+                  placeholder="Enter ISBN (e.g., 9780375826696)"
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  className="flex-1"
+                  autoFocus={!showScanner}
+                />
+                <Button type="submit" disabled={loading || !isbn}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Scanning
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Scan Book
+                    </>
+                  )}
+                </Button>
+              </form>
+            </div>
+          </div>
 
           {error && (
             <Alert variant="destructive" className="mb-6">
@@ -271,9 +365,35 @@ export default function ScanTestPage() {
                     <div className="p-4 border rounded bg-muted/50">
                         <h3 className="font-bold text-lg">{result.book.title || "Unknown Title"}</h3>
                         <p className="text-sm text-muted-foreground">{result.book.author}</p>
+                        
+                        {/* Timing Display */}
+                        {result.timing && (
+                          <div className="mt-3 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">
+                            <div className="font-bold mb-1">⏱️ Scan Timing:</div>
+                            <div>Total: <strong>{result.timing.duration.toFixed(0)}ms</strong></div>
+                            {Object.entries(result.timing.stages).map(([stage, duration]) => (
+                              <div key={stage} className="ml-2 text-muted-foreground">
+                                {stage}: {duration.toFixed(0)}ms
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
                         <div className="mt-4">
                             <Link href={`/book/${result.book.isbn}`}>
-                                <Button variant="outline" className="w-full">
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full"
+                                  onClick={() => {
+                                    // Track timing to book page navigation
+                                    if (result.timing) {
+                                      const navStart = performance.now()
+                                      const timeToNav = navStart - (result.timing.startTime + result.timing.duration)
+                                      console.log(`📊 Time to navigate: ${timeToNav.toFixed(0)}ms`)
+                                      console.log(`📊 Total time (scan + nav): ${(result.timing.duration + timeToNav).toFixed(0)}ms`)
+                                    }
+                                  }}
+                                >
                                     View Book Page <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>
                             </Link>

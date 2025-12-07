@@ -24,7 +24,7 @@ export default function HomePage() {
           </h1>
 
           <p className="mx-auto max-w-2xl text-xl text-slate-600 leading-relaxed font-light">
-            Subtext analyzes books to reveal content warnings, age ratings, and thematic depth—so you can read with confidence.
+            Subtext analyzes books to reveal content warnings, age ratings, and thematic depth—so you can read with confidence. Scan a barcode or enter an ISBN to get started.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
