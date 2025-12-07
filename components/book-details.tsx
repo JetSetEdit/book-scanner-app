@@ -75,9 +75,9 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
           </div>
         </div>
 
-        <div className="grid lg:grid-cols-[380px_1fr] gap-16 items-start">
+        <div className="grid lg:grid-cols-[380px_1fr] gap-8 lg:gap-16 items-start">
           {/* Left Column: Cover & Specs */}
-          <div className="space-y-8 sticky top-8">
+          <div className="space-y-8 lg:sticky lg:top-8">
             {/* Cover Image - Sharp, elegant shadow */}
             <div className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-slate-100">
               {book.cover_url ? (
