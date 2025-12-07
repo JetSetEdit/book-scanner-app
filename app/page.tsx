@@ -37,7 +37,7 @@ export default function HomePage() {
             <Link href="/collection">
               <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-300">
                 <Search className="mr-2 h-5 w-5" />
-                Browse Library
+                Browse Bookshelf
               </Button>
             </Link>
           </div>
