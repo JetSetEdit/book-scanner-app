@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     console.log('Scan ISBN API called')
 
-    const { isbn, stream, selectedCandidate, forceRefresh } = await request.json()
+    const { isbn, stream, selectedCandidate, forceRefresh, model } = await request.json()
     console.log('Processing ISBN:', isbn)
 
     if (!isbn) {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
           }
 
           try {
-            const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh)
+            const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh, model || "gpt-4o")
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : (error as any)?.message || 'Unknown error';
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Standard JSON response
-      const result = await processIsbnScan(isbn, undefined, selectedCandidate)
+      const result = await processIsbnScan(isbn, undefined, selectedCandidate, false, model || "gpt-4o")
       return NextResponse.json(result)
     }
 

@@ -1,0 +1,56 @@
+[
+  {
+    "model": "gpt-4o",
+    "isbn": "9780593356159",
+    "bookTitle": "The Maid",
+    "timestamp": 1765102398899,
+    "timings": {
+      "total": 23880.615707999794,
+      "aiContentWarningGeneration": 15043.118299999995,
+      "webSearch": 21490.168999999994,
+      "dbLookup": 607.2553749999497,
+      "dbWrites": 570.6070419996977
+    },
+    "flags": {
+      "usedWebSearch": true,
+      "pipelinePath": "web_search_existing"
+    },
+    "warnings": {
+      "count": 0,
+      "categories": [],
+      "severities": []
+    },
+    "quality": {
+      "hasReasoning": false,
+      "reasoningLength": 0,
+      "confidence": "unknown"
+    }
+  },
+  {
+    "model": "gpt-4o-mini",
+    "isbn": "9780593356159",
+    "bookTitle": "The Maid",
+    "timestamp": 1765102432873,
+    "timings": {
+      "total": 30952.174165999983,
+      "aiContentWarningGeneration": 20239.427570600015,
+      "webSearch": 28913.467958000023,
+      "dbLookup": 285.3536249999888,
+      "dbWrites": 641.4811670000199
+    },
+    "flags": {
+      "usedWebSearch": true,
+      "pipelinePath": "web_search_existing"
+    },
+    "warnings": {
+      "count": 0,
+      "categories": [],
+      "severities": []
+    },
+    "quality": {
+      "hasReasoning": false,
+      "reasoningLength": 0,
+      "confidence": "unknown"
+    }
+  }
+]

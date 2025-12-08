@@ -1,0 +1,654 @@
+/**
+ * Hierarchical Taxonomy Structure v2.0
+ * 
+ * This version introduces parent-child relationships:
+ * - Parent categories: High-level groupings (e.g., "Mental Health")
+ * - Subcategories: Specific subcategories under parents (e.g., "Disordered Eating", "Anxiety")
+ * 
+ * This allows multiple specific warnings under one parent category,
+ * solving the duplicate category problem.
+ * 
+ * Also includes contextual metadata:
+ * - Presence: How the content appears (on_page, off_page, flashback, referenced, implied)
+ * - Detail Level: How graphic/explicit (graphic, moderate, vague, clinical)
+ * - Spoiler Flag: Whether warning reveals plot twists
+ * - Mediation Flag: Whether content requires parental/educational mediation
+ */
+
+export const TAXONOMY_VERSION = "2.0.0";
+export const MODEL_VERSION = "gpt-4o-2024-11-20";
+
+export interface WarningSubcategory {
+  id: string;
+  userLabel: string;
+  shortDescription: string;
+  defaultSeverityHint?: 'mild' | 'moderate' | 'severe';
+}
+
+export interface WarningCategory {
+  id: string;
+  userLabel: string;
+  shortDescription: string;
+  legacyCategory: string; // For backward compatibility with DB constraints
+  subcategories: WarningSubcategory[];
+  defaultSeverityHint?: 'mild' | 'moderate' | 'severe';
+}
+
+export const WARNING_CATEGORIES: WarningCategory[] = [
+  {
+    id: 'mental_health',
+    userLabel: 'Mental Health',
+    shortDescription: 'Depression, anxiety, suicide, eating disorders, and other mental health themes.',
+    legacyCategory: 'mental_health',
+    subcategories: [
+      {
+        id: 'disordered_eating',
+        userLabel: 'Disordered Eating',
+        shortDescription: 'Disordered eating, eating disorders, body image issues.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'anxiety',
+        userLabel: 'Anxiety',
+        shortDescription: 'Anxiety, panic attacks, stress, anxiety disorders.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'depression',
+        userLabel: 'Depression',
+        shortDescription: 'Depression, mood disorders, depressive episodes.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'ptsd',
+        userLabel: 'PTSD / Trauma',
+        shortDescription: 'Post-traumatic stress disorder, trauma, traumatic experiences.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'self_harm',
+        userLabel: 'Self-Harm',
+        shortDescription: 'Self-harm behaviors, cutting, non-suicidal self-injury.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'suicidal_ideation',
+        userLabel: 'Suicidal Ideation',
+        shortDescription: 'Suicidal thoughts, attempts, detailed descriptions of suicide.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'other_mental_health',
+        userLabel: 'Other Mental Health',
+        shortDescription: 'Other mental health themes not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'sexual_content',
+    userLabel: 'Sexual Content',
+    shortDescription: 'Sexual situations, explicit content, sexual violence, or intense romance.',
+    legacyCategory: 'sexual_content',
+    subcategories: [
+      {
+        id: 'explicit_sexual_content',
+        userLabel: 'Explicit Sexual Content',
+        shortDescription: 'Explicit sexual scenes, graphic sexual descriptions.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'sexual_violence',
+        userLabel: 'Sexual Violence',
+        shortDescription: 'Sexual assault, rape, non-consensual sexual content.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'intense_romance',
+        userLabel: 'Intense Romance / Spice',
+        shortDescription: 'Intense romantic/sexual tension, steamy scenes, explicit romance/spice content. Note: Emotional romantic tension alone may not require a warning.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'sexual_themes',
+        userLabel: 'Sexual Themes',
+        shortDescription: 'Sexual themes, discussions, references (non-explicit).',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'other_sexual_content',
+        userLabel: 'Other Sexual Content',
+        shortDescription: 'Other sexual content not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'emotional_abuse_or_toxic_relationships',
+    userLabel: 'Emotional Abuse / Toxic Relationships',
+    shortDescription: 'Gaslighting, manipulation, controlling behavior, or toxic relationship dynamics.',
+    legacyCategory: 'abuse',
+    subcategories: [
+      {
+        id: 'gaslighting',
+        userLabel: 'Gaslighting',
+        shortDescription: 'Gaslighting, psychological manipulation, making someone question their reality.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'manipulation',
+        userLabel: 'Manipulation',
+        shortDescription: 'Manipulative behavior, emotional manipulation, coercive control.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'controlling_behavior',
+        userLabel: 'Controlling Behavior',
+        shortDescription: 'Controlling relationships, possessiveness, isolation.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'toxic_friendships',
+        userLabel: 'Toxic Friendships',
+        shortDescription: 'Toxic friendships, unhealthy social dynamics, peer pressure.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'cheating',
+        userLabel: 'Cheating',
+        shortDescription: 'Infidelity, cheating in relationships, betrayal.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'emotional_abuse',
+        userLabel: 'Emotional Abuse',
+        shortDescription: 'Emotional abuse, verbal abuse, psychological abuse.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'other_toxic_relationships',
+        userLabel: 'Other Toxic Relationships',
+        shortDescription: 'Other toxic relationship dynamics not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'bullying_or_social_cruelty',
+    userLabel: 'Bullying / Social Cruelty',
+    shortDescription: 'Bullying, hazing, public humiliation, or intense social pressure.',
+    legacyCategory: 'abuse',
+    subcategories: [
+      {
+        id: 'bullying',
+        userLabel: 'Bullying',
+        shortDescription: 'Bullying, harassment, intimidation.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'hazing',
+        userLabel: 'Hazing',
+        shortDescription: 'Hazing, initiation rituals, forced participation.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'public_humiliation',
+        userLabel: 'Public Humiliation',
+        shortDescription: 'Public humiliation, shaming, embarrassment.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'social_pressure',
+        userLabel: 'Social Pressure',
+        shortDescription: 'Intense social pressure, peer pressure, conformity pressure.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'other_social_cruelty',
+        userLabel: 'Other Social Cruelty',
+        shortDescription: 'Other forms of social cruelty not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'violence',
+    userLabel: 'Violence',
+    shortDescription: 'Physical violence, fighting, weapons, war, or gore.',
+    legacyCategory: 'violence',
+    subcategories: [
+      {
+        id: 'physical_violence',
+        userLabel: 'Physical Violence',
+        shortDescription: 'Physical fighting, combat, brawls, physical altercations.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'graphic_violence',
+        userLabel: 'Graphic Violence',
+        shortDescription: 'Graphic violence, gore, detailed violence, blood.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'weapons',
+        userLabel: 'Weapons',
+        shortDescription: 'Weapons, gun violence, knife violence, weapon use.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'war',
+        userLabel: 'War',
+        shortDescription: 'War, military violence, battle scenes, combat.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'domestic_violence',
+        userLabel: 'Domestic Violence',
+        shortDescription: 'Domestic violence, intimate partner violence, family violence.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'torture',
+        userLabel: 'Torture',
+        shortDescription: 'Torture, extreme violence, prolonged suffering.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'kidnapping_confinement',
+        userLabel: 'Kidnapping / Confinement',
+        shortDescription: 'Kidnapping, abduction, confinement, being held against will, captivity.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'violence_against_children',
+        userLabel: 'Violence Against Children',
+        shortDescription: 'Violence directed at children, child abuse, harm to minors.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'animal_cruelty',
+        userLabel: 'Animal Cruelty',
+        shortDescription: 'Animal cruelty, harm to animals, animal death, pet death.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'other_violence',
+        userLabel: 'Other Violence',
+        shortDescription: 'Other forms of violence not covered by specific subcategories.',
+        defaultSeverityHint: 'moderate'
+      }
+    ]
+  },
+  {
+    id: 'substance_use_or_alcohol',
+    userLabel: 'Substance Use',
+    shortDescription: 'Alcohol consumption, drug use, addiction, or overdose.',
+    legacyCategory: 'substance_abuse',
+    subcategories: [
+      {
+        id: 'alcohol',
+        userLabel: 'Alcohol',
+        shortDescription: 'Alcohol consumption, drinking, alcohol abuse.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'drug_use',
+        userLabel: 'Drug Use',
+        shortDescription: 'Drug use, drug abuse, illegal substances.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'addiction',
+        userLabel: 'Addiction',
+        shortDescription: 'Addiction, substance dependence, substance use disorder.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'overdose',
+        userLabel: 'Overdose',
+        shortDescription: 'Overdose, drug-related medical emergencies, poisoning.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'other_substance_use',
+        userLabel: 'Other Substance Use',
+        shortDescription: 'Other substance-related content not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'death_or_grief',
+    userLabel: 'Death / Grief',
+    shortDescription: 'Character deaths, terminal illness, mourning, or funeral scenes.',
+    legacyCategory: 'death',
+    subcategories: [
+      {
+        id: 'character_death',
+        userLabel: 'Character Death',
+        shortDescription: 'Character deaths, on-page deaths, death scenes.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'terminal_illness',
+        userLabel: 'Terminal Illness',
+        shortDescription: 'Terminal illness, dying characters, end-of-life care.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'grief',
+        userLabel: 'Grief',
+        shortDescription: 'Grief, mourning, loss, bereavement.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'funeral_scenes',
+        userLabel: 'Funeral Scenes',
+        shortDescription: 'Funeral scenes, death rituals, memorial services.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'near_death',
+        userLabel: 'Near Death',
+        shortDescription: 'Near-death experiences, life-threatening situations.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'past_death',
+        userLabel: 'Past Death',
+        shortDescription: 'Past deaths (discussed but not shown), historical deaths.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'miscarriage_abortion',
+        userLabel: 'Miscarriage / Abortion',
+        shortDescription: 'Miscarriage, stillbirth, abortion, pregnancy loss.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'pregnancy_childbirth',
+        userLabel: 'Pregnancy / Childbirth',
+        shortDescription: 'Pregnancy complications, difficult childbirth, pregnancy-related trauma.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'other_death_grief',
+        userLabel: 'Other Death / Grief',
+        shortDescription: 'Other death/grief-related content not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'discrimination',
+    userLabel: 'Discrimination',
+    shortDescription: 'Racism, sexism, homophobia, transphobia, or other forms of hate speech/discrimination.',
+    legacyCategory: 'discrimination',
+    subcategories: [
+      {
+        id: 'racism',
+        userLabel: 'Racism',
+        shortDescription: 'Racism, racial discrimination, racial slurs.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'sexism',
+        userLabel: 'Sexism',
+        shortDescription: 'Sexism, gender discrimination, misogyny, misandry.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'homophobia',
+        userLabel: 'Homophobia',
+        shortDescription: 'Homophobia, anti-LGBTQ+ content, discrimination against gay/lesbian people.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'transphobia',
+        userLabel: 'Transphobia',
+        shortDescription: 'Transphobia, anti-trans content, discrimination against transgender people.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'religious_discrimination',
+        userLabel: 'Religious Discrimination',
+        shortDescription: 'Religious discrimination, religious intolerance, religious persecution.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'ableism',
+        userLabel: 'Ableism',
+        shortDescription: 'Ableism, discrimination against disabilities, disability slurs.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'other_discrimination',
+        userLabel: 'Other Discrimination',
+        shortDescription: 'Other forms of discrimination not covered by specific subcategories.',
+        defaultSeverityHint: 'moderate'
+      }
+    ]
+  },
+  {
+    id: 'language',
+    userLabel: 'Coarse Language',
+    shortDescription: 'Strong language, swearing, or slurs.',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'strong_language',
+        userLabel: 'Strong Language',
+        shortDescription: 'Strong language, profanity, swearing.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'slurs',
+        userLabel: 'Slurs',
+        shortDescription: 'Slurs, hate speech, derogatory language.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'other_language',
+        userLabel: 'Other Language',
+        shortDescription: 'Other language-related content not covered by specific subcategories.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'other',
+    userLabel: 'Other',
+    shortDescription: 'Other potentially triggering content not covered by specific categories.',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'other',
+        userLabel: 'Other',
+        shortDescription: 'Other potentially triggering content.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  }
+];
+
+export type SeverityLevel = 'none' | 'mild' | 'moderate' | 'severe';
+
+export const SEVERITY_MAPPING = {
+  none: { min: 0.0, max: 0.30 },
+  mild: { min: 0.31, max: 0.55 },
+  moderate: { min: 0.56, max: 0.80 },
+  severe: { min: 0.81, max: 1.0 }
+};
+
+export function getSeverityFromScore(score: number): SeverityLevel {
+  if (score <= SEVERITY_MAPPING.none.max) return 'none';
+  if (score <= SEVERITY_MAPPING.mild.max) return 'mild';
+  if (score <= SEVERITY_MAPPING.moderate.max) return 'moderate';
+  return 'severe';
+}
+
+export function getCategoryById(id: string): WarningCategory | undefined {
+  return WARNING_CATEGORIES.find(c => c.id === id);
+}
+
+export function getSubcategoryById(categoryId: string, subcategoryId: string): WarningSubcategory | undefined {
+  const category = getCategoryById(categoryId);
+  if (!category) return undefined;
+  return category.subcategories.find(s => s.id === subcategoryId);
+}
+
+export function getAllSubcategories(): Array<{ categoryId: string; subcategory: WarningSubcategory }> {
+  const result: Array<{ categoryId: string; subcategory: WarningSubcategory }> = [];
+  for (const category of WARNING_CATEGORIES) {
+    for (const subcategory of category.subcategories) {
+      result.push({ categoryId: category.id, subcategory });
+    }
+  }
+  return result;
+}
+
+export function getSubcategoriesByCategory(categoryId: string): WarningSubcategory[] {
+  const category = getCategoryById(categoryId);
+  return category?.subcategories || [];
+}
+
+/**
+ * Get a flat list of all valid subcategory IDs in the format "category_id.subcategory_id"
+ * Useful for validation and AI prompts
+ */
+export function getAllSubcategoryIds(): string[] {
+  const result: string[] = [];
+  for (const category of WARNING_CATEGORIES) {
+    for (const subcategory of category.subcategories) {
+      result.push(`${category.id}.${subcategory.id}`);
+    }
+  }
+  return result;
+}
+
+/**
+ * Get just the subcategory IDs (without parent prefix)
+ * Useful for validating the subcategory_id database field
+ */
+export function getSubcategoryIdsOnly(): string[] {
+  const result: string[] = [];
+  for (const category of WARNING_CATEGORIES) {
+    for (const subcategory of category.subcategories) {
+      result.push(subcategory.id);
+    }
+  }
+  return result;
+}
+
+/**
+ * Validate that a subcategory belongs to its parent category
+ * Returns true if valid, false otherwise
+ */
+export function validateSubcategoryParent(categoryId: string, subcategoryId: string): boolean {
+  const category = getCategoryById(categoryId);
+  if (!category) return false;
+  return category.subcategories.some(s => s.id === subcategoryId);
+}
+
+/**
+ * Get all valid subcategory IDs for a specific parent category
+ * Useful for AI prompt constraints and validation
+ */
+export function getValidSubcategoriesForCategory(categoryId: string): string[] {
+  const category = getCategoryById(categoryId);
+  if (!category) return [];
+  return category.subcategories.map(s => s.id);
+}
+
+/**
+ * Presence types: How the content appears in the book
+ */
+export type PresenceType = 'on_page' | 'off_page' | 'flashback' | 'referenced' | 'implied';
+
+export const PRESENCE_TYPES: Array<{ id: PresenceType; label: string; description: string }> = [
+  {
+    id: 'on_page',
+    label: 'On Page',
+    description: 'The event is described as it happens in real-time during the narrative.'
+  },
+  {
+    id: 'off_page',
+    label: 'Off Page',
+    description: 'The event happens but is not directly described (happens "off-screen").'
+  },
+  {
+    id: 'flashback',
+    label: 'Flashback',
+    description: 'The event is shown in a flashback or memory sequence.'
+  },
+  {
+    id: 'referenced',
+    label: 'Referenced',
+    description: 'The event is discussed or mentioned but not shown (e.g., in therapy, conversation).'
+  },
+  {
+    id: 'implied',
+    label: 'Implied',
+    description: 'The event is strongly implied but not explicitly stated or shown.'
+  }
+];
+
+/**
+ * Detail level: How graphic or detailed the content is
+ */
+export type DetailLevel = 'graphic' | 'moderate' | 'vague' | 'clinical';
+
+export const DETAIL_LEVELS: Array<{ id: DetailLevel; label: string; description: string }> = [
+  {
+    id: 'graphic',
+    label: 'Graphic',
+    description: 'Detailed, explicit, or graphic description of the content.'
+  },
+  {
+    id: 'moderate',
+    label: 'Moderate',
+    description: 'Moderate level of detail, not overly explicit but clear.'
+  },
+  {
+    id: 'vague',
+    label: 'Vague',
+    description: 'Vague or minimal description, mostly implied.'
+  },
+  {
+    id: 'clinical',
+    label: 'Clinical',
+    description: 'Clinical or matter-of-fact description without emotional detail.'
+  }
+];
+
+/**
+ * Australian Context: Indigenous deceased persons protocol
+ */
+export interface IndigenousContext {
+  hasIndigenousContent: boolean;
+  hasDeceasedPersons: boolean;
+}
+
+/**
+ * Helper to determine if a book requires mediation/notification
+ * Based on Australian Department of Education requirements
+ */
+export function requiresMediation(warnings: Array<{
+  category_id: string;
+  severity: 'mild' | 'moderate' | 'severe';
+  detail_level?: DetailLevel | null;
+}>): boolean {
+  // Flag if any warning is moderate+ severity in sensitive categories
+  const sensitiveCategories = [
+    'sexual_content',
+    'violence',
+    'substance_use_or_alcohol',
+    'mental_health',
+    'emotional_abuse_or_toxic_relationships'
+  ];
+
+  return warnings.some(w => 
+    sensitiveCategories.includes(w.category_id) &&
+    (w.severity === 'moderate' || w.severity === 'severe')
+  );
+}

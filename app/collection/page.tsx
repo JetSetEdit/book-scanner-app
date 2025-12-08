@@ -7,6 +7,9 @@ import Image from "next/image"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
 import { SeverityMild, SeverityModerate, SeveritySevere } from "@/components/severity-icons"
 import { SeverityLegend } from "@/components/severity-legend"
+import { CollectionSort } from "@/components/collection-sort"
+import { compareBySeverity } from "@/lib/utils/severity-scoring"
+import { SeverityScoreWrapper } from "@/components/severity-score-wrapper"
 
 // Helper function to extract classification rating from categories
 function getClassificationFromCategories(categories?: string[]): string | null {
@@ -27,11 +30,19 @@ function getContentWarningSummary(contentWarnings?: any[]): { severe: number; mo
   }, { severe: 0, moderate: 0, mild: 0 })
 }
 
-export default async function CollectionPage() {
-  const supabase = await createClient()
+interface CollectionPageProps {
+  searchParams: Promise<{ author?: string; q?: string; sort?: string }>
+}
 
-  // Fetch all books from the database with content warnings
-  const { data: books, error } = await supabase
+export default async function CollectionPage({ searchParams }: CollectionPageProps) {
+  const supabase = await createClient()
+  const params = await searchParams
+  const authorFilter = params?.author
+  const searchQuery = params?.q
+  const sortOption = params?.sort || "newest"
+
+  // Build query with optional filters
+  let query = supabase
     .from("books")
     .select(`
       *,
@@ -41,7 +52,53 @@ export default async function CollectionPage() {
         severity
       )
     `)
-    .order("created_at", { ascending: false })
+
+  // Apply filters
+  if (authorFilter) {
+    query = query.eq("author", decodeURIComponent(authorFilter))
+  } else if (searchQuery) {
+    query = query.or(
+      `title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,isbn.ilike.%${searchQuery}%`
+    )
+  }
+
+  // Apply sorting
+  switch (sortOption) {
+    case "title-asc":
+      query = query.order("title", { ascending: true })
+      break
+    case "title-desc":
+      query = query.order("title", { ascending: false })
+      break
+    case "author-asc":
+      query = query.order("author", { ascending: true, nullsFirst: false })
+      break
+    case "newest":
+    default:
+      query = query.order("created_at", { ascending: false })
+      break
+  }
+
+  // Fetch books with content warnings
+  const { data: books, error } = await query
+
+  // Apply client-side sorting for severity (since it requires complex calculation)
+  let sortedBooks = books || []
+  if (sortOption === "severity-desc") {
+    sortedBooks = [...sortedBooks].sort((a, b) => 
+      compareBySeverity(
+        { warnings: a.content_warnings || [] },
+        { warnings: b.content_warnings || [] }
+      )
+    )
+  } else if (sortOption === "severity-asc") {
+    sortedBooks = [...sortedBooks].sort((a, b) => 
+      compareBySeverity(
+        { warnings: b.content_warnings || [] },
+        { warnings: a.content_warnings || [] }
+      )
+    )
+  }
 
   if (error) {
     console.error("Error fetching books:", error)
@@ -68,13 +125,39 @@ export default async function CollectionPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
-            <Library className="h-8 w-8" />
-            Bookshelf
-          </h1>
-          <p className="text-muted-foreground">
-            {books?.length || 0} books with content warnings available
-          </p>
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex-1">
+              <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
+                <Library className="h-8 w-8" />
+                {authorFilter ? (
+                  <>
+                    Books by {decodeURIComponent(authorFilter)}
+                  </>
+                ) : searchQuery ? (
+                  <>
+                    Search Results for &quot;{searchQuery}&quot;
+                  </>
+                ) : (
+                  "Bookshelf"
+                )}
+              </h1>
+              <p className="text-muted-foreground">
+                {books?.length || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
+                {authorFilter && (
+                  <Link 
+                    href="/collection" 
+                    className="ml-2 text-sm text-primary hover:underline"
+                  >
+                    (View all books)
+                  </Link>
+                )}
+              </p>
+            </div>
+            {/* Sort Selector */}
+            {books && books.length > 0 && (
+              <CollectionSort />
+            )}
+          </div>
 
           {/* Content Warning Legend */}
           <div className="mt-8 border-t-2 border-slate-200 pt-6">
@@ -118,40 +201,40 @@ export default async function CollectionPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" style={{ gap: '3rem' }}>
-            {books.map((book) => {
+            {sortedBooks.map((book) => {
               const warningSummary = getContentWarningSummary(book.content_warnings)
               const hasWarnings = warningSummary.severe > 0 || warningSummary.moderate > 0 || warningSummary.mild > 0
 
               return (
-                <Link key={book.id} href={`/book/${book.isbn}`}>
-                  <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                    <CardContent className="p-6 flex flex-col h-full">
-                      <div className="flex gap-4 flex-1">
-                        {/* Book Cover */}
-                        <div className="flex-shrink-0">
-                          <div className="w-20 h-32 bg-muted rounded-lg overflow-hidden relative">
-                            {book.cover_url ? (
-                              <Image
-                                src={book.cover_url}
-                                alt={`Cover of ${book.title}`}
-                                fill
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No Cover</div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Book Details */}
-                        <div className="flex-1 space-y-2">
-                          <div className="flex justify-between items-start gap-2">
-                            <div>
-                              <h3 className="font-bold text-lg text-balance mb-1 leading-tight">{book.title}</h3>
-                              {book.author && <p className="text-sm text-muted-foreground">by {book.author}</p>}
+                <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full">
+                    <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+                      <CardContent className="p-6 flex flex-col h-full">
+                        <div className="flex gap-4 flex-1">
+                          {/* Book Cover */}
+                          <div className="flex-shrink-0">
+                            <div className="w-20 h-32 bg-muted rounded-lg overflow-hidden relative">
+                              {book.cover_url ? (
+                                <Image
+                                  src={book.cover_url}
+                                  alt={`Cover of ${book.title}`}
+                                  fill
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No Cover</div>
+                              )}
                             </div>
-                            <RefreshBookButtonWrapper isbn={book.isbn} />
                           </div>
+
+                          {/* Book Details */}
+                          <div className="flex-1 space-y-2">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1">
+                                <h3 className="font-bold text-lg text-balance leading-tight mb-1">{book.title}</h3>
+                                {book.author && <p className="text-sm text-muted-foreground">by {book.author}</p>}
+                              </div>
+                              <RefreshBookButtonWrapper isbn={book.isbn} />
+                            </div>
 
                           {/* Content Warnings Summary */}
                           {hasWarnings ? (

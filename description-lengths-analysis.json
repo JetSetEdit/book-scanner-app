@@ -1,0 +1,322 @@
+{
+  "summary": {
+    "totalBooks": 38,
+    "booksWithDescriptions": 37,
+    "avgLength": 970,
+    "medianLength": 677,
+    "categoryCounts": {
+      "Extremely Long (> 2000)": 5,
+      "Very Long (1000-2000)": 10,
+      "Long (500-1000)": 11,
+      "Medium (200-500)": 9,
+      "Short (< 200)": 2,
+      "No description": 1
+    }
+  },
+  "allBooks": [
+    {
+      "isbn": "9780063471740",
+      "title": "Wicked [Movie Tie-In #2]",
+      "author": "Gregory Maguire",
+      "description_length": 3079,
+      "length_category": "Extremely Long (> 2000)",
+      "url": "https://subtext-books.vercel.app/book/9780063471740"
+    },
+    {
+      "isbn": "9781401994136",
+      "title": "The Let Them Theory",
+      "author": "Mel Robbins",
+      "description_length": 2652,
+      "length_category": "Extremely Long (> 2000)",
+      "url": "https://subtext-books.vercel.app/book/9781401994136"
+    },
+    {
+      "isbn": "9781405971201",
+      "title": "Pucking Strong",
+      "author": "Emily Rath",
+      "description_length": 2099,
+      "length_category": "Extremely Long (> 2000)",
+      "url": "https://subtext-books.vercel.app/book/9781405971201"
+    },
+    {
+      "isbn": "9780593356159",
+      "title": "The Maid",
+      "author": "Nita Prose",
+      "description_length": 2093,
+      "length_category": "Extremely Long (> 2000)",
+      "url": "https://subtext-books.vercel.app/book/9780593356159"
+    },
+    {
+      "isbn": "9780735211292",
+      "title": "Atomic Habits",
+      "author": "James Clear",
+      "description_length": 2002,
+      "length_category": "Extremely Long (> 2000)",
+      "url": "https://subtext-books.vercel.app/book/9780735211292"
+    },
+    {
+      "isbn": "9781526605399",
+      "title": "A Court of Thorns and Roses",
+      "author": "Sarah J. Maas",
+      "description_length": 1723,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9781526605399"
+    },
+    {
+      "isbn": "9780008804190",
+      "title": "Good Spirits",
+      "author": "B. K. Borison",
+      "description_length": 1595,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9780008804190"
+    },
+    {
+      "isbn": "9780349446684",
+      "title": "Holiday Ever After",
+      "author": "Hannah Grace",
+      "description_length": 1515,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9780349446684"
+    },
+    {
+      "isbn": "9780008744397",
+      "title": "All Together for Christmas",
+      "author": "Sarah Morgan",
+      "description_length": 1483,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9780008744397"
+    },
+    {
+      "isbn": "9781460759851",
+      "title": "Gravity Let Me Go",
+      "author": "Trent Dalton",
+      "description_length": 1383,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9781460759851"
+    },
+    {
+      "isbn": "9780241714348",
+      "title": "Alchemised",
+      "author": "SenLinYu",
+      "description_length": 1326,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9780241714348"
+    },
+    {
+      "isbn": "9781038959188",
+      "title": "Honeymoon Phase",
+      "author": "Amy Daws",
+      "description_length": 1288,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9781038959188"
+    },
+    {
+      "isbn": "9781913484835",
+      "title": "Guinness World Records 2026",
+      "author": "Guinness World Records",
+      "description_length": 1264,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9781913484835"
+    },
+    {
+      "isbn": "9780241743997",
+      "title": "The Impossible Fortune",
+      "author": "Richard Osman",
+      "description_length": 1244,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9780241743997"
+    },
+    {
+      "isbn": "9780349433883",
+      "title": "Encore in Death: an Eve Dallas Thriller (in Death 56)",
+      "author": "J. D. Robb",
+      "description_length": 1222,
+      "length_category": "Very Long (1000-2000)",
+      "url": "https://subtext-books.vercel.app/book/9780349433883"
+    },
+    {
+      "isbn": "9781761420917",
+      "title": "Icebreaker",
+      "author": "Hannah Grace",
+      "description_length": 918,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781761420917"
+    },
+    {
+      "isbn": "9780241712788",
+      "title": "Keep Your Friends Close",
+      "author": "Cynthia Murphy",
+      "description_length": 827,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9780241712788"
+    },
+    {
+      "isbn": "9780670916832",
+      "title": "MetaMAUS",
+      "author": "Art Spiegelman",
+      "description_length": 823,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9780670916832"
+    },
+    {
+      "isbn": "9781760783969",
+      "title": "Last One Out",
+      "author": "Jane Harper",
+      "description_length": 712,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781760783969"
+    },
+    {
+      "isbn": "9781923419049",
+      "title": "Bedtime Tales for Cricket Tragics",
+      "author": "Adam Collins",
+      "description_length": 677,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781923419049"
+    },
+    {
+      "isbn": "9780008472429",
+      "title": "The Skulduggery Pleasant Grimoire",
+      "author": "Derek Landy",
+      "description_length": 643,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9780008472429"
+    },
+    {
+      "isbn": "9780349443768",
+      "title": "Onyx Storm",
+      "author": "Rebecca Yarros",
+      "description_length": 633,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9780349443768"
+    },
+    {
+      "isbn": "9781957635002",
+      "title": "Haunting Adeline",
+      "author": "H. D. Carlton",
+      "description_length": 597,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781957635002"
+    },
+    {
+      "isbn": "9781761266492",
+      "title": "Mad Mabel",
+      "author": "Sally Hepworth",
+      "description_length": 595,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781761266492"
+    },
+    {
+      "isbn": "9781444758993",
+      "title": "Red Rising",
+      "author": "Pierce Brown",
+      "description_length": 575,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781444758993"
+    },
+    {
+      "isbn": "9781405293181",
+      "title": "A Good Girl's Guide to Murder",
+      "author": "Holly Jackson",
+      "description_length": 555,
+      "length_category": "Long (500-1000)",
+      "url": "https://subtext-books.vercel.app/book/9781405293181"
+    },
+    {
+      "isbn": "9780571334643",
+      "title": "Normal People",
+      "author": "Sally Rooney",
+      "description_length": 486,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9780571334643"
+    },
+    {
+      "isbn": "9781529442397",
+      "title": "Lights Out",
+      "author": "Navessa Allen",
+      "description_length": 424,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9781529442397"
+    },
+    {
+      "isbn": "9780525559474",
+      "title": "The Midnight Library",
+      "author": "Matt Haig",
+      "description_length": 411,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9780525559474"
+    },
+    {
+      "isbn": "9781761260773",
+      "title": "The Detective",
+      "author": "Matthew Reilly",
+      "description_length": 410,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9781761260773"
+    },
+    {
+      "isbn": "9780062457714",
+      "title": "The Subtle Art of Not Giving a F**k",
+      "author": "Mark Manson",
+      "description_length": 345,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9780062457714"
+    },
+    {
+      "isbn": "9780375826696",
+      "title": "Eragon",
+      "author": "Christopher Paolini",
+      "description_length": 326,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9780375826696"
+    },
+    {
+      "isbn": "9781501110368",
+      "title": "It Ends with Us",
+      "author": "Colleen Hoover",
+      "description_length": 255,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9781501110368"
+    },
+    {
+      "isbn": "9780099592419",
+      "title": "The Moor's Last Sigh",
+      "author": "Salman Rushdie",
+      "description_length": 255,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9780099592419"
+    },
+    {
+      "isbn": "9781399745482",
+      "title": "Fae & Alchemy #2: The Utterly Addictive Enemies-To-Lovers Romantasy Sensation",
+      "author": "Callie Hart",
+      "description_length": 230,
+      "length_category": "Medium (200-500)",
+      "url": "https://subtext-books.vercel.app/book/9781399745482"
+    },
+    {
+      "isbn": "9780008582128",
+      "title": "The Lone Husky",
+      "author": "Hannah Gold",
+      "description_length": 155,
+      "length_category": "Short (< 200)",
+      "url": "https://subtext-books.vercel.app/book/9780008582128"
+    },
+    {
+      "isbn": "9780593135204",
+      "title": "Project Hail Mary",
+      "author": "Andy Weir",
+      "description_length": 22,
+      "length_category": "Short (< 200)",
+      "url": "https://subtext-books.vercel.app/book/9780593135204"
+    },
+    {
+      "isbn": "9781101904220",
+      "title": "Dark Matter",
+      "author": "Blake Crouch",
+      "description_length": 0,
+      "length_category": "No description",
+      "url": "https://subtext-books.vercel.app/book/9781101904220"
+    }
+  ]
+}

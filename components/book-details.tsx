@@ -5,8 +5,12 @@ import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ChevronDown, ChevronUp, Code } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import Link from "next/link"
+import { SeverityScoreBadge } from "@/components/severity-score-badge"
+
+const DESCRIPTION_TRUNCATE_LENGTH = 600
 
 interface BookDetailsProps {
   book: any
@@ -29,6 +33,9 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
   const [isAuditOpen, setIsAuditOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
   const [showAuditTrail, setShowAuditTrail] = useState(false)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
+  const descriptionRef = useRef<HTMLDivElement>(null)
+  const [fullHeight, setFullHeight] = useState<number | null>(null)
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -57,6 +64,14 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
       window.removeEventListener('dev-settings-changed', handleDevSettingsChange as EventListener)
     }
   }, [searchParams])
+
+  // Measure full height when expanded
+  useEffect(() => {
+    if (isDescriptionExpanded && descriptionRef.current) {
+      const height = descriptionRef.current.scrollHeight
+      setFullHeight(height)
+    }
+  }, [isDescriptionExpanded, book.description])
 
   return (
     <div className="min-h-screen bg-white text-slate-950 font-sans selection:bg-slate-950 selection:text-white">
@@ -145,22 +160,89 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                 </div>
               )}
 
-              <h1 className="text-5xl md:text-7xl font-serif font-medium tracking-tight text-slate-950 leading-[1.1]">
-                {book.title}
-              </h1>
-              <div className="text-xl md:text-2xl font-serif italic text-slate-500 border-l-2 border-slate-950 pl-6 py-1">
-                by {book.author || 'Unknown Author'}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h1 className="text-5xl md:text-7xl font-serif font-medium tracking-tight text-slate-950 leading-[1.1]">
+                    {book.title}
+                  </h1>
+                  <div className="text-xl md:text-2xl font-serif italic text-slate-500 border-l-2 border-slate-950 pl-6 py-1 mt-4">
+                    by{" "}
+                    {book.author ? (
+                      <Link
+                        href={`/collection?author=${encodeURIComponent(book.author)}`}
+                        className="hover:text-slate-950 transition-colors underline-offset-4 hover:underline"
+                      >
+                        {book.author}
+                      </Link>
+                    ) : (
+                      "Unknown Author"
+                    )}
+                  </div>
+                </div>
+                {/* Severity Score Badge - Dev Only */}
+                <div className="flex-shrink-0">
+                  <SeverityScoreBadge warnings={warnings || []} bookTitle={book.title} />
+                </div>
               </div>
             </div>
 
             {/* Synopsis */}
-            {book.description && (
-              <div className="prose prose-slate prose-lg max-w-none">
-                <p className="text-slate-600 leading-relaxed text-lg">
-                  {book.description.replace(/<[^>]*>?/gm, '')}
-                </p>
-              </div>
-            )}
+            {book.description && (() => {
+              const cleanDescription = book.description.replace(/<[^>]*>?/gm, '')
+              const shouldTruncate = cleanDescription.length > DESCRIPTION_TRUNCATE_LENGTH
+
+              const handleToggle = () => {
+                if (!isDescriptionExpanded && descriptionRef.current) {
+                  // Temporarily expand to measure height before animating
+                  const currentMaxHeight = descriptionRef.current.style.maxHeight
+                  descriptionRef.current.style.maxHeight = 'none'
+                  const height = descriptionRef.current.scrollHeight
+                  descriptionRef.current.style.maxHeight = currentMaxHeight
+                  // Use requestAnimationFrame to ensure smooth transition
+                  requestAnimationFrame(() => {
+                    setFullHeight(height)
+                    setIsDescriptionExpanded(true)
+                  })
+                } else {
+                  // Collapse immediately - no pause
+                  setFullHeight(null)
+                  setIsDescriptionExpanded(false)
+                }
+              }
+
+              return (
+                <div className="prose prose-slate prose-lg max-w-none">
+                  <div className="relative">
+                    <div 
+                      ref={descriptionRef}
+                      className="overflow-hidden transition-all duration-500 ease-in-out"
+                      style={{
+                        maxHeight: isDescriptionExpanded && fullHeight
+                          ? `${fullHeight}px`
+                          : '200px',
+                      }}
+                    >
+                      <p className="text-slate-600 leading-relaxed text-lg">
+                        {cleanDescription}
+                      </p>
+                    </div>
+                    {shouldTruncate && !isDescriptionExpanded && (
+                      <div 
+                        className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/95 to-transparent pointer-events-none transition-opacity duration-300 ease-in-out"
+                      />
+                    )}
+                  </div>
+                  {shouldTruncate && (
+                    <button
+                      onClick={handleToggle}
+                      className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-950 transition-colors underline-offset-4 hover:underline"
+                    >
+                      {isDescriptionExpanded ? 'Show less' : 'Read more'}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Content Warnings - The "Feature" Block */}
             <div className="mt-16">

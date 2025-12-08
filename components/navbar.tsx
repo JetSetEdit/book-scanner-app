@@ -3,8 +3,9 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { SearchComponent } from "@/components/search"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +45,7 @@ export function Navbar() {
   const [isDev, setIsDev] = useState(false)
   const [showAuditTrail, setShowAuditTrail] = useState(false)
   const [showRefreshButton, setShowRefreshButton] = useState(false)
+  const [showSeverityScore, setShowSeverityScore] = useState(false)
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -53,6 +55,8 @@ export function Navbar() {
       setShowAuditTrail(savedAudit === 'true')
       const savedRefresh = localStorage.getItem('dev-show-refresh-button')
       setShowRefreshButton(savedRefresh === 'true')
+      const savedSeverityScore = localStorage.getItem('dev-show-severity-score')
+      setShowSeverityScore(savedSeverityScore === 'true')
     }
   }, [])
 
@@ -62,7 +66,7 @@ export function Navbar() {
     localStorage.setItem('dev-show-audit-trail', String(newValue))
     // Update all book detail pages by triggering a custom event
     window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail: newValue, showRefreshButton } 
+      detail: { showAuditTrail: newValue, showRefreshButton, showSeverityScore } 
     }))
   }
 
@@ -72,12 +76,22 @@ export function Navbar() {
     localStorage.setItem('dev-show-refresh-button', String(newValue))
     // Update all pages by triggering a custom event
     window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail, showRefreshButton: newValue } 
+      detail: { showAuditTrail, showRefreshButton: newValue, showSeverityScore } 
+    }))
+  }
+
+  const toggleSeverityScore = () => {
+    const newValue = !showSeverityScore
+    setShowSeverityScore(newValue)
+    localStorage.setItem('dev-show-severity-score', String(newValue))
+    // Update all pages by triggering a custom event
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
+      detail: { showAuditTrail, showRefreshButton, showSeverityScore: newValue } 
     }))
   }
 
   return (
-    <nav className="border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
+    <nav className="relative z-40 border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
@@ -85,6 +99,11 @@ export function Navbar() {
             <img src="/logo.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
             <span className="text-2xl font-serif font-bold tracking-tight text-slate-900">Subtext</span>
           </Link>
+
+          {/* Search */}
+          <div className="hidden md:flex flex-1 max-w-md mx-4">
+            <SearchComponent />
+          </div>
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-1">
@@ -170,6 +189,28 @@ export function Navbar() {
                       )}
                     </div>
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={toggleSeverityScore}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Calculator className="h-4 w-4" />
+                    <div className="flex-1">
+                      <div className="font-medium">Show Severity Score</div>
+                      <div className="text-xs text-muted-foreground">
+                        Display severity score badges on book cards
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showSeverityScore 
+                        ? "bg-primary border-primary" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showSeverityScore && (
+                        <div className="h-full w-full bg-primary rounded-sm" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -197,6 +238,11 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden" id="mobile-menu">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
+              {/* Mobile Search */}
+              <div className="px-3 py-2 mb-2">
+                <SearchComponent />
+              </div>
+              
               {navigation.map((item) => {
                 const isActive = pathname === item.href
                 return (
@@ -274,6 +320,33 @@ export function Navbar() {
                         : "border-muted-foreground"
                     )}>
                       {showRefreshButton && (
+                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
+                      )}
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => {
+                      toggleSeverityScore()
+                      setMobileMenuOpen(false)
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
+                      showSeverityScore
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calculator className="h-4 w-4" />
+                      <span>Show Severity Score</span>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showSeverityScore 
+                        ? "bg-primary-foreground border-primary-foreground" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showSeverityScore && (
                         <div className="h-full w-full bg-primary-foreground rounded-sm" />
                       )}
                     </div>

@@ -2,12 +2,25 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { fetchBookByISBN, fetchCandidatesByISBN, BookCandidate } from '@/lib/book-api'
 import { normalizeISBN } from '@/lib/isbn-validation'
 import { findBookAndGenerateWarnings, generateContentWarnings } from '@/lib/content-warning-agent'
-import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById } from '@/lib/config/taxonomy'
+import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById, requiresMediation } from '@/lib/config/taxonomy-v2'
 import { Database } from '@/types/supabase'
+
+// Performance API is available globally in Node.js 16+ and Next.js
+declare const performance: { now(): number }
 
 type Book = Database['public']['Tables']['books']['Row']
 type ContentWarningInsert = Database['public']['Tables']['content_warnings']['Insert']
 type AuditLogInsert = Database['public']['Tables']['ai_audit_logs']['Insert']
+
+export type ScanTimings = {
+  dbLookup: number
+  externalMetadataFetch: number
+  webSearch: number
+  imageValidation: number
+  aiContentWarningGeneration: number
+  dbWrites: number
+  total: number
+}
 
 export type ScanResult = {
   success: boolean
@@ -20,6 +33,12 @@ export type ScanResult = {
   isNewBook: boolean
   contentWarningsGenerated: boolean
   authorContextInvestigated: boolean
+  timings?: ScanTimings
+  flags?: {
+    usedWebSearch: boolean
+    isThinMetadata: boolean
+    pipelinePath: string
+  }
 }
 
 export type ProgressCallback = (message: string) => void;
@@ -73,10 +92,28 @@ export async function processIsbnScan(
   isbn: string,
   onProgress?: ProgressCallback,
   selectedCandidate?: BookCandidate,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  model: string = "gpt-4o"
 ): Promise<ScanResult> {
+  const overallStartTime = performance.now()
   console.log('Processing ISBN scan:', isbn)
   onProgress?.('Validating ISBN and checking local database...');
+
+  // Initialize timing object
+  const timings: ScanTimings = {
+    dbLookup: 0,
+    externalMetadataFetch: 0,
+    webSearch: 0,
+    imageValidation: 0,
+    aiContentWarningGeneration: 0,
+    dbWrites: 0,
+    total: 0
+  }
+
+  // Initialize flags
+  let usedWebSearch = false
+  let isThinMetadata = false
+  let pipelinePath = 'unknown'
 
   // Clean ISBN (remove hyphens, spaces)
   const cleanIsbn = normalizeISBN(isbn)
@@ -92,11 +129,13 @@ export async function processIsbnScan(
 
   // Only check DB if we aren't forcing a candidate
   if (!usedSelectedCandidate) {
+    const dbLookupStart = performance.now()
     const { data, error: fetchError } = await supabaseAdmin
       .from('books')
       .select('*')
       .eq('isbn', cleanIsbn)
       .single()
+    timings.dbLookup = performance.now() - dbLookupStart
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       console.error('Error fetching existing book:', JSON.stringify(fetchError, null, 2))
@@ -118,7 +157,9 @@ export async function processIsbnScan(
       console.log('Fetching book candidates for ISBN:', cleanIsbn)
       onProgress?.('Book not found locally. Fetching metadata from external libraries...');
 
+      const metadataFetchStart = performance.now()
       const candidates = await fetchCandidatesByISBN(cleanIsbn)
+      timings.externalMetadataFetch = performance.now() - metadataFetchStart
 
       if (candidates.length > 1) {
         console.log(`Found ${candidates.length} candidates for ISBN ${cleanIsbn}, returning ambiguity.`)
@@ -134,6 +175,7 @@ export async function processIsbnScan(
           .select()
           .single()
 
+        timings.total = performance.now() - overallStartTime
         return {
           success: true,
           status: 'ambiguous',
@@ -142,7 +184,13 @@ export async function processIsbnScan(
           scan: { id: 'temp-ambiguous', isbn: cleanIsbn },
           isNewBook: true,
           contentWarningsGenerated: false,
-          authorContextInvestigated: false
+          authorContextInvestigated: false,
+          timings,
+          flags: {
+            usedWebSearch: false,
+            isThinMetadata: false,
+            pipelinePath: 'ambiguous'
+          }
         }
       }
 
@@ -152,7 +200,7 @@ export async function processIsbnScan(
     }
 
     // Flag if the metadata is "thin" (likely to cause AI failure) or missing cover
-    const isThinMetadata = bookData && (!bookData.description || bookData.description.length < 150 || !bookData.cover_url);
+    isThinMetadata = !!(bookData && (!bookData.description || bookData.description.length < 150 || !bookData.cover_url));
 
     if (!bookData || isThinMetadata) {
       console.log('Book not found in external APIs or metadata is thin, asking AI agent...')
@@ -206,7 +254,15 @@ export async function processIsbnScan(
       console.log('Asking AI agent to find book information via web search...')
       try {
         // Perform the search and CACHE the result
-        cachedWebSearchResult = await findBookAndGenerateWarnings(cleanIsbn)
+        // findBookAndGenerateWarnings does both web search AND AI generation
+        const webSearchStart = performance.now()
+        cachedWebSearchResult = await findBookAndGenerateWarnings(cleanIsbn, model)
+        const webSearchTotalTime = performance.now() - webSearchStart
+        timings.webSearch += webSearchTotalTime
+        // Approximate AI generation time (70% of total, 30% is actual web search)
+        timings.aiContentWarningGeneration += webSearchTotalTime * 0.7
+        usedWebSearch = true
+        pipelinePath = 'web_search_initial'
 
         if (cachedWebSearchResult.book_found) {
           onProgress?.(`AI found book: "${cachedWebSearchResult.book_title}". Analyzing content...`);
@@ -229,6 +285,7 @@ export async function processIsbnScan(
           })
 
           // Update the book record with AI-found information
+          const dbWriteStart = performance.now()
           const { data: updatedBook, error: updateError } = await supabaseAdmin
             .from('books')
             .update({
@@ -241,6 +298,7 @@ export async function processIsbnScan(
             .eq('id', bookId)
             .select()
             .single()
+          timings.dbWrites += performance.now() - dbWriteStart
 
           if (updateError) {
             console.error('Failed to update book with AI-found data:', updateError)
@@ -276,9 +334,18 @@ export async function processIsbnScan(
               book_id: bookId,
               category: getCategoryById(warning.category_id || warning.category)?.legacyCategory || 'other',
               category_id: warning.category_id || warning.category,
+              subcategory_id: warning.subcategory_id || null,
               confidence_score: warning.score,
               description: warning.description,
               severity: warning.severity,
+              presence: warning.presence || 'on_page',
+              detail_level: warning.detail_level || null,
+              is_spoiler: warning.is_spoiler || false,
+              requires_mediation: requiresMediation([{
+                category_id: warning.category_id || warning.category,
+                severity: warning.severity,
+                detail_level: warning.detail_level || null
+              }]),
               user_id: null, // AI-generated warnings don't have a user_id
               reasoning: warning.reasoning || null,
               is_author_verified: warning.is_author_verified || false,
@@ -322,6 +389,7 @@ export async function processIsbnScan(
       console.log('Creating new book record with metadata:', bookData.title)
       onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
 
+      const dbWriteStart = performance.now()
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
         .insert({
@@ -337,6 +405,7 @@ export async function processIsbnScan(
         })
         .select()
         .single()
+      timings.dbWrites += performance.now() - dbWriteStart
 
       if (insertError) {
         console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
@@ -402,7 +471,7 @@ export async function processIsbnScan(
         if (currentBook) {
           // RESTORED LOGIC: For existing books, always use web search (more thorough, finds official content notes)
           // For new books, use metadata-based generation first (more efficient), then verify
-          const isThinMetadata = !currentBook.description || currentBook.description.length < 150 || !currentBook.cover_url;
+          isThinMetadata = !currentBook.description || currentBook.description.length < 150 || !currentBook.cover_url;
 
           let result;
           let usedSearch = false;
@@ -420,6 +489,10 @@ export async function processIsbnScan(
               console.log("Using cached web search result");
               const searchResult = cachedWebSearchResult;
               usedSearch = true;
+              usedWebSearch = true;
+              pipelinePath = 'web_search_cached';
+              // Note: AI generation already happened when cached result was created, so we can't time it here
+              // The webSearch timing was already captured when the cache was created
               result = {
                 content_warnings: searchResult.content_warnings,
                 confidence: searchResult.confidence,
@@ -435,8 +508,19 @@ export async function processIsbnScan(
                 ? 'Performing comprehensive web search for content warnings...'
                 : 'Book description is brief. AI performing web search for deeper analysis...');
 
-              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
-              usedSearch = true;
+              // findBookAndGenerateWarnings does both web search AND AI generation
+              // We track the total time as webSearch (includes both operations)
+              const webSearchStart = performance.now()
+              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn, model);
+              const webSearchTotalTime = performance.now() - webSearchStart
+              timings.webSearch += webSearchTotalTime
+              // Note: AI generation is included in webSearch timing since findBookAndGenerateWarnings
+              // performs both web search and AI analysis. We approximate AI time as part of webSearch.
+              // For more granular tracking, we'd need to modify findBookAndGenerateWarnings to return separate timings.
+              timings.aiContentWarningGeneration += webSearchTotalTime * 0.7 // Approximate 70% is AI, 30% is web search
+              usedSearch = true
+              usedWebSearch = true
+              pipelinePath = isExistingBook ? 'web_search_existing' : (isThinMetadata ? 'web_search_thin_metadata' : 'web_search_force_refresh')
 
               // Map the result format
               result = {
@@ -453,14 +537,17 @@ export async function processIsbnScan(
             // Then verify with web search if no warnings found (catches false negatives)
             onProgress?.('Analyzing book metadata for content warnings...');
 
+            const aiStart = performance.now()
             result = await generateContentWarnings({
               book_title: currentBook.title,
               book_author: currentBook.author || 'Unknown',
               book_description: currentBook.description || undefined,
               book_categories: currentBook.categories || undefined,
               book_isbn: currentBook.isbn
-            });
+            }, model);
+            timings.aiContentWarningGeneration += performance.now() - aiStart
             classificationRating = (result as any).classification_rating || null;
+            pipelinePath = 'metadata_only'
 
             // DOUBLE CHECK: If standard analysis says "Safe" (no warnings),
             // force a web search verification to avoid false negatives.
@@ -468,7 +555,15 @@ export async function processIsbnScan(
               console.log("Initial analysis found no warnings. Performing deep search verification...");
               onProgress?.("Initial text analysis safe. Verifying with web search...");
 
-              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn);
+              // findBookAndGenerateWarnings does both web search AND AI generation
+              const webSearchStart = performance.now()
+              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn, model);
+              const webSearchTotalTime = performance.now() - webSearchStart
+              timings.webSearch += webSearchTotalTime
+              // Approximate AI generation time (70% of total)
+              timings.aiContentWarningGeneration += webSearchTotalTime * 0.7
+              usedWebSearch = true
+              pipelinePath = 'metadata_then_web_search_verification'
 
               // Handle "Book Not Found" in Deep Search
               if (!searchResult.book_found) {
@@ -521,7 +616,9 @@ export async function processIsbnScan(
           }
 
           if (Object.keys(updates).length > 0) {
+            const dbWriteStart = performance.now()
             await supabaseAdmin.from('books').update(updates).eq('id', bookId);
+            timings.dbWrites += performance.now() - dbWriteStart
             // Update currentBook in memory as well
             currentBook = { ...currentBook, ...updates };
           }
@@ -556,18 +653,29 @@ export async function processIsbnScan(
               book_id: bookId,
               category: getCategoryById(warning.category_id || warning.category)?.legacyCategory || 'other',
               category_id: warning.category_id || warning.category,
+              subcategory_id: warning.subcategory_id || null,
               confidence_score: warning.score,
               description: warning.description,
               severity: warning.severity,
+              presence: warning.presence || 'on_page',
+              detail_level: warning.detail_level || null,
+              is_spoiler: warning.is_spoiler || false,
+              requires_mediation: requiresMediation([{
+                category_id: warning.category_id || warning.category,
+                severity: warning.severity,
+                detail_level: warning.detail_level || null
+              }]),
               user_id: null,
               reasoning: warning.reasoning || null,
               is_author_verified: warning.is_author_verified || false,
               source_url: warning.source_url || null
             }))
 
+            const dbWriteStart = performance.now()
             const { error: insertError } = await supabaseAdmin
               .from('content_warnings')
               .insert(warningsToInsert)
+            timings.dbWrites += performance.now() - dbWriteStart
 
             if (!insertError) {
               contentWarningsGenerated = true
@@ -581,6 +689,8 @@ export async function processIsbnScan(
         }
       } else {
         onProgress?.(`Found ${existingWarnings.length} existing content warnings.`);
+        // Set pipeline path for cached warnings
+        pipelinePath = 'cached_warnings'
       }
     } catch (warningError) {
       console.error('Error generating content warnings:', warningError)
@@ -621,6 +731,7 @@ export async function processIsbnScan(
   let scan = null;
   try {
     console.log('Recording scan...')
+    const scanInsertStart = performance.now()
     const { data: scanData, error: scanError } = await supabaseAdmin
       .from('scans')
       .insert({
@@ -629,6 +740,7 @@ export async function processIsbnScan(
       })
       .select()
       .single()
+    timings.dbWrites += performance.now() - scanInsertStart
 
     if (scanError) {
       console.warn('Failed to record scan (scans table might be missing):', scanError.message)
@@ -644,12 +756,21 @@ export async function processIsbnScan(
 
   onProgress?.('Scan completed successfully.');
 
+  // Calculate total time before returning
+  timings.total = performance.now() - overallStartTime
+
   return {
     success: true,
     book: currentBook || { id: bookId, isbn: cleanIsbn, review_status: 'pending' },
     scan: scan,
     isNewBook: !existingBook,
     contentWarningsGenerated,
-    authorContextInvestigated
+    authorContextInvestigated,
+    timings,
+    flags: {
+      usedWebSearch,
+      isThinMetadata,
+      pipelinePath
+    }
   }
 }

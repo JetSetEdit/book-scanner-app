@@ -1,6 +1,16 @@
 import { Agent, run, tool } from "@openai/agents";
 import { z } from "zod";
-import { WARNING_CATEGORIES, SEVERITY_MAPPING, getSeverityFromScore } from "./config/taxonomy";
+import { 
+  WARNING_CATEGORIES, 
+  SEVERITY_MAPPING, 
+  getSeverityFromScore,
+  getValidSubcategoriesForCategory,
+  validateSubcategoryParent,
+  PRESENCE_TYPES,
+  DETAIL_LEVELS,
+  type PresenceType,
+  type DetailLevel
+} from "./config/taxonomy-v2";
 
 // Configure OpenAI API key
 
@@ -31,156 +41,184 @@ export const performWebSearch = async (args: any) => {
       }
     };
 
-    // 1. Google Books API - Try ISBN search first if we have an ISBN
-    try {
-      let gbResponse;
-      if (isbn) {
-        // Direct ISBN search (most reliable)
-        gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=3`);
-      } else {
-        // Clean the query to just key terms (remove search-specific terms)
-        const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
-        if (cleanQuery.length > 0) {
+    // Helper to validate image (parallelized version)
+    const validateImage = async (url: string) => {
+      if (!url) return false;
+      try {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'follow' });
+        clearTimeout(id);
+        if (!res.ok) return false;
+        const len = res.headers.get('content-length');
+        if (len) {
+          const size = parseInt(len);
+          if (size < 1000) return false; // Too small
+          if (size === 15567) return false; // Google Books placeholder
+        }
+        return true;
+      } catch (e) { return false; }
+    };
+
+    // Helper to find best cover URL by checking all sizes in parallel
+    const findBestCover = async (imageLinks: any): Promise<string> => {
+      const potentialCovers = [
+        imageLinks?.extraLarge,
+        imageLinks?.large,
+        imageLinks?.medium,
+        imageLinks?.thumbnail,
+        imageLinks?.smallThumbnail
+      ].filter(Boolean).map(url => url?.replace("http:", "https:"));
+
+      if (potentialCovers.length === 0) return "No cover available";
+
+      // Check all cover sizes in parallel
+      const validationResults = await Promise.all(
+        potentialCovers.map(async (url) => ({
+          url,
+          valid: await validateImage(url)
+        }))
+      );
+
+      // Return the first valid cover, or first available if none valid
+      const validCover = validationResults.find(r => r.valid);
+      return validCover?.url || potentialCovers[0] || "No cover available";
+    };
+
+    // Prepare search functions for parallel execution
+    const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
+
+    // 1. Google Books API search function
+    const searchGoogleBooks = async () => {
+      try {
+        let gbResponse;
+        if (isbn) {
+          gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&maxResults=3`);
+        } else if (cleanQuery.length > 0) {
           gbResponse = await fetchWithTimeout(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanQuery)}&maxResults=3`);
         }
-      }
 
-      if (gbResponse) {
+        if (!gbResponse) return [];
+
         const gbData = await gbResponse.json();
+        if (!gbData.items || gbData.items.length === 0) return [];
 
-        if (gbData.items && gbData.items.length > 0) {
-          // Helper to validate image
-          const validateImage = async (url: string) => {
-            if (!url) return false;
-            try {
-              const controller = new AbortController();
-              const id = setTimeout(() => controller.abort(), 3000);
-              const res = await fetch(url, { method: 'HEAD', signal: controller.signal, redirect: 'follow' });
-              clearTimeout(id);
-              if (!res.ok) return false;
-              const len = res.headers.get('content-length');
-              if (len) {
-                const size = parseInt(len);
-                if (size < 1000) return false; // Too small
-                if (size === 15567) return false; // Google Books placeholder
-              }
-              return true;
-            } catch (e) { return false; }
-          };
+        const googleResults = [];
+        for (const item of gbData.items) {
+          const info = item.volumeInfo;
+          const description = info.description || "No description available";
+          const categories = info.categories?.join(", ") || "No categories";
+          
+          // Use parallelized cover finding
+          const coverUrl = await findBestCover(info.imageLinks);
 
-          for (const item of gbData.items) {
-            const info = item.volumeInfo;
-            const description = info.description || "No description available";
-            const categories = info.categories?.join(", ") || "No categories";
+          googleResults.push(`Source: Google Books\nTitle: ${info.title}\nAuthor: ${info.authors?.join(", ") || "Unknown"}\nDescription: ${description}\nCategories: ${categories}\nPublisher: ${info.publisher || "Unknown"}\nPublished: ${info.publishedDate || "Unknown"}\nCover URL: ${coverUrl}`);
+        }
+        return googleResults;
+      } catch (e) {
+        return [];
+      }
+    };
 
-            // Select best cover
-            let coverUrl = "No cover available";
-            const potentialCovers = [
-              info.imageLinks?.extraLarge,
-              info.imageLinks?.large,
-              info.imageLinks?.medium,
-              info.imageLinks?.thumbnail,
-              info.imageLinks?.smallThumbnail
-            ];
-
-            for (const url of potentialCovers) {
-              if (url) {
-                const secureUrl = url.replace("http:", "https:");
-                if (await validateImage(secureUrl)) {
-                  coverUrl = secureUrl;
-                  break;
+    // 2. Apple Books API search function
+    const searchAppleBooks = async () => {
+      try {
+        let appleResponse;
+        if (isbn) {
+          appleResponse = await fetchWithTimeout(`https://itunes.apple.com/lookup?isbn=${isbn}`);
+          if (appleResponse) {
+            const data = await appleResponse.json();
+            if (data.resultCount === 0) {
+              const titleMatch = query.match(/^(.*?)(?:\s\d{10,13})?$/);
+              if (titleMatch && titleMatch[1]) {
+                const title = titleMatch[1].trim();
+                if (title.length > 5) {
+                  appleResponse = await fetchWithTimeout(`https://itunes.apple.com/search?term=${encodeURIComponent(title)}&media=ebook&limit=3`);
                 }
               }
             }
-
-            results.push(`Source: Google Books\nTitle: ${info.title}\nAuthor: ${info.authors?.join(", ") || "Unknown"}\nDescription: ${description}\nCategories: ${categories}\nPublisher: ${info.publisher || "Unknown"}\nPublished: ${info.publishedDate || "Unknown"}\nCover URL: ${coverUrl}`);
           }
-        }
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-
-    // 2. Apple Books API (Fallback)
-    try {
-      let appleResponse;
-      if (isbn) {
-        appleResponse = await fetchWithTimeout(`https://itunes.apple.com/lookup?isbn=${isbn}`);
-
-        // If ISBN search yields no results, try searching by title if available in query
-        if (appleResponse) {
-          const data = await appleResponse.json();
-          if (data.resultCount === 0) {
-            // Extract title from query if possible, or skip
-            const titleMatch = query.match(/^(.*?)(?:\s\d{10,13})?$/);
-            if (titleMatch && titleMatch[1]) {
-              const title = titleMatch[1].trim();
-              if (title.length > 5) { // Avoid short garbage queries
-                appleResponse = await fetchWithTimeout(`https://itunes.apple.com/search?term=${encodeURIComponent(title)}&media=ebook&limit=3`);
-              }
-            }
-          }
-        }
-      } else {
-        const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
-        if (cleanQuery.length > 0) {
+        } else if (cleanQuery.length > 0) {
           appleResponse = await fetchWithTimeout(`https://itunes.apple.com/search?term=${encodeURIComponent(cleanQuery)}&media=ebook&limit=3`);
         }
-      }
 
-      if (appleResponse) {
+        if (!appleResponse) return [];
+
         const appleData = await appleResponse.json();
-        if (appleData.results && appleData.results.length > 0) {
-          for (const item of appleData.results) {
-            // Apple artwork is usually 100x100, replace to get higher res
-            const highResCover = item.artworkUrl100 ? item.artworkUrl100.replace('100x100', '600x600') : "No cover available";
+        if (!appleData.results || appleData.results.length === 0) return [];
 
-            results.push(`Source: Apple Books\nTitle: ${item.trackName}\nAuthor: ${item.artistName}\nDescription: ${item.description || "No description"}\nCover URL: ${highResCover}`);
-          }
-        }
+        return appleData.results.map((item: any) => {
+          const highResCover = item.artworkUrl100 ? item.artworkUrl100.replace('100x100', '600x600') : "No cover available";
+          return `Source: Apple Books\nTitle: ${item.trackName}\nAuthor: ${item.artistName}\nDescription: ${item.description || "No description"}\nCover URL: ${highResCover}`;
+        });
+      } catch (e) {
+        return [];
       }
-    } catch (e) {
-      // Ignore errors
-    }
+    };
 
-    // 3. Author/Publisher Official Site Search (Priority)
-    try {
-      // Construct a query specifically for author content warnings
-      let authorQuery = "";
-      if (isbn) {
-        // Try a broader query first
-        authorQuery = `"${isbn}" content warnings`;
-      } else {
-        const cleanQuery = query.replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
-        // Try to extract author name for a more targeted search
-        const authorMatch = cleanQuery.match(/by\s+(.+)/i);
-        const authorName = authorMatch ? authorMatch[1] : "";
+    // 3. DuckDuckGo General Search function
+    const searchDuckDuckGo = async () => {
+      try {
+        const ddgResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
+        if (!ddgResponse) return [];
 
-        if (authorName) {
-          authorQuery = `${cleanQuery} site:hannahgrace.co.uk OR site:author-site.com content warnings`;
-        } else {
-          authorQuery = `${cleanQuery} official author content warnings`;
-        }
-      }
-
-      // Use the HTML version of DuckDuckGo or a different search approach if API is limited
-      // For now, we'll try a slightly different query structure
-      const ddgResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(authorQuery)}&format=json`);
-      if (ddgResponse) {
         const ddgData = await ddgResponse.json();
+        const ddgResults = [];
 
         if (ddgData.AbstractText) {
-          results.push(`Source: Official/Author Search\nSummary: ${ddgData.AbstractText}\nURL: ${ddgData.AbstractURL || "N/A"}`);
+          ddgResults.push(`Source: DuckDuckGo\nSummary: ${ddgData.AbstractText}`);
         }
         if (ddgData.RelatedTopics) {
-          for (const topic of ddgData.RelatedTopics.slice(0, 5)) { // Increased to 5
+          for (const topic of ddgData.RelatedTopics.slice(0, 3)) {
+            if (topic.Text) {
+              ddgResults.push(`Source: DuckDuckGo Related\nInfo: ${topic.Text}`);
+            }
+          }
+        }
+        if (ddgData.Image && ddgData.Image.length > 0) {
+          ddgResults.push(`Source: DuckDuckGo Image\nImage URL: ${ddgData.Image}`);
+        }
+
+        return ddgResults;
+      } catch (e) {
+        return [];
+      }
+    };
+
+    // 4. Author Site Search function
+    const searchAuthorSites = async () => {
+      try {
+        let authorQuery = "";
+        if (isbn) {
+          authorQuery = `"${isbn}" content warnings`;
+        } else {
+          const authorMatch = cleanQuery.match(/by\s+(.+)/i);
+          const authorName = authorMatch ? authorMatch[1] : "";
+          if (authorName) {
+            authorQuery = `${cleanQuery} site:hannahgrace.co.uk OR site:author-site.com content warnings`;
+          } else {
+            authorQuery = `${cleanQuery} official author content warnings`;
+          }
+        }
+
+        const ddgResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(authorQuery)}&format=json`);
+        if (!ddgResponse) return [];
+
+        const ddgData = await ddgResponse.json();
+        const authorResults = [];
+
+        if (ddgData.AbstractText) {
+          authorResults.push(`Source: Official/Author Search\nSummary: ${ddgData.AbstractText}\nURL: ${ddgData.AbstractURL || "N/A"}`);
+        }
+        if (ddgData.RelatedTopics) {
+          for (const topic of ddgData.RelatedTopics.slice(0, 5)) {
             if (topic.Text && topic.FirstURL) {
-              results.push(`Source: Official/Author Search\nInfo: ${topic.Text}\nURL: ${topic.FirstURL}`);
+              authorResults.push(`Source: Official/Author Search\nInfo: ${topic.Text}\nURL: ${topic.FirstURL}`);
             }
           }
         }
 
-        // Also try searching for the author's name directly to find their site
+        // Also try searching for the author's name directly
         if (!ddgData.AbstractText && !ddgData.RelatedTopics?.length) {
           const authorNameMatch = query.match(/by\s+(.+?)(?:\s+content|\s*$)/i);
           if (authorNameMatch) {
@@ -190,109 +228,79 @@ export const performWebSearch = async (args: any) => {
             if (authorResponse) {
               const authorData = await authorResponse.json();
               if (authorData.AbstractText) {
-                results.push(`Source: Author Site Search\nSummary: ${authorData.AbstractText}\nURL: ${authorData.AbstractURL}`);
+                authorResults.push(`Source: Author Site Search\nSummary: ${authorData.AbstractText}\nURL: ${authorData.AbstractURL}`);
               }
             }
           }
         }
+
+        return authorResults;
+      } catch (e) {
+        return [];
       }
-    } catch (e) {
-      // Ignore errors
-    }
+    };
 
-    // 3b. Direct Author Site Scraping (Fallback for specific authors)
-    try {
-      // Known author sites mapping (can be expanded)
-      const authorDomains: Record<string, string> = {
-        "hannah grace": "https://www.hannahgrace.co.uk/books",
-        "h.d. carlton": "https://hdcarlton.com/library",
-        "hd carlton": "https://hdcarlton.com/library",
-        "jennifer hallock": "https://www.jenniferhallock.com/content-guidance",
-        // Add more authors here
-      };
+    // 5. Direct Author Site Scraping function
+    const scrapeAuthorSites = async () => {
+      try {
+        const authorDomains: Record<string, string> = {
+          "hannah grace": "https://www.hannahgrace.co.uk/books",
+          "h.d. carlton": "https://hdcarlton.com/library",
+          "hd carlton": "https://hdcarlton.com/library",
+          "jennifer hallock": "https://www.jenniferhallock.com/content-guidance",
+        };
 
-      const cleanQuery = query.toLowerCase();
-      console.log(`--- DEBUG: Checking for author domains in query: "${cleanQuery}" ---`);
-      let targetUrl = "";
+        const cleanQueryLower = query.toLowerCase();
+        let targetUrl = "";
 
-      for (const [author, url] of Object.entries(authorDomains)) {
-        if (cleanQuery.includes(author)) {
-          console.log(`--- DEBUG: Match found for author: "${author}" -> ${url} ---`);
-          targetUrl = url;
-          break;
+        for (const [author, url] of Object.entries(authorDomains)) {
+          if (cleanQueryLower.includes(author)) {
+            targetUrl = url;
+            break;
+          }
         }
-      }
 
-      if (targetUrl) {
-        // Fetch the author's book list page
-        console.log(`--- DEBUG: Attempting to fetch: ${targetUrl} ---`);
+        if (!targetUrl) return [];
+
         const response = await fetchWithTimeout(targetUrl);
-        if (response) {
-          const html = await response.text();
-          console.log(`--- DEBUG: Fetched HTML length: ${html.length} ---`);
+        if (!response) return [];
 
-          // Simple heuristic to find the book link
-          // Extract title more reliably
-          let bookTitle = "";
+        const html = await response.text();
+        let bookTitle = "";
 
-          console.log(`--- DEBUG: Processing query for title extraction: "${query}" ---`);
-
-          // Try to find title in quotes first
-          const quoteMatch = query.match(/"([^"]+)"/);
-          if (quoteMatch) {
-            bookTitle = quoteMatch[1].toLowerCase().replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
-          } else {
-            // Fallback: remove known terms
-            // More aggressive removal of author names and common terms
-            bookTitle = query.toLowerCase()
-              .replace(/content warnings|plot summary|official|notes|book|find|isbn|\d{10,13}|by\s+hannah\s+grace|hannah\s+grace|by\s+h\.d\.\s+carlton|h\.d\.\s+carlton|hd\s+carlton|by\s+jennifer\s+hallock|jennifer\s+hallock/gi, "")
-              .trim();
-          }
-
-          console.log(`--- DEBUG: Looking for book title: "${bookTitle}" ---`);
-
-          if (bookTitle && html.toLowerCase().includes(bookTitle)) {
-            console.log('--- DEBUG: Found book title in HTML! ---');
-            // Inject a strong signal to the agent
-            results.push(`Source: Direct Author Site Scrape\nInfo: CONFIRMED: The book "${bookTitle}" is listed on the official author website (${targetUrl}) which contains content warnings. You should treat this as a verified source.\nURL: ${targetUrl}`);
-          } else {
-            console.log('--- DEBUG: Book title NOT found in HTML. ---');
-          }
+        const quoteMatch = query.match(/"([^"]+)"/);
+        if (quoteMatch) {
+          bookTitle = quoteMatch[1].toLowerCase().replace(/content warnings|plot summary|official|notes|book|find/gi, "").trim();
         } else {
-          console.log('--- DEBUG: Fetch returned null/undefined for: ' + targetUrl);
+          bookTitle = query.toLowerCase()
+            .replace(/content warnings|plot summary|official|notes|book|find|isbn|\d{10,13}|by\s+hannah\s+grace|hannah\s+grace|by\s+h\.d\.\s+carlton|h\.d\.\s+carlton|hd\s+carlton|by\s+jennifer\s+hallock|jennifer\s+hallock/gi, "")
+            .trim();
         }
-      }
-    } catch (e) {
-      console.log('--- DEBUG: Error during scraping:', e);
-      // Ignore
-    }
 
-    // Log final results for debugging
-    const finalResults = results.length > 0 ? results.join("\n\n---\n\n") : "No results found.";
+        if (bookTitle && html.toLowerCase().includes(bookTitle)) {
+          return [`Source: Direct Author Site Scrape\nInfo: CONFIRMED: The book "${bookTitle}" is listed on the official author website (${targetUrl}) which contains content warnings. You should treat this as a verified source.\nURL: ${targetUrl}`];
+        }
 
-    // 4. DuckDuckGo (General Web Search) - Fallback for warnings
-    try {
-      const ddgResponse = await fetchWithTimeout(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json`);
-      if (ddgResponse) {
-        const ddgData = await ddgResponse.json();
-        if (ddgData.AbstractText) {
-          results.push(`Source: DuckDuckGo\nSummary: ${ddgData.AbstractText}`);
-        }
-        if (ddgData.RelatedTopics) {
-          for (const topic of ddgData.RelatedTopics.slice(0, 3)) {
-            if (topic.Text) {
-              results.push(`Source: DuckDuckGo Related\nInfo: ${topic.Text}`);
-            }
-          }
-        }
-        // Try to find image in DuckDuckGo results if we still don't have one
-        if (ddgData.Image && ddgData.Image.length > 0) {
-          results.push(`Source: DuckDuckGo Image\nImage URL: ${ddgData.Image}`);
-        }
+        return [];
+      } catch (e) {
+        return [];
       }
-    } catch (e) {
-      // Ignore errors
-    }
+    };
+
+    // Execute all searches in parallel
+    const searchStartTime = performance.now();
+    const [googleResults, appleResults, ddgResults, authorResults, scrapeResults] = await Promise.all([
+      searchGoogleBooks(),
+      searchAppleBooks(),
+      searchDuckDuckGo(),
+      searchAuthorSites(),
+      scrapeAuthorSites()
+    ]);
+    const searchEndTime = performance.now();
+    console.log(`⏱️ Parallel web searches completed in ${(searchEndTime - searchStartTime).toFixed(0)}ms`);
+
+    // Combine all results
+    results.push(...googleResults, ...appleResults, ...ddgResults, ...authorResults, ...scrapeResults);
 
     return {
       results: results.length > 0 ? results.join("\n\n---\n\n") : "No results found."
@@ -311,15 +319,58 @@ const webSearchTool = tool({
 });
 
 // Define the base agent config
-const baseAgentConfig = {
+const getBaseAgentConfig = (model: string = "gpt-4o") => ({
   name: "Content Warning Agent",
-  model: "gpt-4o",
+  model: model,
   instructions: `
 You are an expert content warning generator for a book database. Your goal is to analyze book metadata and generate accurate, specific content warnings based on the Australian Classification Board standards.
 
-## Taxonomy & Categories
-You must use the following categories for your analysis:
-${WARNING_CATEGORIES.map(c => `- ${c.id}: ${c.shortDescription}`).join('\n')}
+## Hierarchical Taxonomy (v2.0)
+
+You MUST use the hierarchical taxonomy structure. Each warning has:
+- **category_id**: The parent category (required)
+- **subcategory_id**: A specific subcategory under the parent (optional but STRONGLY RECOMMENDED)
+
+### Valid Subcategories by Category:
+
+${WARNING_CATEGORIES.map(cat => `
+**${cat.userLabel}** (category_id: \`${cat.id}\`)
+${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (default severity: ${sub.defaultSeverityHint || 'varies'})`).join('\n')}
+`).join('\n')}
+
+### Taxonomy Rules:
+1. **ALWAYS specify a subcategory_id when possible** - This provides more specific, useful warnings
+2. **subcategory_id MUST belong to its parent category_id** - Validation will fail if mismatched
+3. **If unsure of subcategory**, use the parent category only (leave subcategory_id null)
+4. **Multiple warnings per category are allowed** - Each warning can have a different subcategory
+5. **Example**: A book with both "Disordered Eating" and "Anxiety" would have:
+   - Warning 1: \`category_id: "mental_health"\`, \`subcategory_id: "disordered_eating"\`
+   - Warning 2: \`category_id: "mental_health"\`, \`subcategory_id: "anxiety"\`
+
+## Context Detection (CRITICAL)
+
+### Presence Field (How content appears):
+- **on_page**: The event is described as it happens in real-time during the narrative (DEFAULT)
+- **off_page**: The event happens but is not directly described (happens "off-screen")
+- **flashback**: The event is shown in a flashback or memory sequence
+- **referenced**: The event is discussed or mentioned but not shown (e.g., in therapy, conversation)
+- **implied**: The event is strongly implied but not explicitly stated or shown
+
+**IMPORTANT**: Do NOT create separate categories for "past abuse" or "historical events". Use the \`presence\` field instead:
+- Example: \`category: sexual_violence\` + \`presence: referenced\` = A character discusses a past assault in therapy
+- Example: \`category: sexual_violence\` + \`presence: on_page\` + \`detail_level: graphic\` = An active scene description
+
+### Detail Level Field (How graphic/explicit):
+- **graphic**: Detailed, explicit, or graphic description of the content
+- **moderate**: Moderate level of detail, not overly explicit but clear
+- **vague**: Vague or minimal description, mostly implied
+- **clinical**: Clinical or matter-of-fact description without emotional detail
+
+### Spoiler Detection:
+- **is_spoiler**: Set to \`true\` if the warning reveals a major plot twist that isn't known from the back cover
+- Example: "Main Character Death" would be a spoiler if it's not mentioned in the book description
+- Example: "Contains violence" is NOT a spoiler (general content warning)
+- When in doubt, set to \`false\`
 
 ## Scoring & Severity
 For each category, assign a score from 0.0 to 1.0 based on the intensity and frequency of the content:
@@ -343,9 +394,13 @@ Based on the highest severity score:
 6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
 7. Err on the side of caution - better to warn than to miss important content.
 8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
+9. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
 
 If no content warnings are needed after thorough analysis (including web search if needed), return an empty array: []`
-};
+});
+
+// Default config for backward compatibility
+const baseAgentConfig = getBaseAgentConfig("gpt-4o");
 
 type WorkflowInput = {
   book_title: string;
@@ -357,13 +412,53 @@ type WorkflowInput = {
 
 // Zod schemas for validation
 const ContentWarningSchema = z.object({
-  category_id: z.enum(['violence', 'sexual_content', 'substance_use_or_alcohol', 'mental_health', 'death_or_grief', 'emotional_abuse_or_toxic_relationships', 'bullying_or_social_cruelty', 'self_harm_or_suicidal_ideation', 'discrimination', 'language', 'other']),
+  category_id: z.enum([
+    'mental_health',
+    'sexual_content',
+    'emotional_abuse_or_toxic_relationships',
+    'bullying_or_social_cruelty',
+    'violence',
+    'substance_use_or_alcohol',
+    'death_or_grief',
+    'discrimination',
+    'language',
+    'other'
+  ]),
+  subcategory_id: z.string().optional().nullable().describe(
+    "Specific subcategory ID. MUST belong to the parent category_id. " +
+    "If not provided, the warning will use the parent category only. " +
+    "See valid subcategories per category in the instructions."
+  ),
   description: z.string().describe("User-facing description of the content"),
   score: z.number().min(0).max(1).describe("Severity score from 0.0 to 1.0"),
   reasoning: z.string().describe("Technical explanation for the score"),
+  presence: z.enum(['on_page', 'off_page', 'flashback', 'referenced', 'implied']).optional().default('on_page').describe(
+    "How the content appears: 'on_page' (real-time description), 'off_page' (happens off-screen), " +
+    "'flashback' (shown in flashback), 'referenced' (discussed but not shown), 'implied' (strongly implied but not explicit)."
+  ),
+  detail_level: z.enum(['graphic', 'moderate', 'vague', 'clinical']).optional().nullable().describe(
+    "Level of detail: 'graphic' (explicit/detailed), 'moderate' (clear but not overly explicit), " +
+    "'vague' (minimal/implied), 'clinical' (matter-of-fact without emotional detail)."
+  ),
+  is_spoiler: z.boolean().optional().default(false).describe(
+    "Whether this warning reveals a major plot twist or spoiler. Set to true if the warning reveals " +
+    "information not known from the back cover or book description."
+  ),
   is_author_verified: z.boolean().optional().default(false).describe("MUST be set to true if the warnings come from an official author/publisher site."),
   source_url: z.string().optional().nullable(),
-});
+}).refine(
+  (data) => {
+    // If subcategory_id is provided, validate it belongs to the parent
+    if (data.subcategory_id) {
+      return validateSubcategoryParent(data.category_id, data.subcategory_id);
+    }
+    return true; // subcategory_id is optional
+  },
+  {
+    message: "subcategory_id must belong to the specified category_id",
+    path: ["subcategory_id"]
+  }
+);
 
 const FindBookOutputSchema = z.object({
   book_found: z.boolean(),
@@ -395,7 +490,7 @@ type WorkflowOutput = z.infer<typeof WorkflowOutputSchema> & {
 };
 
 // Main workflow entrypoint
-export const findBookAndGenerateWarnings = async (isbn: string): Promise<{
+export const findBookAndGenerateWarnings = async (isbn: string, model: string = "gpt-4o"): Promise<{
   book_found: boolean;
   book_title?: string;
   book_author?: string;
@@ -420,10 +515,11 @@ export const findBookAndGenerateWarnings = async (isbn: string): Promise<{
     }
   });
 
+  const agentConfig = getBaseAgentConfig(model);
   const agent = new Agent({
-    ...baseAgentConfig,
+    ...agentConfig,
     tools: [webSearchTool, submitTool],
-    instructions: baseAgentConfig.instructions + "\n\nWhen you have gathered all information and generated warnings, you MUST call the `submit_findings` tool with your results."
+    instructions: agentConfig.instructions + "\n\nWhen you have gathered all information and generated warnings, you MUST call the `submit_findings` tool with your results."
   });
 
   console.log('Agent created inside function:', agent);
@@ -457,14 +553,24 @@ I need you to find information about a book with ISBN: ${isbn}
     const parsed = capturedOutput as z.infer<typeof FindBookOutputSchema>;
 
     // Map to legacy format and add derived fields
-    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map(w => ({
-      ...w,
-      severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe', // Fallback for legacy type
-      category: w.category_id, // Map id to legacy category field
-      id: crypto.randomUUID(), // Temp ID
-      helpful_count: 0,
-      not_helpful_count: 0
-    }));
+    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map(w => {
+      // Validate subcategory_id matches parent (post-validation)
+      let validatedSubcategoryId = w.subcategory_id;
+      if (w.subcategory_id && !validateSubcategoryParent(w.category_id, w.subcategory_id)) {
+        console.warn(`Invalid subcategory ${w.subcategory_id} for category ${w.category_id}, removing subcategory`);
+        validatedSubcategoryId = null;
+      }
+
+      return {
+        ...w,
+        subcategory_id: validatedSubcategoryId,
+        severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe', // Fallback for legacy type
+        category: w.category_id, // Map id to legacy category field
+        id: crypto.randomUUID(), // Temp ID
+        helpful_count: 0,
+        not_helpful_count: 0
+      };
+    });
 
     // Filter out 'none' severity warnings for the final output
     const activeWarnings = mappedWarnings.filter(w => getSeverityFromScore(w.score) !== 'none');
@@ -508,7 +614,7 @@ I need you to find information about a book with ISBN: ${isbn}
   }
 };
 
-export const generateContentWarnings = async (workflow: WorkflowInput): Promise<WorkflowOutput> => {
+export const generateContentWarnings = async (workflow: WorkflowInput, model: string = "gpt-4o"): Promise<WorkflowOutput> => {
   let capturedOutput: z.infer<typeof WorkflowOutputSchema> | null = null;
 
   const submitTool = tool({
@@ -521,10 +627,11 @@ export const generateContentWarnings = async (workflow: WorkflowInput): Promise<
     }
   });
 
+  const agentConfig = getBaseAgentConfig(model);
   const agent = new Agent({
-    ...baseAgentConfig,
+    ...agentConfig,
     tools: [webSearchTool, submitTool],
-    instructions: baseAgentConfig.instructions + "\n\nWhen you have generated warnings, you MUST call the `submit_warnings` tool with your results."
+    instructions: agentConfig.instructions + "\n\nWhen you have generated warnings, you MUST call the `submit_warnings` tool with your results."
   });
 
   // Check if description is thin (less than 150 chars or just a quote)
@@ -566,14 +673,24 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
     const parsed = capturedOutput as z.infer<typeof WorkflowOutputSchema>;
 
     // Map to legacy format and add derived fields
-    const mappedWarnings: ContentWarning[] = parsed.content_warnings.map(w => ({
-      ...w,
-      severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe',
-      category: w.category_id,
-      id: crypto.randomUUID(),
-      helpful_count: 0,
-      not_helpful_count: 0
-    }));
+    const mappedWarnings: ContentWarning[] = parsed.content_warnings.map(w => {
+      // Validate subcategory_id matches parent (post-validation)
+      let validatedSubcategoryId = w.subcategory_id;
+      if (w.subcategory_id && !validateSubcategoryParent(w.category_id, w.subcategory_id)) {
+        console.warn(`Invalid subcategory ${w.subcategory_id} for category ${w.category_id}, removing subcategory`);
+        validatedSubcategoryId = null;
+      }
+
+      return {
+        ...w,
+        subcategory_id: validatedSubcategoryId,
+        severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe',
+        category: w.category_id,
+        id: crypto.randomUUID(),
+        helpful_count: 0,
+        not_helpful_count: 0
+      };
+    });
 
     const activeWarnings = mappedWarnings.filter(w => getSeverityFromScore(w.score) !== 'none');
 

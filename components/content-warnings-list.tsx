@@ -209,6 +209,13 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
           </div>
         </section>
       )}
+
+      {/* Disclaimer */}
+      <div className="mt-12 pt-8 border-t border-slate-100">
+        <p className="text-[10px] text-slate-400 leading-relaxed text-center italic max-w-xl mx-auto">
+          All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment.
+        </p>
+      </div>
     </div>
   )
 }
@@ -279,8 +286,34 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                 <PopoverContent className="max-w-xs p-4 text-xs bg-white border border-slate-100 shadow-xl text-slate-600">
                   <p className="font-bold text-slate-900 mb-1 uppercase tracking-wider text-[10px]">AI Reasoning</p>
                   {warning.reasoning}
+                  {warning.source_url && (
+                    <>
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <p className="font-bold text-slate-900 mb-1 uppercase tracking-wider text-[10px]">Source</p>
+                        <a
+                          href={warning.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple-600 hover:text-purple-700 break-all"
+                        >
+                          {warning.source_url}
+                        </a>
+                      </div>
+                    </>
+                  )}
                 </PopoverContent>
               </Popover>
+            )}
+
+            {isAi && !warning.reasoning && warning.source_url && (
+              <a
+                href={warning.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 flex items-center gap-1"
+              >
+                Source <ExternalLink className="h-3 w-3" />
+              </a>
             )}
 
             {isVerified && warning.source_url && (
