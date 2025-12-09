@@ -3,6 +3,7 @@ import { fetchBookByISBN, fetchCandidatesByISBN, BookCandidate } from '@/lib/boo
 import { normalizeISBN } from '@/lib/isbn-validation'
 import { findBookAndGenerateWarnings, generateContentWarnings } from '@/lib/content-warning-agent'
 import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById, requiresMediation } from '@/lib/config/taxonomy-v2'
+import { isPlaceholderTitle } from '@/lib/utils/placeholder-detection'
 import { Database } from '@/types/supabase'
 
 // Performance API is available globally in Node.js 16+ and Next.js
@@ -93,7 +94,8 @@ export async function processIsbnScan(
   onProgress?: ProgressCallback,
   selectedCandidate?: BookCandidate,
   forceRefresh: boolean = false,
-  model: string = "gpt-4o"
+  model: string = "gpt-4o",
+  instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid'
 ): Promise<ScanResult> {
   const overallStartTime = performance.now()
   console.log('Processing ISBN scan:', isbn)
@@ -200,7 +202,9 @@ export async function processIsbnScan(
     }
 
     // Flag if the metadata is "thin" (likely to cause AI failure) or missing cover
-    isThinMetadata = !!(bookData && (!bookData.description || bookData.description.length < 150 || !bookData.cover_url));
+    // Check if metadata is thin OR if title is a placeholder
+    const hasPlaceholderTitle = bookData && isPlaceholderTitle(bookData.title)
+    isThinMetadata = !!(bookData && (!bookData.description || bookData.description.length < 150 || !bookData.cover_url || hasPlaceholderTitle));
 
     if (!bookData || isThinMetadata) {
       console.log('Book not found in external APIs or metadata is thin, asking AI agent...')
@@ -209,11 +213,16 @@ export async function processIsbnScan(
         : 'Book not found in standard libraries. Initiating AI web search...');
 
       // Create a minimal book record with just the ISBN (or the thin data we have)
+      // Don't use placeholder titles - use a generic unknown title instead
+      const title = bookData?.title && !isPlaceholderTitle(bookData.title)
+        ? bookData.title
+        : `Unknown Book (ISBN: ${cleanIsbn})`
+
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
         .insert({
           isbn: cleanIsbn,
-          title: bookData?.title || `Unknown Book (ISBN: ${cleanIsbn})`,
+          title: title,
           author: bookData?.author || 'Unknown Author',
           cover_url: bookData?.cover_url || null,
           description: bookData?.description || null,
@@ -236,13 +245,14 @@ export async function processIsbnScan(
 
       // Log thin metadata if applicable
       if (isThinMetadata && bookData) {
+        const placeholderReason = hasPlaceholderTitle ? ' (placeholder title detected)' : ''
         await logAuditDecision({
           bookId,
           isbn: cleanIsbn,
           decisionType: 'metadata_thin',
           warningsCount: 0,
-          aiReasoning: `Metadata retrieved from external APIs was insufficient (description length: ${bookData.description?.length || 0} chars, cover: ${bookData.cover_url ? 'found' : 'missing'}). Triggering AI web search for deeper analysis.`,
-          bookTitle: bookData.title,
+          aiReasoning: `Metadata retrieved from external APIs was insufficient${placeholderReason} (description length: ${bookData.description?.length || 0} chars, cover: ${bookData.cover_url ? 'found' : 'missing'}). Triggering AI web search for deeper analysis.`,
+          bookTitle: hasPlaceholderTitle ? `Placeholder: ${bookData.title}` : bookData.title,
           bookAuthor: bookData.author || null,
           descriptionLength: bookData.description?.length || null,
           hadThinMetadata: true,
@@ -256,7 +266,7 @@ export async function processIsbnScan(
         // Perform the search and CACHE the result
         // findBookAndGenerateWarnings does both web search AND AI generation
         const webSearchStart = performance.now()
-        cachedWebSearchResult = await findBookAndGenerateWarnings(cleanIsbn, model)
+        cachedWebSearchResult = await findBookAndGenerateWarnings(cleanIsbn, model, instructionMode)
         const webSearchTotalTime = performance.now() - webSearchStart
         timings.webSearch += webSearchTotalTime
         // Approximate AI generation time (70% of total, 30% is actual web search)
@@ -285,15 +295,20 @@ export async function processIsbnScan(
           })
 
           // Update the book record with AI-found information
+          // Don't use placeholder titles - keep existing title or use generic one
+          const aiTitle = cachedWebSearchResult.book_title && !isPlaceholderTitle(cachedWebSearchResult.book_title)
+            ? cachedWebSearchResult.book_title
+            : (currentBook?.title || `Unknown Book (ISBN: ${cleanIsbn})`)
+
           const dbWriteStart = performance.now()
           const { data: updatedBook, error: updateError } = await supabaseAdmin
             .from('books')
             .update({
-              title: cachedWebSearchResult.book_title || `Unknown Book (ISBN: ${cleanIsbn})`,
-              author: cachedWebSearchResult.book_author || 'Unknown Author',
-              description: cachedWebSearchResult.book_description || null,
-              categories: cachedWebSearchResult.book_categories || null,
-              cover_url: cachedWebSearchResult.book_cover_url || null
+              title: aiTitle,
+              author: cachedWebSearchResult.book_author || currentBook?.author || 'Unknown Author',
+              description: cachedWebSearchResult.book_description || currentBook?.description || null,
+              categories: cachedWebSearchResult.book_categories || currentBook?.categories || null,
+              cover_url: cachedWebSearchResult.book_cover_url || currentBook?.cover_url || null
             })
             .eq('id', bookId)
             .select()
@@ -385,16 +400,20 @@ export async function processIsbnScan(
         console.error('Error with AI agent book search:', warningError)
       }
     } else {
-      // Insert book with real metadata
-      console.log('Creating new book record with metadata:', bookData.title)
-      onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
+      // Insert book with real metadata (but check for placeholder titles)
+      const finalTitle = isPlaceholderTitle(bookData.title) 
+        ? `Unknown Book (ISBN: ${cleanIsbn})` 
+        : bookData.title
+
+      console.log('Creating new book record with metadata:', finalTitle)
+      onProgress?.(`Found metadata for "${finalTitle}". Saving to database...`);
 
       const dbWriteStart = performance.now()
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
         .insert({
           isbn: bookData.isbn,
-          title: bookData.title,
+          title: finalTitle,
           author: bookData.author || null,
           cover_url: bookData.cover_url || null,
           description: bookData.description || null,
@@ -511,7 +530,7 @@ export async function processIsbnScan(
               // findBookAndGenerateWarnings does both web search AND AI generation
               // We track the total time as webSearch (includes both operations)
               const webSearchStart = performance.now()
-              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn, model);
+              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn, model, instructionMode);
               const webSearchTotalTime = performance.now() - webSearchStart
               timings.webSearch += webSearchTotalTime
               // Note: AI generation is included in webSearch timing since findBookAndGenerateWarnings
@@ -544,7 +563,7 @@ export async function processIsbnScan(
               book_description: currentBook.description || undefined,
               book_categories: currentBook.categories || undefined,
               book_isbn: currentBook.isbn
-            }, model);
+            }, model, instructionMode);
             timings.aiContentWarningGeneration += performance.now() - aiStart
             classificationRating = (result as any).classification_rating || null;
             pipelinePath = 'metadata_only'
@@ -557,7 +576,7 @@ export async function processIsbnScan(
 
               // findBookAndGenerateWarnings does both web search AND AI generation
               const webSearchStart = performance.now()
-              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn, model);
+              const searchResult = await findBookAndGenerateWarnings(currentBook.isbn, model, instructionMode);
               const webSearchTotalTime = performance.now() - webSearchStart
               timings.webSearch += webSearchTotalTime
               // Approximate AI generation time (70% of total)
