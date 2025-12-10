@@ -8,8 +8,11 @@ import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapp
 import { SeverityMild, SeverityModerate, SeveritySevere } from "@/components/severity-icons"
 import { SeverityLegend } from "@/components/severity-legend"
 import { CollectionSort } from "@/components/collection-sort"
+import { CollectionPagination } from "@/components/collection-pagination"
 import { compareBySeverity } from "@/lib/utils/severity-scoring"
 import { SeverityScoreWrapper } from "@/components/severity-score-wrapper"
+import { BookAdminControls } from "@/components/book-admin-controls"
+import { BookCardAdmin } from "@/components/book-card-admin"
 
 // Helper function to extract classification rating from categories
 function getClassificationFromCategories(categories?: string[]): string | null {
@@ -31,8 +34,10 @@ function getContentWarningSummary(contentWarnings?: any[]): { severe: number; mo
 }
 
 interface CollectionPageProps {
-  searchParams: Promise<{ author?: string; q?: string; sort?: string }>
+  searchParams: Promise<{ author?: string; q?: string; sort?: string; page?: string }>
 }
+
+const BOOKS_PER_PAGE = 12
 
 export default async function CollectionPage({ searchParams }: CollectionPageProps) {
   const supabase = await createClient()
@@ -40,7 +45,11 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
   const authorFilter = params?.author
   const searchQuery = params?.q
   const sortOption = params?.sort || "newest"
+  const currentPage = Math.max(1, parseInt(params?.page || "1"))
 
+  // Build base query for counting total books
+  let countQuery = supabase.from("books").select("*", { count: "exact", head: true })
+  
   // Build query with optional filters
   let query = supabase
     .from("books")
@@ -55,29 +64,52 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
   // Apply filters
   if (authorFilter) {
-    query = query.eq("author", decodeURIComponent(authorFilter))
+    const decodedAuthor = decodeURIComponent(authorFilter)
+    query = query.eq("author", decodedAuthor)
+    countQuery = countQuery.eq("author", decodedAuthor)
   } else if (searchQuery) {
     query = query.or(
       `title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,isbn.ilike.%${searchQuery}%`
     )
+    countQuery = countQuery.or(
+      `title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,isbn.ilike.%${searchQuery}%`
+    )
   }
 
-  // Apply sorting
-  switch (sortOption) {
-    case "title-asc":
-      query = query.order("title", { ascending: true })
-      break
-    case "title-desc":
-      query = query.order("title", { ascending: false })
-      break
-    case "author-asc":
-      query = query.order("author", { ascending: true, nullsFirst: false })
-      break
-    case "newest":
-    default:
-      query = query.order("created_at", { ascending: false })
-      break
+  // Check if we need to fetch all books for severity sorting
+  const needsSeveritySort = sortOption === "severity-desc" || sortOption === "severity-asc"
+  
+  if (!needsSeveritySort) {
+    // Apply database sorting for non-severity sorts
+    switch (sortOption) {
+      case "title-asc":
+        query = query.order("title", { ascending: true })
+        break
+      case "title-desc":
+        query = query.order("title", { ascending: false })
+        break
+      case "author-asc":
+        query = query.order("author", { ascending: true, nullsFirst: false })
+        break
+      case "newest":
+      default:
+        query = query.order("created_at", { ascending: false })
+        break
+    }
+
+    // Apply pagination at database level
+    const from = (currentPage - 1) * BOOKS_PER_PAGE
+    const to = from + BOOKS_PER_PAGE - 1
+    query = query.range(from, to)
+  } else {
+    // For severity sorting, we need all books to sort client-side
+    // Apply a default order for consistency (newest first)
+    query = query.order("created_at", { ascending: false })
   }
+
+  // Get total count for pagination
+  const { count: totalBooks } = await countQuery
+  const totalPages = Math.ceil((totalBooks || 0) / BOOKS_PER_PAGE)
 
   // Fetch books with content warnings
   const { data: books, error } = await query
@@ -91,6 +123,10 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
         { warnings: b.content_warnings || [] }
       )
     )
+    // Paginate after sorting
+    const from = (currentPage - 1) * BOOKS_PER_PAGE
+    const to = from + BOOKS_PER_PAGE
+    sortedBooks = sortedBooks.slice(from, to)
   } else if (sortOption === "severity-asc") {
     sortedBooks = [...sortedBooks].sort((a, b) => 
       compareBySeverity(
@@ -98,6 +134,10 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
         { warnings: a.content_warnings || [] }
       )
     )
+    // Paginate after sorting
+    const from = (currentPage - 1) * BOOKS_PER_PAGE
+    const to = from + BOOKS_PER_PAGE
+    sortedBooks = sortedBooks.slice(from, to)
   }
 
   if (error) {
@@ -142,7 +182,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                 )}
               </h1>
               <p className="text-muted-foreground">
-                {books?.length || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
+                {totalBooks || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
                 {authorFilter && (
                   <Link 
                     href="/collection" 
@@ -154,7 +194,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               </p>
             </div>
             {/* Sort Selector */}
-            {books && books.length > 0 && (
+            {totalBooks && totalBooks > 0 && (
               <CollectionSort />
             )}
           </div>
@@ -172,7 +212,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
           </div>
         </div>
 
-        {!books || books.length === 0 ? (
+        {!sortedBooks || sortedBooks.length === 0 ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -206,8 +246,9 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               const hasWarnings = warningSummary.severe > 0 || warningSummary.moderate > 0 || warningSummary.mild > 0
 
               return (
-                <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full">
+                <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full relative">
                     <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+                      <BookCardAdmin isbn={book.isbn} title={book.title} />
                       <CardContent className="p-6 flex flex-col h-full">
                         <div className="flex gap-4 flex-1">
                           {/* Book Cover */}
@@ -315,6 +356,16 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               )
             })}
           </div>
+        )}
+
+        {/* Pagination */}
+        {totalBooks && totalBooks > BOOKS_PER_PAGE && (
+          <CollectionPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalBooks={totalBooks}
+            booksPerPage={BOOKS_PER_PAGE}
+          />
         )}
       </div>
     </div>

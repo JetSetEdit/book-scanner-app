@@ -3,9 +3,10 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
+import { SparksCounter } from "@/components/sparks-counter"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,11 @@ const navigation = [
     href: "/collection",
     icon: Library,
   },
+  {
+    name: "Help Improve",
+    href: "/rlhf",
+    icon: Brain,
+  },
 ]
 
 // Check if we're in dev mode
@@ -46,6 +52,7 @@ export function Navbar() {
   const [showAuditTrail, setShowAuditTrail] = useState(false)
   const [showRefreshButton, setShowRefreshButton] = useState(false)
   const [showSeverityScore, setShowSeverityScore] = useState(false)
+  const [showAdminControls, setShowAdminControls] = useState(false)
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -57,6 +64,8 @@ export function Navbar() {
       setShowRefreshButton(savedRefresh === 'true')
       const savedSeverityScore = localStorage.getItem('dev-show-severity-score')
       setShowSeverityScore(savedSeverityScore === 'true')
+      const savedAdminControls = localStorage.getItem('dev-show-admin-controls')
+      setShowAdminControls(savedAdminControls === 'true')
     }
   }, [])
 
@@ -66,7 +75,7 @@ export function Navbar() {
     localStorage.setItem('dev-show-audit-trail', String(newValue))
     // Update all book detail pages by triggering a custom event
     window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail: newValue, showRefreshButton, showSeverityScore } 
+      detail: { showAuditTrail: newValue, showRefreshButton, showSeverityScore, showAdminControls } 
     }))
   }
 
@@ -76,7 +85,7 @@ export function Navbar() {
     localStorage.setItem('dev-show-refresh-button', String(newValue))
     // Update all pages by triggering a custom event
     window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail, showRefreshButton: newValue, showSeverityScore } 
+      detail: { showAuditTrail, showRefreshButton: newValue, showSeverityScore, showAdminControls } 
     }))
   }
 
@@ -86,7 +95,17 @@ export function Navbar() {
     localStorage.setItem('dev-show-severity-score', String(newValue))
     // Update all pages by triggering a custom event
     window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail, showRefreshButton, showSeverityScore: newValue } 
+      detail: { showAuditTrail, showRefreshButton, showSeverityScore: newValue, showAdminControls } 
+    }))
+  }
+
+  const toggleAdminControls = () => {
+    const newValue = !showAdminControls
+    setShowAdminControls(newValue)
+    localStorage.setItem('dev-show-admin-controls', String(newValue))
+    // Update all pages by triggering a custom event
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
+      detail: { showAuditTrail, showRefreshButton, showSeverityScore, showAdminControls: newValue } 
     }))
   }
 
@@ -125,6 +144,9 @@ export function Navbar() {
                 </Link>
               )
             })}
+            
+            {/* Sparks Counter */}
+            <SparksCounter />
             
             {/* Dev Settings Dropdown */}
             {isDev && (
@@ -210,6 +232,41 @@ export function Navbar() {
                         <div className="h-full w-full bg-primary rounded-sm" />
                       )}
                     </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={toggleAdminControls}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <div className="flex-1">
+                      <div className="font-medium">Show Admin Controls</div>
+                      <div className="text-xs text-muted-foreground">
+                        Enable delete/edit buttons on book pages
+                      </div>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showAdminControls 
+                        ? "bg-primary border-primary" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showAdminControls && (
+                        <div className="h-full w-full bg-primary rounded-sm" />
+                      )}
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dev/agent-comparison" className="flex items-center gap-2 cursor-pointer">
+                      <Code className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Agent Comparison Tool</div>
+                        <div className="text-xs text-muted-foreground">
+                          Compare old vs new agent instructions
+                        </div>
+                      </div>
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -351,6 +408,44 @@ export function Navbar() {
                       )}
                     </div>
                   </button>
+                  <button
+                    onClick={() => {
+                      toggleAdminControls()
+                      setMobileMenuOpen(false)
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
+                      showAdminControls
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      <span>Show Admin Controls</span>
+                    </div>
+                    <div className={cn(
+                      "h-4 w-4 rounded border-2 transition-colors",
+                      showAdminControls 
+                        ? "bg-primary-foreground border-primary-foreground" 
+                        : "border-muted-foreground"
+                    )}>
+                      {showAdminControls && (
+                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
+                      )}
+                    </div>
+                  </button>
+                  <Link
+                    href="/dev/agent-comparison"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
+                      "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <Code className="h-4 w-4" />
+                    <span>Agent Comparison Tool</span>
+                  </Link>
                 </div>
               )}
             </div>

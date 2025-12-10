@@ -97,3 +97,7 @@ Now analyze: Blurb: [Input blurb]. Genre: [Input genre]. Strictness: [Input mode
 4. Iterate based on results
 
 
+
+
+
+

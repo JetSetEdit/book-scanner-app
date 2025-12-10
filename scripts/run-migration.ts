@@ -1,47 +1,52 @@
-import { Client } from 'pg';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js'
+import * as dotenv from 'dotenv'
+import * as fs from 'fs'
+import * as path from 'path'
 
-// Load .env.local
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env.local' })
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 async function runMigration() {
-    const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.SUPABASE_DB_URL;
+  const migrationPath = path.join(process.cwd(), 'supabase/migrations/20251210_create_rlhf_comparisons.sql')
+  const sql = fs.readFileSync(migrationPath, 'utf-8')
 
-    if (!connectionString) {
-        console.error('❌ DATABASE_URL (or POSTGRES_URL/SUPABASE_DB_URL) is not defined in .env.local');
-        console.log('Available keys:', Object.keys(process.env).filter(k => !k.startsWith('npm_') && !k.startsWith('NODE_')));
-        process.exit(1);
-    }
+  console.log('📦 Running migration: 20251210_create_rlhf_comparisons.sql\n')
 
-    // Use connection string but ensure SSL is handled correctly for Supabase (transaction mode usually requires it, or session mode)
-    // Supabase usually requires ssl: { rejectUnauthorized: false } for direct connections from Node
-    const client = new Client({
-        connectionString,
-        ssl: { rejectUnauthorized: false }
-    });
+  // Execute SQL using Supabase REST API (via a function or direct)
+  // Since we can't execute raw SQL directly, we'll use the admin client
+  // which has more permissions
+  
+  // Split into statements
+  const statements = sql
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !s.startsWith('--') && !s.startsWith('COMMENT'))
 
-    try {
-        await client.connect();
-        console.log('✅ Connected to database');
+  // Check if table exists first
+  const { data: existingTable } = await supabase
+    .from('rlhf_comparisons')
+    .select('id')
+    .limit(1)
 
-        const migrationFile = path.join(process.cwd(), 'supabase/migrations/20251205_enhance_content_warnings.sql');
-        const sql = fs.readFileSync(migrationFile, 'utf8');
+  if (existingTable !== null) {
+    console.log('✅ Table rlhf_comparisons already exists!')
+    return
+  }
 
-        console.log('🚀 Running migration...');
-        await client.query(sql);
-
-        console.log('✅ Migration executed successfully!');
-        console.log('   - Created scans table');
-        console.log('   - Added RLS policies');
-
-    } catch (err) {
-        console.error('❌ Migration failed:', err);
-        process.exit(1);
-    } finally {
-        await client.end();
-    }
+  console.log('⚠️  Cannot execute DDL via Supabase JS client')
+  console.log('📋 Please run this migration manually:\n')
+  console.log('1. Go to your Supabase Dashboard')
+  console.log('2. Navigate to SQL Editor')
+  console.log('3. Copy and paste the contents of:')
+  console.log('   supabase/migrations/20251210_create_rlhf_comparisons.sql')
+  console.log('4. Click "Run"\n')
+  
+  console.log('Or use psql:')
+  console.log(`psql "${process.env.NEXT_PUBLIC_SUPABASE_URL?.replace('https://', 'postgresql://postgres:')}" -f ${migrationPath}`)
 }
 
-runMigration();
+runMigration().catch(console.error)

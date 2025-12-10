@@ -1,0 +1,27 @@
+[
+  {
+    "book_id": "cbd2f54f-d1af-4671-b656-322b1a3c3903",
+    "book_title": "Icebreaker",
+    "book_isbn": "9781761420917",
+    "total_warnings": 8,
+    "issues": [
+      {
+        "type": "over_classification",
+        "severity": "warning",
+        "book_id": "cbd2f54f-d1af-4671-b656-322b1a3c3903",
+        "book_title": "Icebreaker",
+        "book_isbn": "9781761420917",
+        "warning_ids": [
+          "5482f9dc-0d5b-469f-ad8e-af6ce34ffd24"
+        ],
+        "category_id": "death_or_grief",
+        "subcategory_id": "near_death",
+        "current_severity": "severe",
+        "expected_severity": "moderate",
+        "description": "Over-classified as severe: Near death experience",
+        "recommendation": "Consider downgrading to moderate. Reason: Near death experience in contemporary fiction is typically moderate, not graphic"
+      }
+    ],
+    "score_before": 131.2
+  }
+]

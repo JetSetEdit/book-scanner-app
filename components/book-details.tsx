@@ -9,6 +9,8 @@ import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import Link from "next/link"
 import { SeverityScoreBadge } from "@/components/severity-score-badge"
+import { BookAdminControls } from "@/components/book-admin-controls"
+import { AccessibleAudioPlayer } from "@/components/accessible-audio-player"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -244,6 +246,19 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
               )
             })()}
 
+            {/* Audio Player - Accessibility Feature */}
+            {book.audio_url && book.content_briefing && (
+              <div className="mt-12">
+                <AccessibleAudioPlayer
+                  audioUrl={book.audio_url}
+                  duration={book.audio_duration || undefined}
+                  transcript={book.audio_transcript || book.content_briefing}
+                  briefing={book.content_briefing}
+                />
+              </div>
+            )}
+
+
             {/* Content Warnings - The "Feature" Block */}
             <div className="mt-16">
               <div className="flex items-center gap-4 mb-8">
@@ -257,6 +272,16 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                 isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
               />
             </div>
+
+            {/* Dev-Only: Admin Controls */}
+            <BookAdminControls 
+              isbn={book.isbn} 
+              book={{
+                title: book.title,
+                author: book.author,
+                description: book.description
+              }}
+            />
 
             {/* Dev-Only: Collapsible Audit History */}
             {isDev && showAuditTrail && (

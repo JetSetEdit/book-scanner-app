@@ -12,6 +12,7 @@ import { useScanHistory } from "@/hooks/use-scan-history"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { startTiming, markStage, endTiming, formatTiming } from "@/lib/utils/timing"
 import { BarcodeScanner } from "@/components/barcode-scanner"
+import { AccessibleAudioPlayer } from "@/components/accessible-audio-player"
 import { cn } from "@/lib/utils"
 
 export default function ScanTestPage() {
@@ -379,6 +380,19 @@ export default function ScanTestPage() {
                           </div>
                         )}
                         
+
+                        {/* Audio Player - If Available */}
+                        {result.book.audio_url && result.book.content_briefing && (
+                          <div className="mt-4">
+                            <AccessibleAudioPlayer
+                              audioUrl={result.book.audio_url}
+                              duration={result.book.audio_duration || undefined}
+                              transcript={result.book.audio_transcript || result.book.content_briefing}
+                              briefing={result.book.content_briefing}
+                            />
+                          </div>
+                        )}
+
                         <div className="mt-4">
                             <Link href={`/book/${result.book.isbn}`}>
                                 <Button 

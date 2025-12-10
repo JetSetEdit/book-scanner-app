@@ -7,7 +7,10 @@
     "dev": "next dev",
     "lint": "next lint",
     "test": "vitest",
-    "start": "next start"
+    "start": "next start",
+    "review": "tsx scripts/run-content-review.ts",
+    "review:apply": "tsx scripts/run-content-review.ts --apply",
+    "rlhf": "tsx scripts/rlhf-comparison.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -34,7 +37,7 @@
     "@radix-ui/react-slider": "1.2.2",
     "@radix-ui/react-slot": "1.1.1",
     "@radix-ui/react-switch": "1.1.2",
-    "@radix-ui/react-tabs": "1.1.2",
+    "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-toast": "1.2.4",
     "@radix-ui/react-toggle": "1.1.1",
     "@radix-ui/react-toggle-group": "1.1.1",

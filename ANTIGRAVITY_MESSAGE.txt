@@ -31,3 +31,7 @@ Full details in `.collaboration-protocol.md` and `FOR_ANTIGRAVITY.md`
 
 TL;DR: Check `.cursor-working.md` before editing. Update `.antigravity-working.md` when you start. Delete it when done. Easy!
 
+
+
+
+
