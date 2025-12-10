@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Libre_Baskerville } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
 import './globals.css'
@@ -32,6 +33,7 @@ export default function RootLayout({
         </main>
         <Footer />
         <Analytics />
+        <Toaster position="top-right" />
       </body>
     </html>
   )

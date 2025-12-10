@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import Link from "next/link"
 import { SeverityScoreBadge } from "@/components/severity-score-badge"
+import { VoiceAgent } from "@/components/voice-agent"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -255,6 +256,19 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
               <ContentWarningsList
                 warnings={warnings}
                 isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
+              />
+            </div>
+
+            {/* Voice Agent */}
+            <div className="mt-16">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="h-px bg-slate-200 flex-1"></div>
+                <h3 className="font-serif text-2xl text-slate-950 italic">Voice Assistant</h3>
+                <div className="h-px bg-slate-200 flex-1"></div>
+              </div>
+              <VoiceAgent 
+                isbn={book.isbn} 
+                bookId={book.id}
               />
             </div>
 

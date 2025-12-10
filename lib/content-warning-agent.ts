@@ -318,8 +318,108 @@ const webSearchTool = tool({
   execute: performWebSearch
 });
 
+// Old assumption-based instructions (for comparison)
+const getOldInstructions = () => `
+**REMEMBER**: 
+1. If the description is short or missing, ALWAYS use web search to find the full plot summary.
+2. **CRITICAL: Use Your Internal Knowledge**: If the web search returns limited results or "no results", **YOU MUST use your internal training data** to fill in the gaps. You know about popular books like "Twisted Love" (dark romance, abuse themes), "The Catcher in the Rye" (mental health, language), "1984" (violence, torture), etc. DO NOT say "no warnings" just because the search tool failed.
+3. **CRITICAL: Romance/Fantasy Books**: Romance and fantasy romance books typically contain sexual content, violence, and mature themes. Even if web search fails, you MUST generate appropriate warnings based on genre conventions.
+4. **Well-Known Books**: For books you recognize from your training, generate warnings based on what you know about them.
+5. **When Web Search Fails**: If web search returns no results but you have a book title and author, you MUST still generate warnings based on genre conventions, author's typical content, and title keywords.
+6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
+7. Err on the side of caution - better to warn than to miss important content.
+8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
+9. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+`;
+
+// New evidence-based instructions
+const getNewInstructions = () => `
+**CRITICAL RULES - NO ASSUMPTIONS**:
+1. **ONLY analyze THIS SPECIFIC BOOK** - Do NOT make assumptions based on:
+   - Author's other works or reputation
+   - Genre conventions or typical themes
+   - Similar book titles or authors
+   - Your internal knowledge about other books
+
+2. **Evidence-Based Analysis Only**:
+   - Base warnings ONLY on the book description provided
+   - If description is short/missing, use web search to find THIS SPECIFIC BOOK's plot summary
+   - Only use verified information from web search results about THIS BOOK
+   - If web search fails to find information about THIS SPECIFIC BOOK, return empty warnings with confidence set to 'low' and reasoning explaining insufficient information
+
+3. **When Information is Insufficient**:
+   - If you cannot find verified information about THIS SPECIFIC BOOK, return an empty warnings array: []
+   - Set confidence to 'low'
+   - In reasoning, explain: "Insufficient information available about this specific book. Unable to generate content warnings without verified content details."
+   - DO NOT generate warnings based on assumptions, author reputation, or genre conventions
+
+4. **AUTHOR AUTHORITY**: If you find content warnings on the author's official website FOR THIS SPECIFIC BOOK, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
+
+5. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
+
+6. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+
+7. **Reasoning must be specific**: In your reasoning field, cite the specific evidence from the book description or web search that led to each warning. Do NOT reference author's other works or genre conventions.
+`;
+
+// Hybrid instructions - combines evidence-based rigor with assumption-based comprehensiveness
+const getHybridInstructions = () => `
+## HYBRID APPROACH - EVIDENCE FIRST, THEN INFERENCE
+
+### PHASE 1: Evidence-Based Analysis (Primary)
+
+**1. Source Reliability Hierarchy (In Order of Priority):**
+
+1. **Author/Publisher Authority**: Official "Content Notes" or "Trigger Warnings" from the author's website or publisher page. (Gold Standard).
+2. **Professional Reviews**: Kirkus, Publishers Weekly, Common Sense Media.
+3. **User Consensus**: Goodreads/StoryGraph (Only if multiple reviews cite specific details).
+
+**2. Execution:**
+
+- Base warnings on the book description provided.
+- Use web search to verify details for THIS SPECIFIC BOOK.
+- **Conflict Resolution**: If the Author says "clean" but >70% of user reviews cite a specific graphic trigger, flag it as Verified (User Consensus).
+
+**3. Verification Marking:**
+
+- If found in Source type 1 (Author/Publisher), set \`is_author_verified\` to \`true\` and include \`source_url\`.
+
+### PHASE 2: Inference-Based Analysis (Secondary)
+
+**4. Inference Logic:**
+
+- Use ONLY when verified info is insufficient.
+- **Inference Rules**:
+  - *Romance Genre*: Do NOT infer explicit sex unless "Steamy", "Spice", or "Erotica" is indicated.
+  - *Thriller/Mystery*: Do NOT infer graphic gore unless "Horror", "Slasher", or "Dark" is indicated.
+- Set confidence score lower (0.5 - 0.69) for inferred warnings.
+
+### PHASE 3: Calibration & False Positive Checks
+
+**5. False Positive Logic (Run before outputting):**
+
+- **Death ≠ Grief**: Character death alone is not "Grief" unless the *processing* of loss is a theme.
+- **Action ≠ Violence**: Fantasy battles/Action sequences are usually "Mild/Moderate" unless gore is described.
+- **Non-Fiction**: Clinical discussion of sensitive topics (e.g., history, psychology) uses the \`clinical\` detail level and lower severity than graphic fiction.
+
+**6. Classification Requirement:**
+
+- ALWAYS include a \`classification_rating\` (G/PG/etc.) even if the list of warnings is empty.
+
+**7. Reasoning Transparency:**
+
+- \`reasoning\` field must clearly state:
+  - **evidence_type**: "verified" or "inferred"
+  - **sources_checked**: List sources you checked (e.g., "Author Site", "Kirkus", "Goodreads")
+  - **key_evidence**: Direct quote or specific plot point that led to this warning
+  - **conflict_resolution**: Why you chose this severity if sources disagreed (if applicable)
+  - **confidence_rationale**: Why you assigned this confidence score
+
+**8. Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+`;
+
 // Define the base agent config
-const getBaseAgentConfig = (model: string = "gpt-4o") => ({
+const getBaseAgentConfig = (model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid') => ({
   name: "Content Warning Agent",
   model: model,
   instructions: `
@@ -364,7 +464,7 @@ ${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (defaul
 - **graphic**: Detailed, explicit, or graphic description of the content
 - **moderate**: Moderate level of detail, not overly explicit but clear
 - **vague**: Vague or minimal description, mostly implied
-- **clinical**: Clinical or matter-of-fact description without emotional detail
+- **clinical**: Clinical or matter-of-fact description (common in non-fiction/educational)
 
 ### Spoiler Detection:
 - **is_spoiler**: Set to \`true\` if the warning reveals a major plot twist that isn't known from the back cover
@@ -372,29 +472,30 @@ ${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (defaul
 - Example: "Contains violence" is NOT a spoiler (general content warning)
 - When in doubt, set to \`false\`
 
-## Scoring & Severity
-For each category, assign a score from 0.0 to 1.0 based on the intensity and frequency of the content:
-- 0.0 - 0.30: None (No significant content)
-- 0.31 - 0.55: Mild (Infrequent or low impact)
-- 0.56 - 0.80: Moderate (Frequent or moderate impact)
-- 0.81 - 1.0: Severe (High impact, graphic, or pervasive)
+## Scoring & Severity (ACB Alignment)
+
+For each category, assign a score from 0.0 to 1.0 based on the intensity and frequency, aligned with Australian Classification Board impact tests:
+
+- **0.0 - 0.30: None / Very Mild (G)**
+  *(Context is comedic, educational, or highly stylized)*
+- **0.31 - 0.55: Mild (PG)**
+  *(Infrequent, low impact, implied violence, vague sexual references)*
+- **0.56 - 0.80: Moderate (M)**
+  *(Mature themes, moderate impact, non-graphic sexual scenes, detailed but not prolonged violence)*
+- **0.81 - 1.0: Severe (MA15+ / R18+)**
+  *(High impact, graphic/prolonged violence, explicit sexual activity, sexual violence)*
 
 ## Classification Ratings
-Based on the highest severity score:
-- None/Mild → "G" or "PG"
-- Moderate → "M" or "MA15+"
-- Severe → "MA15+" or "R18+"
 
-**REMEMBER**: 
-1. If the description is short or missing, ALWAYS use web search to find the full plot summary.
-2. **CRITICAL: Use Your Internal Knowledge**: If the web search returns limited results or "no results", **YOU MUST use your internal training data** to fill in the gaps. You know about popular books like "Twisted Love" (dark romance, abuse themes), "The Catcher in the Rye" (mental health, language), "1984" (violence, torture), etc. DO NOT say "no warnings" just because the search tool failed.
-3. **CRITICAL: Romance/Fantasy Books**: Romance and fantasy romance books typically contain sexual content, violence, and mature themes. Even if web search fails, you MUST generate appropriate warnings based on genre conventions.
-4. **Well-Known Books**: For books you recognize from your training, generate warnings based on what you know about them.
-5. **When Web Search Fails**: If web search returns no results but you have a book title and author, you MUST still generate warnings based on genre conventions, author's typical content, and title keywords.
-6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
-7. Err on the side of caution - better to warn than to miss important content.
-8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
-9. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+Based on the highest severity score found:
+
+- **G**: 0.0 - 0.20
+- **PG**: 0.21 - 0.40
+- **M**: 0.41 - 0.70
+- **MA15+**: 0.71 - 0.90
+- **R18+**: 0.91 - 1.0
+
+${instructionMode === 'old' ? getOldInstructions() : instructionMode === 'new' ? getNewInstructions() : getHybridInstructions()}
 
 If no content warnings are needed after thorough analysis (including web search if needed), return an empty array: []`
 });
@@ -490,7 +591,7 @@ type WorkflowOutput = z.infer<typeof WorkflowOutputSchema> & {
 };
 
 // Main workflow entrypoint
-export const findBookAndGenerateWarnings = async (isbn: string, model: string = "gpt-4o"): Promise<{
+export const findBookAndGenerateWarnings = async (isbn: string, model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid'): Promise<{
   book_found: boolean;
   book_title?: string;
   book_author?: string;
@@ -515,7 +616,7 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
     }
   });
 
-  const agentConfig = getBaseAgentConfig(model);
+  const agentConfig = getBaseAgentConfig(model, instructionMode);
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
@@ -527,7 +628,7 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
   // @ts-ignore
   console.log('Agent has getEnabledHandoffs:', typeof agent.getEnabledHandoffs);
 
-  const inputText = `
+  const inputText = instructionMode === 'old' ? `
 I need you to find information about a book with ISBN: ${isbn}
 
 **SEARCH STRATEGY:**
@@ -540,6 +641,25 @@ I need you to find information about a book with ISBN: ${isbn}
 2. Analyze the content and return a list of warnings with scores (0.0-1.0).
 3. Assign a classification rating (G, PG, M, MA15+, R18+).
 4. Provide a confidence level and reasoning.
+5. CALL THE submit_findings TOOL WITH THE RESULT.
+` : `
+I need you to find information about a book with ISBN: ${isbn}
+
+**SEARCH STRATEGY:**
+1. Use web search with the ISBN directly: "${isbn}" or "isbn ${isbn}" - the search tool will automatically detect ISBNs and search Google Books
+2. Also try searching for variations like "ISBN ${isbn} book" or "${isbn} book title author"
+3. If the ISBN search fails to return a description or cover, try searching for the book by Title + Author if you can find that information.
+
+**CRITICAL - NO ASSUMPTIONS:**
+- Only generate warnings based on verified information about THIS SPECIFIC BOOK (identified by ISBN ${isbn})
+- Do NOT make assumptions based on author's other works, genre conventions, or similar books
+- If you cannot find verified information about THIS SPECIFIC BOOK, set book_found: false or return empty warnings with confidence: 'low'
+
+**OUTPUT REQUIREMENTS:**
+1. Return the book metadata (title, author, description, cover URL) ONLY if you can verify this is the correct book for ISBN ${isbn}.
+2. Analyze the content of THIS SPECIFIC BOOK and return a list of warnings with scores (0.0-1.0) based ONLY on verified information about THIS BOOK.
+3. Assign a classification rating (G, PG, M, MA15+, R18+) based on THIS BOOK's content.
+4. Provide a confidence level and reasoning that cites specific evidence from THIS BOOK's description or verified sources.
 5. CALL THE submit_findings TOOL WITH THE RESULT.
 `;
 
@@ -614,7 +734,7 @@ I need you to find information about a book with ISBN: ${isbn}
   }
 };
 
-export const generateContentWarnings = async (workflow: WorkflowInput, model: string = "gpt-4o"): Promise<WorkflowOutput> => {
+export const generateContentWarnings = async (workflow: WorkflowInput, model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid'): Promise<WorkflowOutput> => {
   let capturedOutput: z.infer<typeof WorkflowOutputSchema> | null = null;
 
   const submitTool = tool({
@@ -627,7 +747,7 @@ export const generateContentWarnings = async (workflow: WorkflowInput, model: st
     }
   });
 
-  const agentConfig = getBaseAgentConfig(model);
+  const agentConfig = getBaseAgentConfig(model, instructionMode);
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
@@ -646,7 +766,7 @@ ${workflow.book_description ? `- Description: ${workflow.book_description}` : '-
 ${workflow.book_categories ? `- Categories: ${workflow.book_categories.join(', ')}` : ''}
 ${workflow.book_isbn ? `- ISBN: ${workflow.book_isbn}` : ''}
 
-${isThinDescription ? `
+${isThinDescription ? (instructionMode === 'old' ? `
 ⚠️ IMPORTANT: The book description provided is very short or missing. You MUST use web search to find:
 1. A full plot summary of this book
 2. Reviews or analyses that discuss the book's themes
@@ -655,10 +775,19 @@ ${isThinDescription ? `
 DO NOT rely on the short description above. Search for "[${workflow.book_title}] ${workflow.book_author} plot summary" and "[${workflow.book_title}] content warnings" to get complete information.
 
 This book may be a well-known classic or controversial work that requires thorough analysis.
-` : ''}
+` : `
+⚠️ IMPORTANT: The book description provided is very short or missing. You MUST use web search to find:
+1. A full plot summary of THIS SPECIFIC BOOK: "${workflow.book_title}" by ${workflow.book_author}
+2. Reviews or analyses that discuss THIS BOOK's themes
+3. Any known content warnings or controversies about THIS SPECIFIC BOOK
 
-Please analyze this book and generate appropriate content warnings using Australian Classification Board standards. 
-${isThinDescription ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : ''}
+Search for "[${workflow.book_title}] ${workflow.book_author} plot summary" and "[${workflow.book_title}] content warnings" to get complete information.
+
+**CRITICAL**: Only generate warnings based on verified information about THIS SPECIFIC BOOK. Do NOT make assumptions based on the author's other works, genre conventions, or similar books. If you cannot find verified information about THIS BOOK, return empty warnings with low confidence.
+`) : ''}
+
+Please analyze ${instructionMode === 'old' ? 'this book' : 'THIS SPECIFIC BOOK'} and generate appropriate content warnings using Australian Classification Board standards. 
+${isThinDescription ? (instructionMode === 'old' ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : instructionMode === 'new' ? 'Since the description is brief, you MUST use web search to find verified information about THIS SPECIFIC BOOK first. Do NOT assume content based on author reputation or genre.' : 'Since the description is brief, you MUST use web search to find verified information first. If verified information is insufficient, you may apply genre-aware inference but must clearly mark inferred warnings.') : (instructionMode === 'old' ? '' : instructionMode === 'new' ? 'Base your analysis ONLY on the book description provided above. Do NOT make assumptions based on author reputation or genre conventions.' : 'Start with evidence-based analysis from the description. If information is insufficient, you may apply genre-aware inference but must clearly distinguish verified vs inferred warnings.')}
 
 CALL THE submit_warnings TOOL WITH THE RESULT.
 `;

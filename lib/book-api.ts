@@ -13,6 +13,8 @@ interface OpenLibraryBook {
   excerpts?: Array<{ text: string }>
 }
 
+import { isPlaceholderTitle, filterPlaceholderCandidates } from './utils/placeholder-detection'
+
 interface BookData {
   isbn: string
   title: string
@@ -74,8 +76,8 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
     const data = await response.json()
     if (!data.items || data.items.length === 0) return []
 
-    // Map top 3 results
-    return data.items.slice(0, 3).map((item: any) => {
+    // Map top 3 results and filter out placeholder titles
+    const candidates = data.items.slice(0, 3).map((item: any) => {
       const book = item.volumeInfo
       return {
         isbn,
@@ -94,7 +96,10 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
         source: 'googlebooks',
         source_id: item.id
       }
-    }).filter((b: BookCandidate) => b.title !== 'Unknown Title')
+    })
+    
+    // Filter out placeholder titles (like "Untitled TBC 202325")
+    return filterPlaceholderCandidates(candidates).filter((b: BookCandidate) => b.title !== 'Unknown Title')
   } catch (error) {
     console.error("[Book API] Google Books candidates error:", error)
     return []
@@ -201,9 +206,17 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       return null
     }
 
-    const book = data.items[0].volumeInfo
+    // Find first non-placeholder book
+    let book = null
+    for (const item of data.items) {
+      const volumeInfo = item.volumeInfo
+      if (volumeInfo.title && !isPlaceholderTitle(volumeInfo.title)) {
+        book = volumeInfo
+        break
+      }
+    }
 
-    if (!book.title) {
+    if (!book || !book.title) {
       return null
     }
 
