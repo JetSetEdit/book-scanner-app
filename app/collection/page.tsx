@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle } from "lucide-react"
+import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle, ScanBarcode } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
@@ -167,20 +167,28 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
         <div className="mb-8">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div className="flex-1">
-              <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
-                <Library className="h-8 w-8" />
-                {authorFilter ? (
-                  <>
-                    Books by {decodeURIComponent(authorFilter)}
-                  </>
-                ) : searchQuery ? (
-                  <>
-                    Search Results for &quot;{searchQuery}&quot;
-                  </>
-                ) : (
-                  "Bookshelf"
-                )}
-              </h1>
+              <div className="flex items-center gap-4 mb-2">
+                <h1 className="text-3xl font-bold flex items-center gap-2">
+                  <Library className="h-8 w-8" />
+                  {authorFilter ? (
+                    <>
+                      Books by {decodeURIComponent(authorFilter)}
+                    </>
+                  ) : searchQuery ? (
+                    <>
+                      Search Results for &quot;{searchQuery}&quot;
+                    </>
+                  ) : (
+                    "Bookshelf"
+                  )}
+                </h1>
+                <Link href="/scan-test">
+                  <Button size="sm" className="gap-2">
+                    <ScanBarcode className="h-4 w-4" />
+                    Scan Book
+                  </Button>
+                </Link>
+              </div>
               <p className="text-muted-foreground">
                 {totalBooks || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
                 {authorFilter && (

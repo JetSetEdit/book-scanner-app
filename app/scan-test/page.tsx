@@ -13,6 +13,8 @@ import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { startTiming, markStage, endTiming, formatTiming } from "@/lib/utils/timing"
 import { BarcodeScanner } from "@/components/barcode-scanner"
 import { AccessibleAudioPlayer } from "@/components/accessible-audio-player"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
 export default function ScanTestPage() {
@@ -20,14 +22,19 @@ export default function ScanTestPage() {
   const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
   const [isbn, setIsbn] = useState("")
   
-  // Show scanner by default, can be hidden
-  const [showScanner, setShowScanner] = useState(true)
-  
   // Scan history
   const { history, addScan, clearHistory } = useScanHistory()
   
   // User preferences
-  const { preferences } = useUserPreferences()
+  const { preferences, updatePreference } = useUserPreferences()
+  
+  // Show scanner based on user preference
+  const [showScanner, setShowScanner] = useState(preferences.showCameraScanner ?? false)
+  
+  // Update showScanner when preference changes
+  useEffect(() => {
+    setShowScanner(preferences.showCameraScanner ?? false)
+  }, [preferences.showCameraScanner])
   
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -191,6 +198,30 @@ export default function ScanTestPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Scanner Preference Toggle */}
+          <div className="mb-6 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="show-camera-scanner"
+                checked={showScanner}
+                onCheckedChange={(checked) => {
+                  const newValue = checked === true
+                  setShowScanner(newValue)
+                  updatePreference('showCameraScanner', newValue)
+                }}
+              />
+              <Label
+                htmlFor="show-camera-scanner"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Show camera scanner by default
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 ml-6">
+              When enabled, the camera scanner will be shown when you visit this page. You can always toggle it on/off.
+            </p>
+          </div>
+
           {/* Scan History */}
           {history.length > 0 && (
             <div className="mb-6 p-4 border rounded-lg bg-muted/30">
@@ -218,7 +249,6 @@ export default function ScanTestPage() {
                     size="sm"
                     onClick={() => {
                       setIsbn(item.isbn)
-                      setScanMode("manual")
                       performScan(item.isbn)
                     }}
                     className="text-xs h-7"

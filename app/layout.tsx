@@ -6,6 +6,8 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
+import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
+import { PWARegister } from '@/components/pwa-register'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -17,6 +19,24 @@ const libreBaskerville = Libre_Baskerville({
 export const metadata: Metadata = {
   title: 'Subtext',
   description: 'Reveal the hidden content in every book.',
+  manifest: '/manifest.json',
+  themeColor: '#fef3c7',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Subtext',
+  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
 }
 
 export default function RootLayout({
@@ -28,10 +48,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${libreBaskerville.variable} flex flex-col min-h-screen`}>
         <Navbar />
-        <main className="flex-1">
+        <main className="flex-1 pb-16 md:pb-0">
           {children}
         </main>
         <Footer />
+        <PWARegister />
+        <PWAInstallPrompt />
         <Analytics />
         <Toaster position="top-right" />
       </body>

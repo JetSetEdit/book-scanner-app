@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { SparksCounter } from "@/components/sparks-counter"
@@ -22,6 +22,11 @@ const navigation = [
     name: "Home",
     href: "/",
     icon: BookOpen,
+  },
+  {
+    name: "Scan",
+    href: "/scan-test",
+    icon: ScanBarcode,
   },
   {
     name: "Bookshelf",
@@ -110,46 +115,58 @@ export function Navbar() {
   }
 
   return (
-    <nav className="relative z-40 border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
-      <div className="container mx-auto px-4">
-        <div className="flex h-16 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <img src="/logo.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
-            <span className="text-2xl font-serif font-bold tracking-tight text-slate-900">Subtext</span>
-          </Link>
+    <>
+      <nav className="relative z-40 border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
+        <div className="container mx-auto px-4">
+          {/* Top Row: Logo, Search, Desktop Nav */}
+          <div className="flex h-16 items-center justify-between">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-3">
+              <img src="/logo.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
+              <span className="text-2xl font-serif font-bold tracking-tight text-slate-900 hidden sm:inline">Subtext</span>
+            </Link>
 
-          {/* Search */}
-          <div className="hidden md:flex flex-1 max-w-md mx-4">
-            <SearchComponent />
-          </div>
+            {/* Search - Desktop */}
+            <div className="hidden md:flex flex-1 max-w-md mx-4">
+              <SearchComponent />
+            </div>
 
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center space-x-1">
-            {navigation.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.name}
-                </Link>
-              )
-            })}
-            
-            {/* Sparks Counter */}
-            <SparksCounter />
-            
-            {/* Dev Settings Dropdown */}
-            {isDev && (
+            {/* Search - Mobile */}
+            <div className="md:hidden flex-1 max-w-xs mx-2">
+              <SearchComponent />
+            </div>
+
+            {/* Sparks Counter - Mobile (if needed) */}
+            <div className="md:hidden">
+              <SparksCounter />
+            </div>
+
+            {/* Navigation Links - Desktop */}
+            <div className="hidden md:flex items-center space-x-1">
+              {navigation.map((item) => {
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {item.name}
+                  </Link>
+                )
+              })}
+              
+              {/* Sparks Counter */}
+              <SparksCounter />
+              
+              {/* Dev Settings Dropdown */}
+              {isDev && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -270,188 +287,42 @@ export function Navbar() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-          </div>
-
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <button
-              type="button"
-              className="inline-flex items-center justify-center rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-expanded={mobileMenuOpen}
-            >
-              <span className="sr-only">Open main menu</span>
-              {mobileMenuOpen ? (
-                <X className="block h-6 w-6" />
-              ) : (
-                <Menu className="block h-6 w-6" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden" id="mobile-menu">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t">
-              {/* Mobile Search */}
-              <div className="px-3 py-2 mb-2">
-                <SearchComponent />
-              </div>
-              
-              {navigation.map((item) => {
-                const isActive = pathname === item.href
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-2 rounded-md text-base font-medium transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.name}
-                  </Link>
-                )
-              })}
-              
-              {/* Dev Settings in Mobile Menu */}
-              {isDev && (
-                <div className="px-3 py-2 border-t mt-2 pt-2">
-                  <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <Code className="h-3 w-3" />
-                    Dev Settings
-                  </div>
-                  <button
-                    onClick={() => {
-                      toggleAuditTrail()
-                      setMobileMenuOpen(false)
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                      showAuditTrail
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      <span>Show Audit Trail</span>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showAuditTrail 
-                        ? "bg-primary-foreground border-primary-foreground" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showAuditTrail && (
-                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      toggleRefreshButton()
-                      setMobileMenuOpen(false)
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
-                      showRefreshButton
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="h-4 w-4" />
-                      <span>Show Refresh Button</span>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showRefreshButton 
-                        ? "bg-primary-foreground border-primary-foreground" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showRefreshButton && (
-                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      toggleSeverityScore()
-                      setMobileMenuOpen(false)
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
-                      showSeverityScore
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Calculator className="h-4 w-4" />
-                      <span>Show Severity Score</span>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showSeverityScore 
-                        ? "bg-primary-foreground border-primary-foreground" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showSeverityScore && (
-                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
-                      )}
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => {
-                      toggleAdminControls()
-                      setMobileMenuOpen(false)
-                    }}
-                    className={cn(
-                      "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
-                      showAdminControls
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Trash2 className="h-4 w-4" />
-                      <span>Show Admin Controls</span>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showAdminControls 
-                        ? "bg-primary-foreground border-primary-foreground" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showAdminControls && (
-                        <div className="h-full w-full bg-primary-foreground rounded-sm" />
-                      )}
-                    </div>
-                  </button>
-                  <Link
-                    href="/dev/agent-comparison"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors mt-1",
-                      "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    <Code className="h-4 w-4" />
-                    <span>Agent Comparison Tool</span>
-                  </Link>
-                </div>
               )}
             </div>
           </div>
-        )}
-      </div>
-    </nav>
+        </div>
+
+      </nav>
+
+      {/* Mobile Navigation - Bottom Bar PWA Style */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60 safe-area-inset-bottom">
+        <div className="flex items-center justify-around h-16 px-2">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "relative flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-md text-xs font-medium transition-colors flex-1 max-w-[80px] min-w-0",
+                  isActive
+                    ? "text-primary"
+                    : "text-muted-foreground"
+                )}
+              >
+                <item.icon className={cn(
+                  "h-5 w-5 flex-shrink-0",
+                  isActive && "text-primary"
+                )} />
+                <span className="text-[10px] leading-tight truncate w-full text-center">{item.name}</span>
+                {isActive && (
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-b-full" />
+                )}
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+    </>
   )
 }

@@ -3,7 +3,7 @@
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ChevronDown, ChevronUp, Code } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -86,8 +86,16 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
           >
             ← Back to Bookshelf
           </Button>
-          <div className="text-xs font-bold tracking-widest uppercase text-slate-400">
-            Book Scanner v1.0
+          <div className="flex items-center gap-4">
+            <Link href="/scan-test">
+              <Button variant="outline" size="sm" className="gap-2 text-xs font-bold tracking-widest uppercase">
+                <ScanBarcode className="h-3 w-3" />
+                Scan Another
+              </Button>
+            </Link>
+            <div className="text-xs font-bold tracking-widest uppercase text-slate-400">
+              Book Scanner v1.0
+            </div>
           </div>
         </div>
 
