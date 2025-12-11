@@ -27,9 +27,9 @@ export function CollectionSort() {
 
   return (
     <div className="flex items-center gap-2">
-      <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+      <ArrowUpDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
       <Select value={currentSort} onValueChange={handleSortChange}>
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-full sm:w-[180px]">
           <SelectValue placeholder="Sort by..." />
         </SelectTrigger>
         <SelectContent>

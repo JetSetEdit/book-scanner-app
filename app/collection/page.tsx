@@ -162,14 +162,14 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="container mx-auto px-4 py-8 overflow-x-hidden">
+      <div className="max-w-6xl mx-auto w-full">
         <div className="mb-8">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-3xl font-bold flex items-center gap-2">
-                  <Library className="h-8 w-8" />
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                  <Library className="h-6 w-6 sm:h-8 sm:w-8" />
                   {authorFilter ? (
                     <>
                       Books by {decodeURIComponent(authorFilter)}
@@ -182,7 +182,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                     "Bookshelf"
                   )}
                 </h1>
-                <Link href="/scan-test">
+                <Link href="/scan-test" className="self-start sm:self-auto">
                   <Button size="sm" className="gap-2">
                     <ScanBarcode className="h-4 w-4" />
                     Scan Book
@@ -203,7 +203,9 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
             </div>
             {/* Sort Selector */}
             {totalBooks && totalBooks > 0 && (
-              <CollectionSort />
+              <div className="flex-shrink-0">
+                <CollectionSort />
+              </div>
             )}
           </div>
 
