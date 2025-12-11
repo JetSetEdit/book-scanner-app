@@ -68,10 +68,18 @@ export function VoiceAgent({ isbn, bookId, className, voiceId }: VoiceAgentProps
               selectedVoiceIdRef.current = prev // Keep ref in sync
               return prev // Keep current selection
             })
+          } else if (data.error) {
+            // API key not configured - log warning but continue
+            console.warn('Voice selection unavailable:', data.error)
           }
+        } else {
+          // Gracefully handle missing API key or other errors
+          console.warn('Failed to fetch voices:', response.status, response.statusText)
+          // Continue without voice selection - will use default voice
         }
       } catch (error) {
         console.error('Failed to fetch voices:', error)
+        // Continue without voice selection - will use default voice
       }
     }
     fetchVoices()
