@@ -27,9 +27,13 @@ export async function POST(request: NextRequest) {
     let apiKey = process.env.ELEVENLABS_API_KEY
     if (!apiKey) {
       console.error('ELEVENLABS_API_KEY not found in environment')
+      // Return a more descriptive error that won't crash the client
       return NextResponse.json(
-        { error: 'ElevenLabs API key not configured' },
-        { status: 500 }
+        { 
+          error: 'ElevenLabs API key not configured',
+          message: 'Please configure ELEVENLABS_API_KEY in Vercel environment variables'
+        },
+        { status: 503 } // Service Unavailable instead of 500
       )
     }
     

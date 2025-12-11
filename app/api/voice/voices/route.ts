@@ -15,10 +15,15 @@ export async function GET(request: NextRequest) {
     // Get ElevenLabs API key from environment
     const apiKey = process.env.ELEVENLABS_API_KEY
     if (!apiKey) {
-      return NextResponse.json(
-        { error: 'ElevenLabs API key not configured' },
-        { status: 500 }
-      )
+      console.warn('ELEVENLABS_API_KEY not found in environment')
+      // Return empty list instead of error to prevent page crashes
+      return NextResponse.json({
+        success: true,
+        allVoices: [],
+        australianVoices: [],
+        totalVoices: 0,
+        error: 'ElevenLabs API key not configured'
+      })
     }
 
     // Call ElevenLabs API to get voices
