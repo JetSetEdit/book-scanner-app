@@ -8,6 +8,7 @@ import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { PWARegister } from '@/components/pwa-register'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -34,8 +35,8 @@ export const metadata: Metadata = {
     viewportFit: 'cover',
   },
   icons: {
-    icon: '/logo.png',
-    apple: '/logo.png',
+    icon: '/logo_var_2.png',
+    apple: '/logo_var_2.png',
   },
 }
 
@@ -45,17 +46,24 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${libreBaskerville.variable} flex flex-col min-h-screen`}>
-        <Navbar />
-        <main className="flex-1 pb-16 md:pb-0">
-          {children}
-        </main>
-        <Footer />
-        <PWARegister />
-        <PWAInstallPrompt />
-        <Analytics />
-        <Toaster position="top-right" />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Navbar />
+          <main className="flex-1 pb-16 md:pb-0">
+            {children}
+          </main>
+          <Footer />
+          <PWARegister />
+          <PWAInstallPrompt />
+          <Analytics />
+          <Toaster position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   )

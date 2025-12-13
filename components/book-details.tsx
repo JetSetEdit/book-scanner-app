@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import Link from "next/link"
 import { SeverityScoreBadge } from "@/components/severity-score-badge"
 import { VoiceAgent } from "@/components/voice-agent"
+import { GoogleBooksAttribution } from "@/components/google-books-attribution"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -256,9 +257,9 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
             {/* Content Warnings - The "Feature" Block */}
             <div className="mt-16">
               <div className="flex items-center gap-4 mb-8">
-                <div className="h-px bg-slate-200 flex-1"></div>
-                <h3 className="font-serif text-2xl text-slate-950 italic">Content Analysis</h3>
-                <div className="h-px bg-slate-200 flex-1"></div>
+                <div className="h-px bg-border flex-1"></div>
+                <h3 className="font-serif text-2xl text-slate-950 dark:text-foreground italic">Content Analysis</h3>
+                <div className="h-px bg-border flex-1"></div>
               </div>
 
               <ContentWarningsList
@@ -270,15 +271,18 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
             {/* Voice Agent */}
             <div className="mt-16">
               <div className="flex items-center gap-4 mb-8">
-                <div className="h-px bg-slate-200 flex-1"></div>
-                <h3 className="font-serif text-2xl text-slate-950 italic">Voice Assistant</h3>
-                <div className="h-px bg-slate-200 flex-1"></div>
+                <div className="h-px bg-border flex-1"></div>
+                <h3 className="font-serif text-2xl text-slate-950 dark:text-foreground italic">Voice Assistant</h3>
+                <div className="h-px bg-border flex-1"></div>
               </div>
               <VoiceAgent 
                 isbn={book.isbn} 
                 bookId={book.id}
               />
             </div>
+
+            {/* Google Books Attribution (TOS Compliance) */}
+            <GoogleBooksAttribution isbn={book.isbn} className="mt-8" />
 
             {/* Dev-Only: Collapsible Audit History */}
             {isDev && showAuditTrail && (

@@ -154,12 +154,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       {officialVerifiedWarnings.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px bg-amber-200 flex-1"></div>
-            <div className="flex items-center gap-2 text-amber-600">
+            <div className="h-px bg-border flex-1"></div>
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
               <CheckCircle className="h-4 w-4" />
               <h3 className="font-bold uppercase tracking-widest text-xs">Official Author Notes</h3>
             </div>
-            <div className="h-px bg-amber-200 flex-1"></div>
+            <div className="h-px bg-border flex-1"></div>
           </div>
 
           <div className="space-y-0">
@@ -174,12 +174,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       {standardAiWarnings.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="h-px bg-border flex-1"></div>
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Sparkles className="h-4 w-4" />
               <h3 className="font-bold uppercase tracking-widest text-xs">AI Analysis</h3>
             </div>
-            <div className="h-px bg-slate-200 flex-1"></div>
+            <div className="h-px bg-border flex-1"></div>
           </div>
 
           <div className="space-y-0">
@@ -194,12 +194,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       {communityWarnings.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="h-px bg-border flex-1"></div>
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Shield className="h-4 w-4" />
               <h3 className="font-bold uppercase tracking-widest text-xs">Community Reports</h3>
             </div>
-            <div className="h-px bg-slate-200 flex-1"></div>
+            <div className="h-px bg-border flex-1"></div>
           </div>
 
           <div className="space-y-0">
@@ -211,8 +211,8 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       )}
 
       {/* Disclaimer */}
-      <div className="mt-12 pt-8 border-t border-slate-100">
-        <p className="text-[10px] text-slate-400 leading-relaxed text-center italic max-w-xl mx-auto">
+      <div className="mt-12 pt-8 border-t border-border">
+        <p className="text-[10px] text-muted-foreground leading-relaxed text-center italic max-w-xl mx-auto">
           All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment.
         </p>
       </div>
@@ -225,8 +225,8 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
 
   return (
     <div className={cn(
-      "group py-6 border-b border-slate-100 last:border-0 transition-colors",
-      isVerified ? "hover:border-amber-200" : "hover:border-slate-300"
+      "group py-6 border-b border-border last:border-0 transition-colors",
+      isVerified ? "hover:border-amber-200 dark:hover:border-amber-800" : "hover:border-border"
     )}>
       <div className="flex flex-col md:flex-row md:items-baseline gap-4 md:gap-8">
 

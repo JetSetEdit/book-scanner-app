@@ -2,8 +2,9 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState, useEffect } from "react"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { useTheme } from "next-themes"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { SparksCounter } from "@/components/sparks-counter"
@@ -52,6 +53,8 @@ function isDevMode(): boolean {
 
 export function Navbar() {
   const pathname = usePathname()
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
   const [showAuditTrail, setShowAuditTrail] = useState(false)
@@ -60,6 +63,7 @@ export function Navbar() {
   const [showAdminControls, setShowAdminControls] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     setIsDev(isDevMode())
     // Load dev settings from localStorage
     if (isDevMode()) {
@@ -73,6 +77,16 @@ export function Navbar() {
       setShowAdminControls(savedAdminControls === 'true')
     }
   }, [])
+
+  // Filter navigation to hide "Help Improve" in production
+  const visibleNavigation = useMemo(() => {
+    return navigation.filter(item => {
+      if (item.href === '/rlhf') {
+        return isDev
+      }
+      return true
+    })
+  }, [isDev])
 
   const toggleAuditTrail = () => {
     const newValue = !showAuditTrail
@@ -121,9 +135,9 @@ export function Navbar() {
           {/* Top Row: Logo, Search, Desktop Nav */}
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-3">
-              <img src="/logo.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
-              <span className="text-2xl font-serif font-bold tracking-tight text-slate-900 hidden sm:inline">Subtext</span>
+            <Link href="/" className="flex items-center gap-3 group">
+              <img src="/logo_var_2.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
+              <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-slate-900 hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
             </Link>
 
             {/* Search - Desktop */}
@@ -143,7 +157,7 @@ export function Navbar() {
 
             {/* Navigation Links - Desktop */}
             <div className="hidden md:flex items-center space-x-1">
-              {navigation.map((item) => {
+              {visibleNavigation.map((item) => {
                 const isActive = pathname === item.href
                 return (
                   <Link
@@ -164,6 +178,23 @@ export function Navbar() {
               
               {/* Sparks Counter */}
               <SparksCounter />
+              
+              {/* Theme Toggle */}
+              {mounted && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                  aria-label="Toggle theme"
+                >
+                  {theme === 'dark' ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
               
               {/* Dev Settings Dropdown */}
               {isDev && (
@@ -297,7 +328,7 @@ export function Navbar() {
       {/* Mobile Navigation - Bottom Bar PWA Style */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60 safe-area-inset-bottom">
         <div className="flex items-center justify-around h-16 px-2">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const isActive = pathname === item.href
             return (
               <Link

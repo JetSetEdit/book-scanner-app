@@ -210,13 +210,13 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
           </div>
 
           {/* Content Warning Legend */}
-          <div className="mt-8 border-t-2 border-slate-200 pt-6">
+          <div className="mt-8 border-t-2 border-border pt-6">
             <div className="flex items-center gap-4 mb-6">
-              <div className="h-px bg-slate-200 flex-1"></div>
-              <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400">
+              <div className="h-px bg-border flex-1"></div>
+              <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Warning Legend
               </h3>
-              <div className="h-px bg-slate-200 flex-1"></div>
+              <div className="h-px bg-border flex-1"></div>
             </div>
             <SeverityLegend />
           </div>

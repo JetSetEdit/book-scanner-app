@@ -5,12 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 
 export default function HomePage() {
   return (
-    <main className="min-h-screen bg-white flex flex-col">
+    <main className="min-h-screen bg-background flex flex-col">
       {/* Hero Section */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-24 md:py-32 text-center">
         <div className="max-w-4xl mx-auto space-y-8">
-          <div className="flex justify-center mb-12">
-            <img src="/logo.png" alt="Subtext Logo" className="h-48 w-48 md:h-64 md:w-64 object-contain" />
+          <div className="flex flex-col items-center justify-center mb-12">
+            <div className="mb-6">
+              <img src="/logo_var_2.png" alt="Subtext Logo" className="h-48 w-48 md:h-64 md:w-64 object-contain" />
+            </div>
+            <span className="text-5xl md:text-7xl font-serif font-normal tracking-tight text-slate-900" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
           </div>
 
           <div className="inline-flex items-center rounded-full border border-slate-200 px-4 py-1.5 text-sm font-medium text-slate-600 bg-slate-50">
@@ -29,7 +32,7 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Link href="/scan-test">
-              <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-slate-900 text-white hover:bg-slate-800 shadow-xl shadow-slate-200/50 transition-all hover:scale-105">
+              <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105">
                 <ScanBarcode className="mr-2 h-5 w-5" />
                 Start Scanning
               </Button>
@@ -45,7 +48,7 @@ export default function HomePage() {
       </div>
 
       {/* Features Grid */}
-      <div className="border-t border-slate-100 bg-slate-50/50">
+      <div className="border-t border-slate-200/50 bg-white/60">
         <div className="container mx-auto px-4 py-24">
           <div className="grid md:grid-cols-3 gap-12">
             <div className="space-y-4">

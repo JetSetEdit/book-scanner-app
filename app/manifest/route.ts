@@ -12,7 +12,7 @@ export async function GET() {
     orientation: 'portrait-primary',
     icons: [
       {
-        src: '/logo.png',
+        src: '/logo_var_2.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable',
@@ -49,4 +49,8 @@ export async function GET() {
     },
   })
 }
+
+
+
+
 
