@@ -561,7 +561,7 @@ export function VoiceAgent({ isbn, bookId, className, voiceId }: VoiceAgentProps
 
   return (
     <div className={`voice-agent ${className || ''}`}>
-      <div className="border rounded-lg p-4 bg-white shadow-sm">
+      <div className="border rounded-lg p-4 bg-card shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold">Voice Assistant</h3>
           <div className="flex gap-2">
@@ -607,7 +607,7 @@ export function VoiceAgent({ isbn, bookId, className, voiceId }: VoiceAgentProps
         {/* Voice Selector */}
         {australianVoices.length > 0 && (
           <div className="mb-4">
-            <Label htmlFor="voice-select" className="text-sm text-gray-700 mb-2 block">
+            <Label htmlFor="voice-select" className="text-sm text-foreground mb-2 block">
               Voice:
             </Label>
             <Select 
@@ -644,8 +644,8 @@ export function VoiceAgent({ isbn, bookId, className, voiceId }: VoiceAgentProps
                 <div
                   className={`max-w-[80%] rounded-lg px-3 py-2 ${
                     message.role === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-foreground'
                   }`}
                 >
                   <p className="text-sm">{message.content}</p>
