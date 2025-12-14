@@ -16,11 +16,6 @@ export default function HomePage() {
             <span className="text-5xl md:text-7xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
           </div>
 
-          <div className="inline-flex items-center rounded-full border border-border px-4 py-1.5 text-sm font-medium text-muted-foreground bg-card">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-500 mr-2"></span>
-            v1.0 Now Available
-          </div>
-
           <h1 className="font-serif text-4xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
             The hidden context <br className="hidden md:block" />
             <span className="text-muted-foreground italic">of every story.</span>
