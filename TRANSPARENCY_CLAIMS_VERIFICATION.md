@@ -94,3 +94,9 @@
 2. **Clarify reasoning availability:** "AI-generated warnings include detailed reasoning; author warnings include source URLs"
 3. **Add note about barcode scanning:** Currently only ISBN entry is implemented, barcode scanning may be future feature
 
+
+
+
+
+
+

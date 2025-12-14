@@ -26,6 +26,7 @@ interface BookData {
   page_count?: number
   categories?: string[]
   classification_rating?: string
+  source?: 'openlibrary' | 'googlebooks' // Track data source for TOS compliance
 }
 
 export interface BookCandidate extends BookData {
@@ -180,6 +181,7 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
       published_date: bookData.publish_date,
       page_count: bookData.number_of_pages,
       categories: bookData.subjects?.slice(0, 5).map((s) => s.name),
+      source: 'openlibrary', // Mark as Open Library source (TOS-compliant to store)
     }
   } catch (error) {
     console.error("[Book API] Open Library error:", error)
@@ -255,6 +257,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       published_date: book.publishedDate,
       page_count: book.pageCount,
       categories: book.categories?.slice(0, 5),
+      source: 'googlebooks', // Mark as Google Books source (TOS violation to store permanently)
     }
   } catch (error) {
     console.error("[Book API] Google Books error:", error)

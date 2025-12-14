@@ -41,6 +41,8 @@ export default function ScanTestPage() {
   const [error, setError] = useState<string | null>(null)
   const [statusUpdates, setStatusUpdates] = useState<string[]>([])
   const [candidates, setCandidates] = useState<any[] | null>(null)
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
+  const [isProcessingSelection, setIsProcessingSelection] = useState(false)
 
   // Load last ISBN on mount
   useEffect(() => {
@@ -61,6 +63,9 @@ export default function ScanTestPage() {
         setCandidates(null)
         setStatusUpdates([])
     }
+    // Reset selection state
+    setSelectedCandidateId(null)
+    setIsProcessingSelection(false)
 
     try {
       markStage('api-request-sent')
@@ -162,6 +167,9 @@ export default function ScanTestPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred")
+      // Reset selection state on error
+      setSelectedCandidateId(null)
+      setIsProcessingSelection(false)
     } finally {
       setLoading(false)
     }
@@ -173,6 +181,17 @@ export default function ScanTestPage() {
   }
   
   const handleSelectCandidate = async (candidate: any) => {
+    // Prevent double-click
+    if (isProcessingSelection || selectedCandidateId) return
+    
+    // Mark as selected and processing
+    setSelectedCandidateId(candidate.isbn || candidate.title)
+    setIsProcessingSelection(true)
+    
+    // Clear candidates after a brief delay to show selection animation
+    setTimeout(() => {
+      setCandidates(null)
+    }, 300)
     await performScan(isbn, candidate)
   }
 
@@ -361,23 +380,82 @@ export default function ScanTestPage() {
                 </Alert>
                 
                 <div className="grid gap-3">
-                    {candidates.map((candidate, idx) => (
-                        <div key={idx} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => handleSelectCandidate(candidate)}>
-                            {candidate.cover_url && (
-                                <img src={candidate.cover_url} alt={candidate.title} className="w-16 h-24 object-cover rounded shadow-sm" />
-                            )}
-                            <div className="flex-1">
-                                <h4 className="font-bold text-base">{candidate.title}</h4>
-                                <p className="text-sm text-muted-foreground">{candidate.author}</p>
-                                <p className="text-xs text-muted-foreground mt-1">{candidate.publisher} • {candidate.published_date}</p>
-                                <div className="mt-2 flex gap-2">
-                                    <span className="text-xs bg-secondary px-2 py-1 rounded-full">Source: {candidate.source}</span>
+                    {candidates.map((candidate, idx) => {
+                        const candidateId = candidate.isbn || candidate.title
+                        const isSelected = selectedCandidateId === candidateId
+                        const shouldAnimateOut = selectedCandidateId && !isSelected
+                        
+                        return (
+                            <div 
+                                key={idx} 
+                                className={cn(
+                                    "flex items-start gap-4 p-4 border rounded-lg transition-all duration-300",
+                                    isSelected 
+                                        ? "bg-primary/10 border-primary shadow-md scale-[1.02] cursor-default" 
+                                        : shouldAnimateOut
+                                        ? "opacity-0 scale-95 -translate-x-4 pointer-events-none"
+                                        : "hover:bg-muted/50 cursor-pointer hover:shadow-sm",
+                                    isProcessingSelection && !isSelected && "pointer-events-none"
+                                )}
+                                onClick={() => !isProcessingSelection && handleSelectCandidate(candidate)}
+                            >
+                                {candidate.cover_url && (
+                                    <img 
+                                        src={candidate.cover_url} 
+                                        alt={candidate.title} 
+                                        className={cn(
+                                            "w-16 h-24 object-cover rounded shadow-sm transition-all duration-300",
+                                            isSelected && "ring-2 ring-primary"
+                                        )} 
+                                    />
+                                )}
+                                <div className="flex-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="flex-1">
+                                            <h4 className="font-bold text-base">{candidate.title}</h4>
+                                            <p className="text-sm text-muted-foreground">{candidate.author}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">{candidate.publisher} • {candidate.published_date}</p>
+                                            <div className="mt-2 flex gap-2">
+                                                <span className="text-xs bg-secondary px-2 py-1 rounded-full">Source: {candidate.source}</span>
+                                            </div>
+                                        </div>
+                                        {isSelected && (
+                                            <div className="flex items-center gap-2 text-primary">
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                <span className="text-xs font-medium">Processing...</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
+                                <Button 
+                                    size="sm" 
+                                    variant={isSelected ? "default" : "secondary"}
+                                    disabled={isProcessingSelection}
+                                    className={cn(
+                                        "transition-all duration-300",
+                                        isSelected && "bg-primary text-primary-foreground"
+                                    )}
+                                >
+                                    {isSelected ? "Selected" : "Select"}
+                                </Button>
                             </div>
-                            <Button size="sm" variant="secondary">Select</Button>
-                        </div>
-                    ))}
+                        )
+                    })}
                 </div>
+                {/* Google Books Attribution for candidate covers */}
+                {candidates.some(c => c.source === 'googlebooks') && (
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Covers via{' '}
+                    <a
+                      href="https://books.google.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      Google Books
+                    </a>
+                  </p>
+                )}
             </div>
           )}
 

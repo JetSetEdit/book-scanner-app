@@ -1,4 +1,4 @@
-import { Agent, run, tool } from "@openai/agents";
+import { Agent, run, tool, setDefaultOpenAIKey } from "@openai/agents";
 import { z } from "zod";
 import { 
   WARNING_CATEGORIES, 
@@ -12,10 +12,27 @@ import {
   type DetailLevel
 } from "./config/taxonomy-v2";
 
-// Configure OpenAI API key
-
-// Note: We don't check for OPENAI_API_KEY here to avoid build-time errors.
-// The Agent class will handle missing keys or we can check inside the function.
+// Helper function to ensure API key is set at runtime
+// In Next.js serverless functions, env vars are available at runtime, not module load
+function ensureOpenAIKey(): string | null {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    console.error('[Agent Config] ❌ OPENAI_API_KEY not found in process.env');
+    console.error('[Agent Config] Available env vars:', Object.keys(process.env).filter(k => k.includes('OPENAI') || k.includes('API')));
+    return null;
+  }
+  
+  // Trim whitespace and validate format (OpenAI keys start with 'sk-')
+  const trimmedKey = apiKey.trim();
+  if (!trimmedKey.startsWith('sk-')) {
+    console.warn('[Agent Config] ⚠️ OPENAI_API_KEY format looks invalid (should start with sk-)');
+  }
+  
+  setDefaultOpenAIKey(trimmedKey);
+  console.log('[Agent Config] ✅ OpenAI API key configured (length:', trimmedKey.length, ')');
+  return trimmedKey;
+}
 
 // Web search tool for the AI agent
 export const performWebSearch = async (args: any) => {
@@ -406,7 +423,24 @@ const getHybridInstructions = () => `
 
 - ALWAYS include a \`classification_rating\` (G/PG/etc.) even if the list of warnings is empty.
 
-**7. Reasoning Transparency:**
+**7. Cultural Appropriation & Colonial Themes Detection (CRITICAL):**
+
+- **Watch for**: Books that appropriate or exploit Indigenous, First Nations, or marginalized cultures
+- **Examples**: 
+  - Fantasy/sci-fi books that borrow heavily from real-world cultures (e.g., Middle Eastern, Indigenous, African) without proper context or respect
+  - Colonial narratives where colonizers are portrayed as heroes
+  - "White savior" tropes or narratives that center colonizers over Indigenous peoples
+  - Books that use cultural elements as exotic "flavor" without meaningful representation
+- **Use**: \`category_id: "discrimination"\`, \`subcategory_id: "cultural_appropriation"\`
+- **Set \`has_indigenous_deceased\` flag**: If the book contains Indigenous/First Nations content that may include names/images of deceased persons (Australian cultural protocol)
+- **Note**: This is important for Australian readers, especially in educational contexts. 
+- **SPECIFIC EXAMPLES TO FLAG**:
+  - **"Dune" by Frank Herbert**: The Fremen are heavily based on Middle Eastern and North African desert cultures (Bedouin, Arabic influences). The narrative centers on a colonizer (Paul Atreides) becoming a messianic figure to the Fremen, which has been criticized as a "white savior" narrative and cultural appropriation.
+  - **Books with colonial themes**: Any book where colonizers/outsiders "save" or "lead" Indigenous or marginalized groups
+  - **Cultural borrowing without context**: Fantasy worlds that directly lift real-world cultural elements without acknowledgment or respect
+- **When in doubt, flag it**: If a book has been criticized for cultural appropriation in reviews or academic discussions, include this warning.
+
+**8. Reasoning Transparency:**
 
 - \`reasoning\` field must clearly state:
   - **evidence_type**: "verified" or "inferred"
@@ -604,6 +638,20 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
   reasoning: string;
   raw_output?: any; // For debug
 }> => {
+  // Ensure API key is set before creating agent (check at runtime, not module load)
+  const apiKey = ensureOpenAIKey();
+  if (!apiKey) {
+    console.error('[findBookAndGenerateWarnings] ❌ OPENAI_API_KEY not available');
+    console.error('[findBookAndGenerateWarnings] process.env keys:', Object.keys(process.env).filter(k => k.includes('OPENAI') || k.includes('API')).join(', '));
+    return {
+      book_found: false,
+      content_warnings: [],
+      confidence: 'low',
+      reasoning: 'Configuration error: OPENAI_API_KEY environment variable is not set or not accessible. Please configure it in Vercel environment variables and ensure it is available for Production environment.'
+    };
+  }
+  
+  console.log('[findBookAndGenerateWarnings] ✅ API key available, creating agent...');
   let capturedOutput: z.infer<typeof FindBookOutputSchema> | null = null;
 
   const submitTool = tool({
@@ -616,6 +664,14 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
     }
   });
 
+  // Double-check API key is set right before creating agent
+  if (!apiKey) {
+    const recheckKey = ensureOpenAIKey();
+    if (!recheckKey) {
+      throw new Error('OPENAI_API_KEY not available when creating agent');
+    }
+  }
+
   const agentConfig = getBaseAgentConfig(model, instructionMode);
   const agent = new Agent({
     ...agentConfig,
@@ -623,10 +679,7 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
     instructions: agentConfig.instructions + "\n\nWhen you have gathered all information and generated warnings, you MUST call the `submit_findings` tool with your results."
   });
 
-  console.log('Agent created inside function:', agent);
-  console.log('Agent prototype inside function:', Object.getPrototypeOf(agent));
-  // @ts-ignore
-  console.log('Agent has getEnabledHandoffs:', typeof agent.getEnabledHandoffs);
+  console.log('[findBookAndGenerateWarnings] Agent created successfully');
 
   const inputText = instructionMode === 'old' ? `
 I need you to find information about a book with ISBN: ${isbn}
@@ -725,16 +778,36 @@ I need you to find information about a book with ISBN: ${isbn}
 
   } catch (error) {
     console.error("AI book search failed:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check if it's a missing API key error
+    const isMissingKey = errorMessage.includes('apiKey') || errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('Missing credentials');
+    
     return {
       book_found: false,
       content_warnings: [],
       confidence: 'low',
-      reasoning: `Error during AI search: ${error instanceof Error ? error.message : 'Unknown error'}`
+      reasoning: isMissingKey 
+        ? `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`
+        : `Error during AI search: ${errorMessage}`
     };
   }
 };
 
 export const generateContentWarnings = async (workflow: WorkflowInput, model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid'): Promise<WorkflowOutput> => {
+  // Ensure API key is set before creating agent (check at runtime, not module load)
+  const apiKey = ensureOpenAIKey();
+  if (!apiKey) {
+    console.error('[generateContentWarnings] ❌ OPENAI_API_KEY not available');
+    console.error('[generateContentWarnings] process.env keys:', Object.keys(process.env).filter(k => k.includes('OPENAI') || k.includes('API')).join(', '));
+    return {
+      content_warnings: [],
+      confidence: 'low',
+      reasoning: 'Configuration error: OPENAI_API_KEY environment variable is not set or not accessible. Please configure it in Vercel environment variables and ensure it is available for Production environment.'
+    };
+  }
+  
+  console.log('[generateContentWarnings] ✅ API key available, creating agent...');
   let capturedOutput: z.infer<typeof WorkflowOutputSchema> | null = null;
 
   const submitTool = tool({
@@ -747,12 +820,22 @@ export const generateContentWarnings = async (workflow: WorkflowInput, model: st
     }
   });
 
+  // Double-check API key is set right before creating agent
+  if (!apiKey) {
+    const recheckKey = ensureOpenAIKey();
+    if (!recheckKey) {
+      throw new Error('OPENAI_API_KEY not available when creating agent');
+    }
+  }
+
   const agentConfig = getBaseAgentConfig(model, instructionMode);
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
     instructions: agentConfig.instructions + "\n\nWhen you have generated warnings, you MUST call the `submit_warnings` tool with your results."
   });
+
+  console.log('[generateContentWarnings] Agent created successfully');
 
   // Check if description is thin (less than 150 chars or just a quote)
   const isThinDescription = !workflow.book_description || workflow.book_description.length < 150;
@@ -832,10 +915,17 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
 
   } catch (error) {
     console.error("AI content warning generation failed:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check if it's a missing API key error
+    const isMissingKey = errorMessage.includes('apiKey') || errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('Missing credentials');
+    
     return {
       content_warnings: [],
       confidence: 'low',
-      reasoning: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      reasoning: isMissingKey
+        ? `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`
+        : `Error: ${errorMessage}`
     };
   }
 };

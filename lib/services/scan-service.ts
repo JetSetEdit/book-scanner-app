@@ -4,6 +4,7 @@ import { normalizeISBN } from '@/lib/isbn-validation'
 import { findBookAndGenerateWarnings, generateContentWarnings } from '@/lib/content-warning-agent'
 import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById, requiresMediation } from '@/lib/config/taxonomy-v2'
 import { Database } from '@/types/supabase'
+import { isStale, refreshBookMetadata } from '@/lib/book-cache'
 
 // Performance API is available globally in Node.js 16+ and Next.js
 declare const performance: { now(): number }
@@ -123,7 +124,7 @@ export async function processIsbnScan(
   // Store the result of any web search we perform so we don't do it twice
   let cachedWebSearchResult: any = null;
 
-  // Check if book already exists
+  // Check if book already exists (the "Cache" lookup)
   console.log('Checking for existing book with ISBN:', cleanIsbn)
   let existingBook = null
 
@@ -142,6 +143,19 @@ export async function processIsbnScan(
       throw fetchError
     }
     existingBook = data
+    
+    // --- COMPLIANCE CHECK: Staleness Check ---
+    // If data is stale (>30 days), refresh in background
+    if (existingBook && isStale(existingBook.last_synced_at)) {
+      console.log(`[Cache] Book ${cleanIsbn} is stale (>30 days). Refreshing in background...`);
+      // Fire-and-forget refresh (don't block the user)
+      refreshBookMetadata(cleanIsbn, async (isbn, data) => {
+        await supabaseAdmin
+          .from('books')
+          .update(data)
+          .eq('isbn', isbn);
+      }).catch(console.error);
+    }
   }
 
   console.log('Existing book found:', !!existingBook)
@@ -209,19 +223,23 @@ export async function processIsbnScan(
         : 'Book not found in standard libraries. Initiating AI web search...');
 
       // Create a minimal book record with just the ISBN (or the thin data we have)
+      // Hybrid cache strategy: Store data but mark with last_synced_at for staleness checking
+      const insertData: any = {
+        isbn: cleanIsbn,
+        title: bookData?.title || `Unknown Book (ISBN: ${cleanIsbn})`,
+        author: bookData?.author || 'Unknown Author',
+        cover_url: bookData?.cover_url || null,
+        description: bookData?.description || null,
+        publisher: bookData?.publisher || null,
+        published_date: bookData?.published_date || null,
+        page_count: bookData?.page_count || null,
+        categories: bookData?.categories || null,
+        last_synced_at: new Date().toISOString(), // Set sync date for staleness checking
+      }
+      
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
-        .insert({
-          isbn: cleanIsbn,
-          title: bookData?.title || `Unknown Book (ISBN: ${cleanIsbn})`,
-          author: bookData?.author || 'Unknown Author',
-          cover_url: bookData?.cover_url || null,
-          description: bookData?.description || null,
-          publisher: bookData?.publisher || null,
-          published_date: bookData?.published_date || null,
-          page_count: bookData?.page_count || null,
-          categories: bookData?.categories || null
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -293,7 +311,8 @@ export async function processIsbnScan(
               author: cachedWebSearchResult.book_author || 'Unknown Author',
               description: cachedWebSearchResult.book_description || null,
               categories: cachedWebSearchResult.book_categories || null,
-              cover_url: cachedWebSearchResult.book_cover_url || null
+              cover_url: cachedWebSearchResult.book_cover_url || null,
+              last_synced_at: new Date().toISOString(), // Update sync date when refreshing
             })
             .eq('id', bookId)
             .select()
@@ -385,7 +404,8 @@ export async function processIsbnScan(
         console.error('Error with AI agent book search:', warningError)
       }
     } else {
-      // Insert book with real metadata
+      // Hybrid cache strategy: Store all metadata with last_synced_at timestamp
+      // Data is treated as a temporary cache that expires after 30 days
       console.log('Creating new book record with metadata:', bookData.title)
       onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
 
@@ -401,7 +421,8 @@ export async function processIsbnScan(
           publisher: bookData.publisher || null,
           published_date: bookData.published_date || null,
           page_count: bookData.page_count || null,
-          categories: bookData.categories || null
+          categories: bookData.categories || null,
+          last_synced_at: new Date().toISOString(), // CRITICAL: Set sync date for staleness checking
         })
         .select()
         .single()
@@ -684,7 +705,14 @@ export async function processIsbnScan(
               console.error('Failed to insert AI-generated warnings:', insertError)
             }
           } else {
-            onProgress?.('AI analysis complete. No specific warnings generated.');
+            // Check if the failure was due to missing API key
+            const isConfigError = result.reasoning?.includes('OPENAI_API_KEY') || result.reasoning?.includes('Configuration error');
+            if (isConfigError) {
+              onProgress?.('⚠️ AI analysis failed: OpenAI API key not configured. Please set OPENAI_API_KEY in environment variables.');
+              console.error('❌ OpenAI API key missing:', result.reasoning);
+            } else {
+              onProgress?.('AI analysis complete. No specific warnings generated.');
+            }
           }
         }
       } else {

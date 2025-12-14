@@ -77,3 +77,9 @@ The scraping provides minimal value and poses legal/ethical risks. We should:
 3. Update transparency page to be accurate
 4. Focus on legitimate data sources
 
+
+
+
+
+
+

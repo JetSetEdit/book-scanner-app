@@ -365,3 +365,9 @@ return (
 4. **Offline Mode:** Cache scanned ISBNs if network unavailable
 5. **Image Upload:** Allow users to upload barcode photo instead of live scan
 
+
+
+
+
+
+

@@ -422,6 +422,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'moderate'
       },
       {
+        id: 'cultural_appropriation',
+        userLabel: 'Cultural Appropriation / Colonial Themes',
+        shortDescription: 'Cultural appropriation, colonial themes, exploitation of Indigenous or marginalized cultures, or problematic representation of cultural groups.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
         id: 'other_discrimination',
         userLabel: 'Other Discrimination',
         shortDescription: 'Other forms of discrimination not covered by specific subcategories.',

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { fetchBookByISBN } from "@/lib/book-api"
 import { generateContentWarnings } from "@/lib/content-warning-agent"
+import { isStale, refreshBookMetadata } from "@/lib/book-cache"
 
 export async function ensureBookExists(isbn: string) {
     const supabase = await createClient()
@@ -13,7 +14,7 @@ export async function ensureBookExists(isbn: string) {
     }
 
     try {
-        // 1. Check if book exists in DB
+        // 1. Check if book exists in DB (the "Cache" lookup)
         const { data: existingBook } = await supabase
             .from("books")
             .select("*")
@@ -21,10 +22,25 @@ export async function ensureBookExists(isbn: string) {
             .maybeSingle()
 
         if (existingBook) {
+            // --- COMPLIANCE CHECK: Staleness Check ---
+            // If data is stale (>30 days), refresh in background
+            // This proves we aren't keeping a permanent, never-updated copy
+            if (isStale(existingBook.last_synced_at)) {
+                console.log(`[Cache] Book ${cleanIsbn} is stale (>30 days). Refreshing in background...`);
+                // Fire-and-forget refresh (don't block the user)
+                refreshBookMetadata(cleanIsbn, async (isbn, data) => {
+                    await supabase
+                        .from("books")
+                        .update(data)
+                        .eq("isbn", isbn);
+                }).catch(console.error);
+            }
+            
             return { success: true, book: existingBook }
         }
 
-        // 2. Book doesn't exist, fetch from external APIs
+        // 2. Book doesn't exist in cache, fetch from external APIs
+        console.log(`[Miss] Book ${cleanIsbn} not found. Fetching from APIs...`);
         const bookData = await fetchBookByISBN(cleanIsbn)
 
         if (!bookData) {
@@ -33,7 +49,8 @@ export async function ensureBookExists(isbn: string) {
             }
         }
 
-        // 3. Insert book into database
+        // 3. Store book data with last_synced_at timestamp
+        // This applies to both Open Library and Google Books (hybrid cache strategy)
         const { data: newBook, error: insertError } = await supabase
             .from("books")
             .insert({
@@ -47,6 +64,7 @@ export async function ensureBookExists(isbn: string) {
                 page_count: bookData.page_count,
                 categories: bookData.categories,
                 classification_rating: bookData.classification_rating || null,
+                last_synced_at: new Date().toISOString(), // CRITICAL: Set sync date for staleness checking
             })
             .select()
             .single()
@@ -56,7 +74,7 @@ export async function ensureBookExists(isbn: string) {
             return { error: "Failed to save book data. Please try again." }
         }
 
-        // 4. Generate and insert content warnings
+        // 5. Generate and insert content warnings
         // We do this asynchronously but await it here to ensure the user sees them immediately
         // In a production app, this might be better as a background job
         const { content_warnings: warnings } = await generateContentWarnings({

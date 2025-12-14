@@ -119,3 +119,9 @@ For now, the easiest solution is to enable camera permissions in Safari:
 
 This should work, though you may see security warnings.
 
+
+
+
+
+
+

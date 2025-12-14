@@ -7,15 +7,15 @@ const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function rescanBook(isbn: string) {
-    console.log(`🔄 Rescanning ISBN: ${isbn}`)
+    console.log(`🔄 Rescanning ISBN: ${isbn} (force refresh enabled)`)
 
-    // Call the scan API endpoint
-    const response = await fetch(`http://localhost:3001/api/scan-isbn`, {
+    // Call the scan API endpoint with forceRefresh to regenerate warnings
+    const response = await fetch(`http://localhost:3000/api/scan-isbn`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ isbn })
+        body: JSON.stringify({ isbn, stream: true, forceRefresh: true })
     })
 
     if (!response.ok) {
@@ -48,8 +48,17 @@ async function rescanBook(isbn: string) {
                 }
                 try {
                     const parsed = JSON.parse(data)
-                    if (parsed.type === 'progress') {
-                        console.log(`   ${parsed.message}`)
+                    if (parsed.status) {
+                        console.log(`   ${parsed.status}`)
+                    }
+                    if (parsed.result) {
+                        console.log('✅ Rescan complete!')
+                        if (parsed.result.contentWarningsGenerated) {
+                            console.log(`   Generated ${parsed.result.scan?.warnings?.length || 0} content warnings`)
+                        }
+                    }
+                    if (parsed.error) {
+                        console.error(`   ❌ Error: ${parsed.error}`)
                     }
                 } catch (e) {
                     // Ignore parse errors
