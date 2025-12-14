@@ -41,13 +41,13 @@ const navigation = [
   },
 ]
 
-// Check if we're in dev mode
+// Check if we're in dev mode (only localhost/127.0.0.1, not production)
 function isDevMode(): boolean {
   if (typeof window === 'undefined') return false
+  // Only show dev features on localhost - never in production
   return (
     window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1' ||
-    process.env.NODE_ENV === 'development'
+    window.location.hostname === '127.0.0.1'
   )
 }
 
