@@ -106,12 +106,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
 
   if (!warnings || warnings.length === 0) {
     return (
-      <div className="py-12 text-center border-y border-slate-100">
+      <div className="py-12 text-center border-y border-border">
         <div className="flex justify-center mb-4">
-          <CheckCircle className="h-8 w-8 text-slate-300" />
+          <CheckCircle className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-serif font-medium text-slate-900 mb-1">No Content Warnings</h3>
-        <p className="text-slate-400 text-sm">This book hasn't been flagged for any sensitive content yet.</p>
+        <h3 className="text-lg font-serif font-medium text-foreground mb-1">No Content Warnings</h3>
+        <p className="text-muted-foreground text-sm">This book hasn't been flagged for any sensitive content yet.</p>
       </div>
     )
   }
@@ -126,23 +126,23 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
   return (
     <div className="space-y-16">
       {showMentalHealthResources && (
-        <div className="bg-slate-50 p-6 rounded-none border-l-2 border-slate-900">
+        <div className="bg-muted p-6 rounded-none border-l-2 border-border">
           <div className="flex items-start gap-4">
-            <Phone className="h-5 w-5 text-slate-900 shrink-0 mt-0.5" />
+            <Phone className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-bold text-slate-900 uppercase tracking-widest text-xs mb-2">Support Resources</h3>
-              <p className="text-sm text-slate-600 mb-4 leading-relaxed font-serif italic">
+              <h3 className="font-bold text-foreground uppercase tracking-widest text-xs mb-2">Support Resources</h3>
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed font-serif italic">
                 If the themes in this book are affecting you, help is available.
               </p>
-              <div className="flex flex-wrap gap-6 text-xs font-medium uppercase tracking-wider text-slate-500">
-                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition-colors">
-                  Lifeline <span className="text-slate-300 ml-1">13 11 14</span>
+              <div className="flex flex-wrap gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
                 </a>
-                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition-colors">
-                  Beyond Blue <span className="text-slate-300 ml-1">1300 22 4636</span>
+                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
                 </a>
-                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition-colors">
-                  Kids Helpline <span className="text-slate-300 ml-1">1800 55 1800</span>
+                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
                 </a>
               </div>
             </div>
@@ -245,7 +245,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                 className="h-4 w-4"
               />
             </div>
-            <h4 className="font-bold text-slate-900 text-sm uppercase tracking-wide">
+            <h4 className="font-bold text-foreground text-sm uppercase tracking-wide">
               {categoryLabel}
             </h4>
           </div>
@@ -253,9 +253,9 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
           <div className="flex items-center gap-2 pl-9">
             <span className={cn(
               "text-[10px] font-bold uppercase tracking-widest",
-              warning.severity === "severe" && "text-red-600",
-              warning.severity === "moderate" && "text-orange-600",
-              warning.severity === "mild" && "text-yellow-600"
+              warning.severity === "severe" && "text-red-600 dark:text-red-500",
+              warning.severity === "moderate" && "text-orange-600 dark:text-orange-500",
+              warning.severity === "mild" && "text-yellow-600 dark:text-yellow-500"
             )}>
               {warning.severity} Intensity
             </span>
@@ -264,7 +264,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
 
         {/* Right: Description & Actions */}
         <div className="flex-1">
-          <p className="text-slate-600 text-base leading-relaxed font-serif mb-3">
+          <p className="text-muted-foreground text-base leading-relaxed font-serif mb-3">
             {warning.description}
           </p>
 
@@ -279,22 +279,22 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             {isAi && warning.reasoning && (
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs text-slate-400 hover:text-purple-600 px-2">
+                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2">
                     <Info className="h-3 w-3 mr-1" /> Reasoning
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="max-w-xs p-4 text-xs bg-white border border-slate-100 shadow-xl text-slate-600">
-                  <p className="font-bold text-slate-900 mb-1 uppercase tracking-wider text-[10px]">AI Reasoning</p>
+                <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
+                  <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">AI Reasoning</p>
                   {warning.reasoning}
                   {warning.source_url && (
                     <>
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="font-bold text-slate-900 mb-1 uppercase tracking-wider text-[10px]">Source</p>
+                      <div className="mt-3 pt-3 border-t border-border">
+                        <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">Source</p>
                         <a
                           href={warning.source_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-purple-600 hover:text-purple-700 break-all"
+                          className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 break-all"
                         >
                           {warning.source_url}
                         </a>
@@ -310,7 +310,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                 href={warning.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 flex items-center gap-1"
+                className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-1"
               >
                 Source <ExternalLink className="h-3 w-3" />
               </a>

@@ -130,14 +130,14 @@ export function Navbar() {
 
   return (
     <>
-      <nav className="relative z-40 border-b border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60">
+      <nav className="relative z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4">
           {/* Top Row: Logo, Search, Desktop Nav */}
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
               <img src="/logo_var_2.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
-              <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-slate-900 hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
+              <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-foreground hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
             </Link>
 
             {/* Search - Desktop */}
@@ -326,7 +326,7 @@ export function Navbar() {
       </nav>
 
       {/* Mobile Navigation - Bottom Bar PWA Style */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-amber-100 bg-amber-50/95 backdrop-blur supports-[backdrop-filter]:bg-amber-50/60 safe-area-inset-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-area-inset-bottom">
         <div className="flex items-center justify-around h-16 px-2">
           {visibleNavigation.map((item) => {
             const isActive = pathname === item.href
