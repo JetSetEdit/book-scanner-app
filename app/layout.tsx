@@ -52,7 +52,7 @@ export default function RootLayout({
           attribute="class"
           defaultTheme="light"
           enableSystem
-          disableTransitionOnChange
+          disableTransitionOnChange={false}
         >
           <Navbar />
           <main className="flex-1 pb-16 md:pb-0">

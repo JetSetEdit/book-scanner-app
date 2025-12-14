@@ -82,7 +82,8 @@
 
   --muted: oklch(0.25 0.01 85);
   /* Neutral, low chroma */
-  --muted-foreground: oklch(0.7 0.01 85);
+  --muted-foreground: oklch(0.82 0.01 85);
+  /* Brighter for better readability in low light (~#D1D5DB) */
 
   --accent: oklch(0.25 0.01 85);
   /* Neutral, low chroma */
@@ -185,5 +186,16 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: hidden;
+  }
+
+  /* Smooth theme transitions - prevents flashbang effect */
+  *,
+  *::before,
+  *::after {
+    transition: background-color 0.3s ease, 
+                color 0.3s ease, 
+                border-color 0.3s ease,
+                fill 0.3s ease,
+                stroke 0.3s ease;
   }
 }
