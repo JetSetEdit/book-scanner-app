@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import Link from "next/link"
 import { SeverityScoreBadge } from "@/components/severity-score-badge"
 import { GoogleBooksAttribution } from "@/components/google-books-attribution"
+import { ShareButton } from "@/components/ShareButton"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -186,6 +187,13 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                     ) : (
                       "Unknown Author"
                     )}
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <ShareButton 
+                      title={book.title} 
+                      author={book.author || "Unknown Author"} 
+                      isbn={book.isbn} 
+                    />
                   </div>
                 </div>
                 {/* Severity Score Badge - Dev Only */}
