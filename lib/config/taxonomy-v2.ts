@@ -115,6 +115,81 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         shortDescription: 'Sexual themes, discussions, references (non-explicit).',
         defaultSeverityHint: 'mild'
       },
+      // Sexual Dynamics & Framing
+      {
+        id: 'power_imbalance',
+        userLabel: 'Power Imbalance',
+        shortDescription: 'Sexual or romantic dynamics involving authority, dependency, or unequal power (e.g., boss/employee, teacher/student, age gaps).',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'consent_ambiguity',
+        userLabel: 'Ambiguous or Non-Explicit Consent',
+        shortDescription: 'Consent is unclear, negotiated implicitly, or framed as resistance/desire tension.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'coercion_pressure',
+        userLabel: 'Sexual Coercion / Pressure',
+        shortDescription: 'Emotional pressure, manipulation, or obligation leading to sexual activity.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'degradation_humiliation',
+        userLabel: 'Degradation / Humiliation',
+        shortDescription: 'Sexual content involving humiliation, degradation, or verbal diminishment.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'possessive_dynamics',
+        userLabel: 'Possessive or Obsessive Dynamics',
+        shortDescription: 'Sexual or romantic framing involving ownership, obsession, or control.',
+        defaultSeverityHint: 'moderate'
+      },
+      // Kink / Sexual Practices (Neutral Descriptors)
+      {
+        id: 'bdsm_themes',
+        userLabel: 'BDSM Themes',
+        shortDescription: 'Power exchange, dominance/submission, or restraint themes.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'roleplay',
+        userLabel: 'Sexual Roleplay',
+        shortDescription: 'Sexual roleplay scenarios as part of intimacy.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'exhibitionism_voyeurism',
+        userLabel: 'Exhibitionism / Voyeurism',
+        shortDescription: 'Sexual content involving being watched or watching.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'taboo_fetish_themes',
+        userLabel: 'Taboo or Fetish Themes',
+        shortDescription: 'Fetish-focused sexual framing outside mainstream romance norms.',
+        defaultSeverityHint: 'moderate'
+      },
+      // Sexual Shaming & Language
+      {
+        id: 'slut_shaming',
+        userLabel: 'Sexual Shaming Language',
+        shortDescription: 'Language that shames or devalues characters for sexual behaviour.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'purity_culture',
+        userLabel: 'Purity / Virginity Framing',
+        shortDescription: 'Sexual value tied to virginity, purity, or sexual restraint.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'misogynistic_sexual_language',
+        userLabel: 'Gendered Sexual Degradation',
+        shortDescription: 'Sexually degrading language targeting women or gendered characters.',
+        defaultSeverityHint: 'severe'
+      },
       {
         id: 'other_sexual_content',
         userLabel: 'Other Sexual Content',

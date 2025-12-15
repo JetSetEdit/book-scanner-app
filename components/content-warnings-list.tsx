@@ -28,12 +28,15 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
-import { getCategoryById } from "@/lib/config/taxonomy"
+import { getCategoryById, getSubcategoryById } from "@/lib/config/taxonomy-v2"
+import { TagWithTooltip } from "@/components/tag-with-tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 interface ContentWarning {
   id: string
   category: string
   category_id?: string | null
+  subcategory_id?: string | null
   confidence_score?: number | null
   description: string
   severity: "mild" | "moderate" | "severe"
@@ -124,7 +127,8 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
   const standardAiWarnings = aiWarnings.filter(w => w.is_author_verified !== true)
 
   return (
-    <div className="space-y-16">
+    <TooltipProvider>
+      <div className="space-y-16">
       {showMentalHealthResources && (
         <div className="bg-muted p-6 rounded-none border-l-2 border-border">
           <div className="flex items-start gap-4">
@@ -216,12 +220,31 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
           All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment.
         </p>
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
 
 function WarningItem({ warning, isAi = false, isVerified = false }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean }) {
-  const categoryLabel = (warning.category_id ? getCategoryById(warning.category_id)?.userLabel : null) || categoryLabels[warning.category] || warning.category;
+  // Safely get category label with fallbacks
+  let categoryLabel: string;
+  try {
+    categoryLabel = (warning.category_id ? getCategoryById(warning.category_id)?.userLabel : null) || categoryLabels[warning.category] || warning.category || 'Unknown Category';
+  } catch (error) {
+    console.error('Error getting category label:', error);
+    categoryLabel = categoryLabels[warning.category] || warning.category || 'Unknown Category';
+  }
+
+  // Safely get subcategory label
+  let subcategoryLabel: string | null = null;
+  try {
+    if (warning.category_id && warning.subcategory_id) {
+      subcategoryLabel = getSubcategoryById(warning.category_id, warning.subcategory_id)?.userLabel || null;
+    }
+  } catch (error) {
+    console.error('Error getting subcategory label:', error);
+    subcategoryLabel = null;
+  }
 
   return (
     <div className={cn(
@@ -245,9 +268,18 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                 className="h-4 w-4"
               />
             </div>
-            <h4 className="font-bold text-foreground text-sm uppercase tracking-wide">
-              {categoryLabel}
-            </h4>
+            <div className="flex flex-col gap-1">
+              <TagWithTooltip 
+                label={categoryLabel} 
+                className="font-bold text-foreground text-sm uppercase tracking-wide" 
+              />
+              {subcategoryLabel && (
+                <TagWithTooltip 
+                  label={subcategoryLabel} 
+                  className="text-xs text-muted-foreground font-medium" 
+                />
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 pl-9">
