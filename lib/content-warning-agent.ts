@@ -780,16 +780,25 @@ I need you to find information about a book with ISBN: ${isbn}
     console.error("AI book search failed:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // Check if it's a missing API key error
+    // Check for different error types
     const isMissingKey = errorMessage.includes('apiKey') || errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('Missing credentials');
+    const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('exceeded') || errorMessage.includes('billing');
+    const isRateLimitError = errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('TPM') || errorMessage.includes('RPM');
+    
+    let reasoning = `Error during AI search: ${errorMessage}`;
+    if (isMissingKey) {
+      reasoning = `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`;
+    } else if (isQuotaError) {
+      reasoning = `Error during AI search: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.`;
+    } else if (isRateLimitError) {
+      reasoning = `Error: ${errorMessage} (Note: Deep web search could not confirm this safety rating due to lack of online results. Manual review recommended.)`;
+    }
     
     return {
       book_found: false,
       content_warnings: [],
       confidence: 'low',
-      reasoning: isMissingKey 
-        ? `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`
-        : `Error during AI search: ${errorMessage}`
+      reasoning
     };
   }
 };
@@ -917,15 +926,24 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
     console.error("AI content warning generation failed:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
-    // Check if it's a missing API key error
+    // Check for different error types
     const isMissingKey = errorMessage.includes('apiKey') || errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('Missing credentials');
+    const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('exceeded') || errorMessage.includes('billing');
+    const isRateLimitError = errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('TPM') || errorMessage.includes('RPM');
+    
+    let reasoning = `Error: ${errorMessage}`;
+    if (isMissingKey) {
+      reasoning = `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`;
+    } else if (isQuotaError) {
+      reasoning = `Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.`;
+    } else if (isRateLimitError) {
+      reasoning = `Error: ${errorMessage}`;
+    }
     
     return {
       content_warnings: [],
       confidence: 'low',
-      reasoning: isMissingKey
-        ? `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`
-        : `Error: ${errorMessage}`
+      reasoning
     };
   }
 };

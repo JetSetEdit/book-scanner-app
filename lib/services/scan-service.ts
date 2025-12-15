@@ -705,11 +705,17 @@ export async function processIsbnScan(
               console.error('Failed to insert AI-generated warnings:', insertError)
             }
           } else {
-            // Check if the failure was due to missing API key
+            // Check if the failure was due to missing API key, quota, or rate limits
             const isConfigError = result.reasoning?.includes('OPENAI_API_KEY') || result.reasoning?.includes('Configuration error');
+            const isQuotaError = result.reasoning?.includes('quota') || result.reasoning?.includes('429') || result.reasoning?.includes('exceeded');
+            const isRateLimitError = result.reasoning?.includes('rate limit') || result.reasoning?.includes('Rate limit');
+            
             if (isConfigError) {
               onProgress?.('⚠️ AI analysis failed: OpenAI API key not configured. Please set OPENAI_API_KEY in environment variables.');
               console.error('❌ OpenAI API key missing:', result.reasoning);
+            } else if (isQuotaError || isRateLimitError) {
+              onProgress?.('⚠️ AI analysis failed: OpenAI API quota exceeded or rate limit reached. Please check your OpenAI account billing and limits.');
+              console.error('❌ OpenAI API quota/rate limit error:', result.reasoning);
             } else {
               onProgress?.('AI analysis complete. No specific warnings generated.');
             }
