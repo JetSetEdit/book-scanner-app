@@ -11,6 +11,7 @@ import Link from "next/link"
 import { SeverityScoreBadge } from "@/components/severity-score-badge"
 import { GoogleBooksAttribution } from "@/components/google-books-attribution"
 import { ShareButton } from "@/components/ShareButton"
+import { BuyButton } from "@/components/BuyButton"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -189,6 +190,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                     )}
                   </div>
                   <div className="flex gap-2 mt-4">
+                    <BuyButton isbn={book.isbn} />
                     <ShareButton 
                       title={book.title} 
                       author={book.author || "Unknown Author"} 
