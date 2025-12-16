@@ -16,6 +16,8 @@ import { AccessibleAudioPlayer } from "@/components/accessible-audio-player"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
+import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
 
 export default function ScanTestPage() {
   // Browser storage for last ISBN
@@ -208,7 +210,17 @@ export default function ScanTestPage() {
   }
 
   return (
-    <div className="container mx-auto py-12 px-4 max-w-2xl">
+    <>
+      {/* Dev-only Debug Sidebar */}
+      <ScanDebugSidebar
+        statusUpdates={statusUpdates}
+        loading={loading}
+        result={result}
+        error={error}
+        onClear={() => setStatusUpdates([])}
+      />
+      
+      <div className="container mx-auto py-12 px-4 max-w-2xl">
       <Card>
         <CardHeader>
           <CardTitle>Scan Book</CardTitle>
@@ -351,24 +363,37 @@ export default function ScanTestPage() {
             </Alert>
           )}
 
-          {/* Status Updates */}
-          {(loading || statusUpdates.length > 0) && !result && !candidates && !error && (
-            <div className="mb-6 space-y-2 border rounded-lg p-4 bg-muted/30">
-              <h3 className="font-semibold text-sm">Progress:</h3>
-              <div className="space-y-1">
-                {statusUpdates.map((update, i) => (
-                  <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground animate-in fade-in slide-in-from-bottom-1 duration-300">
-                     {i === statusUpdates.length - 1 && loading ? (
-                        <Loader2 className="h-3 w-3 animate-spin text-primary" /> 
-                     ) : (
-                        <CheckCircle className="h-3 w-3 text-green-500" />
-                     )}
-                    <span className={i === statusUpdates.length - 1 ? "text-foreground font-medium" : ""}>{update}</span>
+          {/* Simplified Progress Display */}
+          {(() => {
+            const currentStage = getCurrentStage(statusUpdates)
+            const shouldShowLoader = loading && currentStage !== null && !result && !candidates && !error
+            
+            if (!shouldShowLoader) return null
+
+            const StageIcon = currentStage.icon
+
+            return (
+              <div className="mb-6 border rounded-lg p-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <StageIcon className="h-5 w-5 text-primary" />
+                    {loading && (
+                      <Loader2 className="h-3 w-3 animate-spin text-primary absolute -top-1 -right-1" />
+                    )}
                   </div>
-                ))}
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground">{currentStage.displayText}</p>
+                    <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${(currentStage.stage / 4) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
           
           {candidates && (
             <div className="space-y-4 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -552,5 +577,6 @@ export default function ScanTestPage() {
         </CardContent>
       </Card>
     </div>
+    </>
   )
 }
