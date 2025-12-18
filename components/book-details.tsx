@@ -12,6 +12,8 @@ import { SeverityScoreBadge } from "@/components/severity-score-badge"
 import { GoogleBooksAttribution } from "@/components/google-books-attribution"
 import { ShareButton } from "@/components/ShareButton"
 import { BuyButton } from "@/components/BuyButton"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Info } from "lucide-react"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -89,7 +91,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
             ← Back to Bookshelf
           </Button>
           <div className="flex items-center gap-4">
-            <Link href="/scan-test">
+            <Link href="/scan">
               <Button variant="outline" size="sm" className="gap-2 text-xs font-bold tracking-widest uppercase">
                 <ScanBarcode className="h-3 w-3" />
                 Scan Another
@@ -108,9 +110,23 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
             <div className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-muted">
               {book.cover_url ? (
                 <img
-                  src={book.cover_url}
+                  src={book.cover_url.startsWith('http') 
+                    ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                    : book.cover_url}
                   alt={`Cover of ${book.title}`}
                   className="object-cover w-full h-full"
+                  onError={(e) => {
+                    // If image fails to load (CORS, broken URL, etc.), show placeholder
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent && !parent.querySelector('.cover-placeholder')) {
+                      const placeholder = document.createElement('div');
+                      placeholder.className = 'cover-placeholder w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-serif italic text-sm';
+                      placeholder.textContent = 'Image not available';
+                      parent.appendChild(placeholder);
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-serif italic">
@@ -197,6 +213,76 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                       isbn={book.isbn} 
                     />
                   </div>
+                  {/* Australian Classification Rating */}
+                  {(() => {
+                    const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
+                    const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+                    
+                    // Generate explanation based on classification and warnings
+                    const getClassificationExplanation = (rating: string): { main: string; process: string; disclaimer: string } => {
+                      const severeCount = warnings.filter((w: any) => w.severity === 'severe').length
+                      const moderateCount = warnings.filter((w: any) => w.severity === 'moderate').length
+                      const mildCount = warnings.filter((w: any) => w.severity === 'mild').length
+                      
+                      let mainExplanation = ''
+                      switch (rating) {
+                        case 'G':
+                          mainExplanation = 'General: Suitable for all ages. Contains no material likely to offend or harm.'
+                          break
+                        case 'PG':
+                          mainExplanation = `Parental Guidance: May contain mild themes or content. ${mildCount > 0 ? `Includes ${mildCount} mild content warning${mildCount > 1 ? 's' : ''}.` : 'No specific content warnings.'}`
+                          break
+                        case 'M':
+                          mainExplanation = `Mature: Recommended for ages 15+. ${moderateCount > 0 ? `Contains ${moderateCount} moderate content warning${moderateCount > 1 ? 's' : ''}.` : severeCount > 0 ? `Contains ${severeCount} severe content warning${severeCount > 1 ? 's' : ''}.` : 'Contains mature themes.'}`
+                          break
+                        case 'MA15+':
+                          mainExplanation = `Mature Accompanied: Restricted to ages 15+. ${severeCount > 0 ? `Contains ${severeCount} severe content warning${severeCount > 1 ? 's' : ''} including graphic or intense content.` : moderateCount > 0 ? `Contains ${moderateCount} moderate content warning${moderateCount > 1 ? 's' : ''} with mature themes.` : 'Contains intense or graphic content.'}`
+                          break
+                        case 'R18+':
+                          mainExplanation = `Restricted: Adults only (18+). Contains explicit content including ${severeCount > 0 ? `${severeCount} severe warning${severeCount > 1 ? 's' : ''}` : 'graphic material'} that may be disturbing or offensive.`
+                          break
+                        default:
+                          mainExplanation = `Content Rating: ${rating}. Based on content analysis.`
+                      }
+                      
+                      const processExplanation = 'How it works: Our AI analyzes the book\'s content and assigns severity scores (0.0-1.0) to each warning. The classification is determined by the highest severity found—severe warnings indicate MA15+/R18+, moderate indicates M, mild indicates PG, and no warnings indicates G.'
+                      
+                      const disclaimer = 'This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.'
+                      
+                      return { main: mainExplanation, process: processExplanation, disclaimer }
+                    }
+                    
+                    return classificationRating && (
+                      <div className="flex items-center gap-2 mt-4">
+                        <span className="text-sm font-medium text-muted-foreground">Content Rating:</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5 cursor-help">
+                                <span className="text-sm font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
+                                  {classificationRating}
+                                </span>
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-sm">
+                              <div className="text-sm space-y-3">
+                                <p>{getClassificationExplanation(classificationRating).main}</p>
+                                <div className="border-t border-border pt-2">
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    {getClassificationExplanation(classificationRating).process}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground italic">
+                                    {getClassificationExplanation(classificationRating).disclaimer}
+                                  </p>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    )
+                  })()}
                 </div>
                 {/* Severity Score Badge - Dev Only */}
                 <div className="flex-shrink-0">

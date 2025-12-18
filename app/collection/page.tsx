@@ -182,7 +182,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                     "Bookshelf"
                   )}
                 </h1>
-                <Link href="/scan-test" className="self-start sm:self-auto">
+                <Link href="/scan" className="self-start sm:self-auto">
                   <Button size="sm" className="gap-2">
                     <ScanBarcode className="h-4 w-4" />
                     Scan Book
@@ -266,7 +266,9 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                             <div className="w-20 h-32 bg-muted rounded-lg overflow-hidden relative">
                               {book.cover_url ? (
                                 <Image
-                                  src={book.cover_url}
+                                  src={book.cover_url.startsWith('http') 
+                                    ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                                    : book.cover_url}
                                   alt={`Cover of ${book.title}`}
                                   fill
                                   className="object-cover"
@@ -333,7 +335,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
                           {/* Classification Rating */}
                           {(() => {
-                            const classificationRating = (book as any).classification_rating || getClassificationFromCategories(book.categories || undefined)
+                            const classificationRating = getClassificationFromCategories(book.categories || undefined)
                             return classificationRating && (
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium">Classification:</span>

@@ -229,7 +229,9 @@ export function SearchComponent({ className }: SearchProps) {
                   <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
                     {book.cover_url ? (
                       <Image
-                        src={book.cover_url}
+                        src={book.cover_url.startsWith('http') 
+                          ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                          : book.cover_url}
                         alt={`Cover of ${book.title}`}
                         fill
                         className="object-cover"

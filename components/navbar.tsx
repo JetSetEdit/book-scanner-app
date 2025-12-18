@@ -4,10 +4,11 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect, useMemo } from "react"
 import { useTheme } from "next-themes"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { SparksCounter } from "@/components/sparks-counter"
+import { BookSpineLogo } from "@/components/book-spine-logo"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +27,7 @@ const navigation = [
   },
   {
     name: "Scan",
-    href: "/scan-test",
+    href: "/scan",
     icon: ScanBarcode,
   },
   {
@@ -136,7 +137,7 @@ export function Navbar() {
           <div className="flex h-16 items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
-              <img src="/logo_var_2.png" alt="Subtext Logo" className="h-10 w-10 object-contain" />
+              <BookSpineLogo className="h-10 w-10 text-foreground" />
               <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-foreground hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
             </Link>
 
@@ -305,6 +306,28 @@ export function Navbar() {
                     </div>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/test-cover" className="flex items-center gap-2 cursor-pointer">
+                      <ScanBarcode className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Cover Test Page</div>
+                        <div className="text-xs text-muted-foreground">
+                          Test ISBN scanning and cover display
+                        </div>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/dev/check-covers" className="flex items-center gap-2 cursor-pointer">
+                      <ImageIcon className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Check Book Covers</div>
+                        <div className="text-xs text-muted-foreground">
+                          Validate covers for existing books
+                        </div>
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/dev/agent-comparison" className="flex items-center gap-2 cursor-pointer">
                       <Code className="h-4 w-4" />
