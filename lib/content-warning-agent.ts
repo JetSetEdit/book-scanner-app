@@ -347,6 +347,45 @@ ${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (defaul
    - Warning 1: \`category_id: "mental_health"\`, \`subcategory_id: "disordered_eating"\`
    - Warning 2: \`category_id: "mental_health"\`, \`subcategory_id: "anxiety"\`
 
+## CRITICAL: Categorical Shielding - Preventing Spoilers in Reasoning
+
+**THE CORE RULE**: The \`reasoning\` field MUST use **Categorical Taxonomy Language**, NOT narrative plot descriptions. This preserves the "Spoiler-Free" value proposition.
+
+### Reasoning Field Requirements (MANDATORY):
+
+1. **Use Standardized Taxonomy Terms**: Reference the category/subcategory taxonomy, not specific plot events.
+   - ❌ WRONG (Narrative): "Character A dies in a fire at the end of the book"
+   - ✅ CORRECT (Categorical): "Contains themes of character loss and accidental death"
+
+2. **Clinical Detail Level for Reasoning**: The \`reasoning\` field must ALWAYS use clinical, matter-of-fact language that describes the TYPE of content, not the SPECIFIC plot point.
+   - ❌ WRONG: "Sold as a child prostitute" (reveals specific plot)
+   - ✅ CORRECT: "Contains themes of systemic exploitation and sexual violence involving minors"
+
+3. **Severity ≠ Narrative Detail**: High severity scores (0.81-1.0) indicate impact/frequency, NOT permission to include more plot details in reasoning.
+   - High severity should trigger: "Contains pervasive themes of [category]" 
+   - NOT: "Character X experiences [specific plot event]"
+
+4. **Spoiler-Free Examples**:
+   - ❌ "Main character commits suicide in chapter 12"
+   - ✅ "Contains themes of self-harm and suicide"
+   - ❌ "Protagonist is raped by their father"
+   - ✅ "Contains themes of sexual violence and familial abuse"
+   - ❌ "Character dies from drug overdose"
+   - ✅ "Contains themes of substance abuse and accidental death"
+
+5. **What Reasoning Should Include**:
+   - The category/subcategory being warned about
+   - The general type of content (e.g., "themes of", "depictions of", "references to")
+   - Frequency/intensity indicators (e.g., "pervasive", "occasional", "brief")
+   - Context indicators (e.g., "on-page", "referenced", "implied") - but WITHOUT plot specifics
+
+6. **What Reasoning MUST NOT Include**:
+   - Specific character names or relationships
+   - Plot events or story beats
+   - Chapter numbers or timing within the narrative
+   - Specific methods or details of how events occur
+   - Character motivations or story outcomes
+
 ## Context Detection (CRITICAL)
 
 ### Presence Field (How content appears):
@@ -366,11 +405,14 @@ ${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (defaul
 - **vague**: Vague or minimal description, mostly implied
 - **clinical**: Clinical or matter-of-fact description without emotional detail
 
+**NOTE**: The \`detail_level\` field describes how the content appears IN THE BOOK. The \`reasoning\` field should ALWAYS use clinical language regardless of the book's detail_level.
+
 ### Spoiler Detection:
 - **is_spoiler**: Set to \`true\` if the warning reveals a major plot twist that isn't known from the back cover
 - Example: "Main Character Death" would be a spoiler if it's not mentioned in the book description
 - Example: "Contains violence" is NOT a spoiler (general content warning)
 - When in doubt, set to \`false\`
+- **CRITICAL**: If your reasoning field contains plot-specific information, you MUST set \`is_spoiler: true\` AND rewrite the reasoning to be categorical
 
 ## Scoring & Severity
 For each category, assign a score from 0.0 to 1.0 based on the intensity and frequency of the content:
@@ -395,6 +437,13 @@ Based on the highest severity score:
 7. Err on the side of caution - better to warn than to miss important content.
 8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
 9. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+10. **CRITICAL: Categorical Reasoning Enforcement**: Before submitting any warning, review the \`reasoning\` field. If it contains ANY of the following, rewrite it to be categorical:
+    - Character names or specific relationships
+    - Plot events or story beats
+    - Chapter numbers or timing
+    - Specific methods or details of events
+    - Story outcomes or character fates
+    Replace narrative descriptions with categorical taxonomy language (e.g., "themes of", "depictions of", "references to").
 
 If no content warnings are needed after thorough analysis (including web search if needed), return an empty array: []`
 });
@@ -431,7 +480,13 @@ const ContentWarningSchema = z.object({
   ),
   description: z.string().describe("User-facing description of the content"),
   score: z.number().min(0).max(1).describe("Severity score from 0.0 to 1.0"),
-  reasoning: z.string().describe("Technical explanation for the score"),
+  reasoning: z.string().describe(
+    "Categorical explanation for the score using standardized taxonomy terms. " +
+    "MUST use clinical, matter-of-fact language describing the TYPE of content (e.g., 'Contains themes of X', 'Depictions of Y'). " +
+    "MUST NOT include specific plot points, character names, story events, or narrative details. " +
+    "Example: 'Contains pervasive themes of sexual violence and exploitation' NOT 'Character is sold as a prostitute'. " +
+    "The reasoning should reference the category/subcategory and general content type, not specific plot occurrences."
+  ),
   presence: z.enum(['on_page', 'off_page', 'flashback', 'referenced', 'implied']).optional().default('on_page').describe(
     "How the content appears: 'on_page' (real-time description), 'off_page' (happens off-screen), " +
     "'flashback' (shown in flashback), 'referenced' (discussed but not shown), 'implied' (strongly implied but not explicit)."
@@ -519,7 +574,7 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
-    instructions: agentConfig.instructions + "\n\nWhen you have gathered all information and generated warnings, you MUST call the `submit_findings` tool with your results."
+    instructions: agentConfig.instructions + "\n\nWhen you have gathered all information and generated warnings, you MUST call the `submit_findings` tool with your results.\n\n**FINAL CHECK**: Before submitting, review each warning's \`reasoning\` field. If it contains plot-specific information (character names, events, story beats), rewrite it to use categorical taxonomy language only."
   });
 
   console.log('Agent created inside function:', agent);
@@ -541,6 +596,12 @@ I need you to find information about a book with ISBN: ${isbn}
 3. Assign a classification rating (G, PG, M, MA15+, R18+).
 4. Provide a confidence level and reasoning.
 5. CALL THE submit_findings TOOL WITH THE RESULT.
+
+**CRITICAL: Categorical Reasoning Enforcement**
+- For each warning's \`reasoning\` field, use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
+- DO NOT include specific plot points, character names, story events, or narrative details
+- Example: "Contains pervasive themes of sexual violence and exploitation" NOT "Character is sold as a prostitute"
+- The reasoning should describe the TYPE of content, not specific plot occurrences
 `;
 
   try {
@@ -631,7 +692,7 @@ export const generateContentWarnings = async (workflow: WorkflowInput, model: st
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
-    instructions: agentConfig.instructions + "\n\nWhen you have generated warnings, you MUST call the `submit_warnings` tool with your results."
+    instructions: agentConfig.instructions + "\n\nWhen you have generated warnings, you MUST call the `submit_warnings` tool with your results.\n\n**FINAL CHECK**: Before submitting, review each warning's \`reasoning\` field. If it contains plot-specific information (character names, events, story beats), rewrite it to use categorical taxonomy language only."
   });
 
   // Check if description is thin (less than 150 chars or just a quote)
@@ -659,6 +720,14 @@ This book may be a well-known classic or controversial work that requires thorou
 
 Please analyze this book and generate appropriate content warnings using Australian Classification Board standards. 
 ${isThinDescription ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : ''}
+
+**CRITICAL: Categorical Reasoning Enforcement**
+- For each warning's \`reasoning\` field, use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
+- DO NOT include specific plot points, character names, story events, or narrative details
+- Example: "Contains pervasive themes of sexual violence and exploitation" NOT "Character is sold as a prostitute"
+- Example: "Contains themes of character loss and accidental death" NOT "Character A dies in a fire at the end"
+- The reasoning should describe the TYPE of content, not specific plot occurrences
+- High severity scores indicate impact/frequency, NOT permission to include more plot details
 
 CALL THE submit_warnings TOOL WITH THE RESULT.
 `;
