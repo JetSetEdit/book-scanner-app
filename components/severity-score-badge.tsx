@@ -58,10 +58,10 @@ export function SeverityScoreBadge({ warnings, bookTitle }: SeverityScoreBadgePr
 
   let weightedSum = 0
   const breakdown = warnings.map(warning => {
-    const basePoints = SEVERITY_POINTS_EXPORT[warning.severity as keyof typeof SEVERITY_POINTS_EXPORT]
+    const basePoints = SEVERITY_POINTS_EXPORT[warning.severity as keyof typeof SEVERITY_POINTS_EXPORT] || 1
     const categoryWeight = warning.category_id 
       ? (CATEGORY_WEIGHTS_EXPORT[warning.category_id] || 1.0)
-      : (warning.category ? CATEGORY_WEIGHTS_EXPORT[warning.category] || 1.0 : 1.0)
+      : (warning.category ? (CATEGORY_WEIGHTS_EXPORT[warning.category] || 1.0) : 1.0)
     const contribution = basePoints * categoryWeight
     weightedSum += contribution
     return {

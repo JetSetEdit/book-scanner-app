@@ -28,7 +28,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
-import { getCategoryById } from "@/lib/config/taxonomy"
+import { getCategoryById } from "@/lib/config/taxonomy-v2"
 
 interface ContentWarning {
   id: string
@@ -99,7 +99,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
   // Check for sensitive topics to show resources
   const showMentalHealthResources = warnings.some(w =>
     ['mental_health', 'suicide', 'self_harm', 'abuse', 'substance_abuse'].includes(w.category) ||
-    (w.category_id && ['mental_health', 'self_harm_or_suicidal_ideation', 'substance_use_or_alcohol', 'emotional_abuse_or_toxic_relationships'].includes(w.category_id)) ||
+    (w.category_id && ['mental_health', 'substance_use_or_alcohol', 'emotional_abuse_or_toxic_relationships'].includes(w.category_id)) ||
     w.description.toLowerCase().includes('suicide') ||
     w.description.toLowerCase().includes('depression')
   );
@@ -221,7 +221,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
 }
 
 function WarningItem({ warning, isAi = false, isVerified = false }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean }) {
-  const categoryLabel = (warning.category_id ? getCategoryById(warning.category_id)?.userLabel : null) || categoryLabels[warning.category] || warning.category;
+  const categoryLabel = (warning.category_id ? (getCategoryById(warning.category_id)?.userLabel || null) : null) || categoryLabels[warning.category] || warning.category || 'Other';
 
   return (
     <div className={cn(
