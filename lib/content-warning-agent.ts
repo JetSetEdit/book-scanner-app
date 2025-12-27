@@ -779,3 +779,4 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
     };
   }
 };
+// Version 1.02 - Categorical Shielding deployed
