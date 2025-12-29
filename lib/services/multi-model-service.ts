@@ -369,22 +369,33 @@ export async function runMultiModelAnalysis(
         } as ModelResult
       }
     })()
-  ]).then(results => [
-    results[0].status === 'fulfilled' ? results[0].value : {
-      model: 'gpt-4o',
-      content_warnings: [],
-      confidence: 'low' as const,
-      reasoning: `Failed: ${results[0].status === 'rejected' ? results[0].reason : 'Unknown error'}`,
-      timing: 0
-    } as ModelResult,
-    results[1].status === 'fulfilled' ? results[1].value : {
-      model: 'gemini-2.5-flash',
-      content_warnings: [],
-      confidence: 'low' as const,
-      reasoning: `Failed: ${results[1].status === 'rejected' ? results[1].reason : 'Unknown error'}`,
-      timing: 0
-    } as ModelResult
-  ])
+  ]).then(results => {
+    const gpt4oResult = results[0].status === 'fulfilled' 
+      ? results[0].value 
+      : {
+          model: 'gpt-4o',
+          content_warnings: [],
+          confidence: 'low' as const,
+          reasoning: `Failed: ${results[0].status === 'rejected' 
+            ? (results[0].reason instanceof Error ? results[0].reason.message : String(results[0].reason))
+            : 'Unknown error'}`,
+          timing: 0
+        } as ModelResult
+    
+    const geminiResult = results[1].status === 'fulfilled'
+      ? results[1].value
+      : {
+          model: 'gemini-2.5-flash',
+          content_warnings: [],
+          confidence: 'low' as const,
+          reasoning: `Failed: ${results[1].status === 'rejected'
+            ? (results[1].reason instanceof Error ? results[1].reason.message : String(results[1].reason))
+            : 'Unknown error'}`,
+          timing: 0
+        } as ModelResult
+    
+    return [gpt4oResult, geminiResult]
+  })
 
   // Combine warnings
   const combinedWarnings = combineWarnings(
