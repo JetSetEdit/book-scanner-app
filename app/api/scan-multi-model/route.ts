@@ -165,10 +165,18 @@ export async function POST(request: NextRequest) {
     console.error('Multi-model scan error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorStack = error instanceof Error ? error.stack : undefined
-    console.error('Error stack:', errorStack)
+    const errorName = error instanceof Error ? error.name : 'Error'
+    console.error('Error details:', {
+      name: errorName,
+      message: errorMessage,
+      stack: errorStack
+    })
+    
+    // Return more detailed error for debugging
     return NextResponse.json({
       error: 'Failed to process multi-model scan',
       details: errorMessage,
+      errorType: errorName,
       ...(process.env.NODE_ENV === 'development' && { stack: errorStack })
     }, { status: 500 })
   }
