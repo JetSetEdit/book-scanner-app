@@ -15,7 +15,7 @@
  * - Mediation Flag: Whether content requires parental/educational mediation
  */
 
-export const TAXONOMY_VERSION = "2.0.0";
+export const TAXONOMY_VERSION = "2.3.0";
 export const MODEL_VERSION = "gpt-4o-2024-11-20";
 
 export interface WarningSubcategory {
@@ -115,6 +115,111 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         shortDescription: 'Sexual themes, discussions, references (non-explicit).',
         defaultSeverityHint: 'mild'
       },
+      // Sexual Dynamics & Framing
+      {
+        id: 'power_imbalance',
+        userLabel: 'Power Imbalance',
+        shortDescription: 'Sexual or romantic dynamics involving authority, dependency, or unequal power (e.g., boss/employee, teacher/student, age gaps).',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'consent_ambiguity',
+        userLabel: 'Ambiguous or Non-Explicit Consent (Dub-Con)',
+        shortDescription: 'Consent is unclear, negotiated implicitly, or framed as resistance/desire tension. Also known as "Dub-Con" in dark romance.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'cnc',
+        userLabel: 'Consensual Non-Consent (CNC)',
+        shortDescription: 'Consensual non-consent, CNC play, or negotiated non-consent scenarios. Distinct from actual non-consent.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'somnophilia',
+        userLabel: 'Somnophilia / Sleep Play',
+        shortDescription: 'Non-consensual or dub-consensual sexual acts while one partner is sleeping or unconscious.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'coercion_pressure',
+        userLabel: 'Sexual Coercion / Pressure',
+        shortDescription: 'Emotional pressure, manipulation, or obligation leading to sexual activity.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'degradation_humiliation',
+        userLabel: 'Degradation / Humiliation',
+        shortDescription: 'Sexual content involving humiliation, degradation, or verbal diminishment.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'possessive_dynamics',
+        userLabel: 'Possessive or Obsessive Dynamics',
+        shortDescription: 'Sexual or romantic framing involving ownership, obsession, or control.',
+        defaultSeverityHint: 'moderate'
+      },
+      // Kink / Sexual Practices (Neutral Descriptors)
+      {
+        id: 'bdsm_themes',
+        userLabel: 'BDSM Themes',
+        shortDescription: 'Power exchange, dominance/submission, or restraint themes.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'roleplay',
+        userLabel: 'Sexual Roleplay',
+        shortDescription: 'Sexual roleplay scenarios as part of intimacy.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'exhibitionism_voyeurism',
+        userLabel: 'Exhibitionism / Voyeurism',
+        shortDescription: 'Sexual content involving being watched or watching.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'taboo_fetish_themes',
+        userLabel: 'Taboo or Fetish Themes',
+        shortDescription: 'Fetish-focused sexual framing outside mainstream romance norms.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'breeding_kink',
+        userLabel: 'Breeding Kink',
+        shortDescription: 'Sexual focus on impregnation, breeding, or pregnancy as kink. Distinct from actual pregnancy/childbirth.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'knife_play',
+        userLabel: 'Knife Play / Blood Play',
+        shortDescription: 'Sexualized use of knives, blood play, or weapon play in sexual contexts.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'primal_play',
+        userLabel: 'Primal Play',
+        shortDescription: 'Hunting/chasing dynamics, primal kink, or "touch her and you die" tropes in sexual/romantic contexts.',
+        defaultSeverityHint: 'moderate'
+      },
+      // Sexual Shaming & Language
+      {
+        id: 'slut_shaming',
+        userLabel: 'Sexual Shaming Language',
+        shortDescription: 'Language that shames or devalues characters for sexual behaviour.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'purity_culture',
+        userLabel: 'Purity / Virginity Framing',
+        shortDescription: 'Sexual value tied to virginity, purity, or sexual restraint.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'misogynistic_sexual_language',
+        userLabel: 'Gendered Sexual Degradation',
+        shortDescription: 'Sexually degrading language targeting women or gendered characters.',
+        defaultSeverityHint: 'severe'
+      },
       {
         id: 'other_sexual_content',
         userLabel: 'Other Sexual Content',
@@ -164,6 +269,24 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         userLabel: 'Emotional Abuse',
         shortDescription: 'Emotional abuse, verbal abuse, psychological abuse.',
         defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'stalking',
+        userLabel: 'Stalking',
+        shortDescription: 'Stalking, obsessive following, or unwanted surveillance.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'financial_abuse',
+        userLabel: 'Financial Abuse',
+        shortDescription: 'Financial abuse, economic control, or financial manipulation.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'grooming',
+        userLabel: 'Grooming',
+        shortDescription: 'Grooming, predatory behavior, or manipulation of vulnerable individuals (often in age-gap or power imbalance contexts).',
+        defaultSeverityHint: 'severe'
       },
       {
         id: 'other_toxic_relationships',
@@ -236,6 +359,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'moderate'
       },
       {
+        id: 'school_shootings',
+        userLabel: 'School Shootings / Mass Violence',
+        shortDescription: 'School shootings, mass shootings, or mass violence events.',
+        defaultSeverityHint: 'severe'
+      },
+      {
         id: 'war',
         userLabel: 'War',
         shortDescription: 'War, military violence, battle scenes, combat.',
@@ -260,6 +389,18 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'severe'
       },
       {
+        id: 'human_trafficking',
+        userLabel: 'Human Trafficking',
+        shortDescription: 'Human trafficking, sex trafficking, or forced servitude. Distinct from general kidnapping.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'cannibalism',
+        userLabel: 'Cannibalism',
+        shortDescription: 'Cannibalism, eating human flesh, or cannibalistic themes.',
+        defaultSeverityHint: 'severe'
+      },
+      {
         id: 'violence_against_children',
         userLabel: 'Violence Against Children',
         shortDescription: 'Violence directed at children, child abuse, harm to minors.',
@@ -269,6 +410,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'animal_cruelty',
         userLabel: 'Animal Cruelty',
         shortDescription: 'Animal cruelty, harm to animals, animal death, pet death.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'police_brutality',
+        userLabel: 'Police Brutality / State Violence',
+        shortDescription: 'Police brutality, state violence, or systemic violence by authorities.',
         defaultSeverityHint: 'severe'
       },
       {
@@ -366,9 +513,21 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'severe'
       },
       {
-        id: 'pregnancy_childbirth',
-        userLabel: 'Pregnancy / Childbirth',
-        shortDescription: 'Pregnancy complications, difficult childbirth, pregnancy-related trauma.',
+        id: 'death_animals',
+        userLabel: 'Animal Death',
+        shortDescription: 'Animal death, pet death, or harm to animals.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'divorce',
+        userLabel: 'Divorce / Separation',
+        shortDescription: 'Divorce, separation, or relationship breakdown.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'grief_processing',
+        userLabel: 'Grief Processing',
+        shortDescription: 'Detailed grief processing, mourning, or loss processing.',
         defaultSeverityHint: 'moderate'
       },
       {
@@ -410,6 +569,36 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'severe'
       },
       {
+        id: 'acephobia',
+        userLabel: 'Acephobia',
+        shortDescription: 'Discrimination against asexual people, invalidation of asexuality, or pressure to be sexual.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'lesbophobia',
+        userLabel: 'Lesbophobia',
+        shortDescription: 'Discrimination specifically against lesbians or lesbian relationships.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'biphobia',
+        userLabel: 'Biphobia',
+        shortDescription: 'Discrimination against bisexual people, biphobic stereotypes, or invalidation of bisexuality.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'misgendering',
+        userLabel: 'Misgendering / Deadnaming',
+        shortDescription: 'Misgendering, deadnaming, or use of incorrect pronouns for transgender or non-binary characters.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'queerphobia',
+        userLabel: 'Queerphobia',
+        shortDescription: 'General anti-queer sentiment, queerphobic language, or discrimination against LGBTQ+ people.',
+        defaultSeverityHint: 'severe'
+      },
+      {
         id: 'religious_discrimination',
         userLabel: 'Religious Discrimination',
         shortDescription: 'Religious discrimination, religious intolerance, religious persecution.',
@@ -419,6 +608,36 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'ableism',
         userLabel: 'Ableism',
         shortDescription: 'Ableism, discrimination against disabilities, disability slurs.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'cultural_appropriation',
+        userLabel: 'Cultural Appropriation / Colonial Themes',
+        shortDescription: 'Cultural appropriation, colonial themes, exploitation of Indigenous or marginalized cultures, or problematic representation of cultural groups.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'antisemitism',
+        userLabel: 'Antisemitism',
+        shortDescription: 'Antisemitism, anti-Jewish discrimination, or Jewish stereotypes.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'islamophobia',
+        userLabel: 'Islamophobia',
+        shortDescription: 'Islamophobia, anti-Muslim discrimination, or Muslim stereotypes.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'fatphobia',
+        userLabel: 'Fatphobia / Body Shaming',
+        shortDescription: 'Discrimination based on weight, body shaming, anti-fat bias, or cruelty toward fat characters.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'classism',
+        userLabel: 'Classism / Poverty',
+        shortDescription: 'Discrimination based on class, extreme poverty, homelessness, or economic status discrimination.',
         defaultSeverityHint: 'moderate'
       },
       {
@@ -456,11 +675,223 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
     ]
   },
   {
+    id: 'phobias',
+    userLabel: 'Phobias / Specific Fears',
+    shortDescription: 'Specific phobias or fear triggers that may cause anxiety or panic.',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'snakes',
+        userLabel: 'Snakes / Serpents',
+        shortDescription: 'Snakes, serpents, or snake-like creatures.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'spiders',
+        userLabel: 'Spiders / Arachnids',
+        shortDescription: 'Spiders, arachnids, or spider-like creatures.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'needles',
+        userLabel: 'Needles / Medical Procedures',
+        shortDescription: 'Needles, injections, medical procedures, or blood draws.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'heights',
+        userLabel: 'Heights / Falling',
+        shortDescription: 'Heights, falling, vertigo, or high places.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'water',
+        userLabel: 'Water / Drowning',
+        shortDescription: 'Water, drowning, deep water, or aquaphobia triggers.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'enclosed_spaces',
+        userLabel: 'Enclosed Spaces / Claustrophobia',
+        shortDescription: 'Enclosed spaces, claustrophobia, being trapped, or confinement.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'darkness',
+        userLabel: 'Darkness / Nyctophobia',
+        shortDescription: 'Darkness, being in the dark, or fear of the dark.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'blood',
+        userLabel: 'Blood / Hemophobia',
+        shortDescription: 'Blood, gore, or blood-related medical content.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'vomiting',
+        userLabel: 'Vomiting / Emetophobia',
+        shortDescription: 'Vomiting, nausea, or scenes depicting sickness.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'trypophobia',
+        userLabel: 'Trypophobia',
+        shortDescription: 'Clusters of small holes, patterns, or trypophobia triggers.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'dental_trauma',
+        userLabel: 'Dental Trauma',
+        shortDescription: 'Dental procedures, teeth falling out, pulling teeth, or dental gore.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'other_phobias',
+        userLabel: 'Other Phobias',
+        shortDescription: 'Other specific phobias or fear triggers not covered above.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'medical_health',
+    userLabel: 'Medical / Health',
+    shortDescription: 'Medical procedures, health conditions, infertility, or medical trauma.',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'medical_procedures',
+        userLabel: 'Medical Procedures',
+        shortDescription: 'Surgery, medical procedures, hospital scenes, or medical trauma.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'infertility',
+        userLabel: 'Infertility / Pregnancy Loss',
+        shortDescription: 'Infertility, miscarriage, stillbirth, or pregnancy loss.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'chronic_illness',
+        userLabel: 'Chronic Illness',
+        shortDescription: 'Chronic illness, disability, or long-term health conditions.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'cancer',
+        userLabel: 'Cancer',
+        shortDescription: 'Cancer, cancer treatment, or cancer-related illness.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'body_horror',
+        userLabel: 'Body Horror',
+        shortDescription: 'Body horror, extreme body modification, or graphic body-related content.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'pregnancy_childbirth',
+        userLabel: 'Pregnancy / Childbirth',
+        shortDescription: 'Pregnancy, childbirth, pregnancy complications, or pregnancy-related trauma.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'other_medical',
+        userLabel: 'Other Medical / Health',
+        shortDescription: 'Other medical or health-related content not covered above.',
+        defaultSeverityHint: 'moderate'
+      }
+    ]
+  },
+  {
+    id: 'religious_cult',
+    userLabel: 'Religious / Cult Content',
+    shortDescription: 'Religious trauma, cult dynamics, occult themes, or religious persecution.',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'cult_content',
+        userLabel: 'Cult Dynamics',
+        shortDescription: 'Cult dynamics, indoctrination, or cult manipulation.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'religious_trauma',
+        userLabel: 'Religious Trauma',
+        shortDescription: 'Religious trauma, religious abuse, or religious-based harm.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'occult',
+        userLabel: 'Occult / Supernatural',
+        shortDescription: 'Occult themes, supernatural elements, or dark magic.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'excommunication',
+        userLabel: 'Excommunication / Religious Exclusion',
+        shortDescription: 'Excommunication, religious exclusion, or religious shunning.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'other_religious_cult',
+        userLabel: 'Other Religious / Cult',
+        shortDescription: 'Other religious or cult-related content not covered above.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
+    id: 'family_dynamics',
+    userLabel: 'Family Dynamics',
+    shortDescription: 'Family-related trauma, abandonment, or family system issues.',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'parental_abandonment',
+        userLabel: 'Parental Abandonment',
+        shortDescription: 'Parental abandonment, estrangement, or parents leaving.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'foster_care_adoption',
+        userLabel: 'Foster Care / Adoption Trauma',
+        shortDescription: 'Foster care trauma, adoption breakdown, or displacement of children.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'incest_taboo',
+        userLabel: 'Incest / Pseudo-Incest',
+        shortDescription: 'Incest, pseudo-incest (step-siblings), or blood relation sexual/romantic content.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'other_family_dynamics',
+        userLabel: 'Other Family Dynamics',
+        shortDescription: 'Other family-related trauma or dynamics not covered above.',
+        defaultSeverityHint: 'mild'
+      }
+    ]
+  },
+  {
     id: 'other',
     userLabel: 'Other',
     shortDescription: 'Other potentially triggering content not covered by specific categories.',
     legacyCategory: 'other',
     subcategories: [
+      {
+        id: 'natural_disasters',
+        userLabel: 'Natural Disasters',
+        shortDescription: 'Natural disasters, environmental trauma, or climate-related events.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'accidents',
+        userLabel: 'Car Accidents / Crashes',
+        shortDescription: 'Car crashes, plane crashes, or severe vehicle accidents.',
+        defaultSeverityHint: 'moderate'
+      },
       {
         id: 'other',
         userLabel: 'Other',
@@ -644,11 +1075,50 @@ export function requiresMediation(warnings: Array<{
     'violence',
     'substance_use_or_alcohol',
     'mental_health',
-    'emotional_abuse_or_toxic_relationships'
+    'emotional_abuse_or_toxic_relationships',
+    'medical_health',
+    'religious_cult',
+    'family_dynamics'
   ];
 
   return warnings.some(w => 
     sensitiveCategories.includes(w.category_id) &&
     (w.severity === 'moderate' || w.severity === 'severe')
   );
+}
+
+/**
+ * Validate that a subcategory_id exists in the taxonomy for the given category_id
+ * This ensures data integrity - subcategory_id must be a valid subcategory of category_id
+ */
+export function validateSubcategory(categoryId: string, subcategoryId: string | null | undefined): boolean {
+  if (!subcategoryId) {
+    // Subcategory is optional, so null/undefined is valid
+    return true;
+  }
+
+  if (!categoryId) {
+    // Can't validate subcategory without category
+    return false;
+  }
+
+  const category = getCategoryById(categoryId);
+  if (!category) {
+    return false;
+  }
+
+  const subcategory = getSubcategoryById(categoryId, subcategoryId);
+  return !!subcategory;
+}
+
+/**
+ * Get all valid subcategory IDs for a given category
+ * Useful for validation and dropdowns
+ */
+export function getValidSubcategoryIds(categoryId: string): string[] {
+  const category = getCategoryById(categoryId);
+  if (!category) {
+    return [];
+  }
+  return category.subcategories.map(sub => sub.id);
 }

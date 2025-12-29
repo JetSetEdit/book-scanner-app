@@ -28,12 +28,15 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
-import { getCategoryById } from "@/lib/config/taxonomy-v2"
+import { getCategoryById, getSubcategoryById } from "@/lib/config/taxonomy-v2"
+import { TagWithTooltip } from "@/components/tag-with-tooltip"
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 interface ContentWarning {
   id: string
   category: string
   category_id?: string | null
+  subcategory_id?: string | null
   confidence_score?: number | null
   description: string
   severity: "mild" | "moderate" | "severe"
@@ -106,12 +109,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
 
   if (!warnings || warnings.length === 0) {
     return (
-      <div className="py-12 text-center border-y border-slate-100">
+      <div className="py-12 text-center border-y border-border">
         <div className="flex justify-center mb-4">
-          <CheckCircle className="h-8 w-8 text-slate-300" />
+          <CheckCircle className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-serif font-medium text-slate-900 mb-1">No Content Warnings</h3>
-        <p className="text-slate-400 text-sm">This book hasn't been flagged for any sensitive content yet.</p>
+        <h3 className="text-lg font-serif font-medium text-foreground mb-1">No Content Warnings</h3>
+        <p className="text-muted-foreground text-sm">This book hasn't been flagged for any sensitive content yet.</p>
       </div>
     )
   }
@@ -124,25 +127,26 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
   const standardAiWarnings = aiWarnings.filter(w => w.is_author_verified !== true)
 
   return (
-    <div className="space-y-16">
+    <TooltipProvider>
+      <div className="space-y-16">
       {showMentalHealthResources && (
-        <div className="bg-slate-50 p-6 rounded-none border-l-2 border-slate-900">
+        <div className="bg-muted p-6 rounded-none border-l-2 border-border">
           <div className="flex items-start gap-4">
-            <Phone className="h-5 w-5 text-slate-900 shrink-0 mt-0.5" />
+            <Phone className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-bold text-slate-900 uppercase tracking-widest text-xs mb-2">Support Resources</h3>
-              <p className="text-sm text-slate-600 mb-4 leading-relaxed font-serif italic">
+              <h3 className="font-bold text-foreground uppercase tracking-widest text-xs mb-2">Support Resources</h3>
+              <p className="text-sm text-muted-foreground mb-4 leading-relaxed font-serif italic">
                 If the themes in this book are affecting you, help is available.
               </p>
-              <div className="flex flex-wrap gap-6 text-xs font-medium uppercase tracking-wider text-slate-500">
-                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition-colors">
-                  Lifeline <span className="text-slate-300 ml-1">13 11 14</span>
+              <div className="flex flex-wrap gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
                 </a>
-                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition-colors">
-                  Beyond Blue <span className="text-slate-300 ml-1">1300 22 4636</span>
+                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
                 </a>
-                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-slate-900 transition-colors">
-                  Kids Helpline <span className="text-slate-300 ml-1">1800 55 1800</span>
+                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
                 </a>
               </div>
             </div>
@@ -154,12 +158,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       {officialVerifiedWarnings.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px bg-amber-200 flex-1"></div>
-            <div className="flex items-center gap-2 text-amber-600">
+            <div className="h-px bg-border flex-1"></div>
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
               <CheckCircle className="h-4 w-4" />
               <h3 className="font-bold uppercase tracking-widest text-xs">Official Author Notes</h3>
             </div>
-            <div className="h-px bg-amber-200 flex-1"></div>
+            <div className="h-px bg-border flex-1"></div>
           </div>
 
           <div className="space-y-0">
@@ -174,12 +178,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       {standardAiWarnings.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="h-px bg-border flex-1"></div>
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Sparkles className="h-4 w-4" />
               <h3 className="font-bold uppercase tracking-widest text-xs">AI Analysis</h3>
             </div>
-            <div className="h-px bg-slate-200 flex-1"></div>
+            <div className="h-px bg-border flex-1"></div>
           </div>
 
           <div className="space-y-0">
@@ -194,12 +198,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       {communityWarnings.length > 0 && (
         <section>
           <div className="flex items-center gap-3 mb-8">
-            <div className="h-px bg-slate-200 flex-1"></div>
-            <div className="flex items-center gap-2 text-slate-400">
+            <div className="h-px bg-border flex-1"></div>
+            <div className="flex items-center gap-2 text-muted-foreground">
               <Shield className="h-4 w-4" />
               <h3 className="font-bold uppercase tracking-widest text-xs">Community Reports</h3>
             </div>
-            <div className="h-px bg-slate-200 flex-1"></div>
+            <div className="h-px bg-border flex-1"></div>
           </div>
 
           <div className="space-y-0">
@@ -211,22 +215,41 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
       )}
 
       {/* Disclaimer */}
-      <div className="mt-12 pt-8 border-t border-slate-100">
-        <p className="text-[10px] text-slate-400 leading-relaxed text-center italic max-w-xl mx-auto">
+      <div className="mt-12 pt-8 border-t border-border">
+        <p className="text-[10px] text-muted-foreground leading-relaxed text-center italic max-w-xl mx-auto">
           All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment.
         </p>
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   )
 }
 
 function WarningItem({ warning, isAi = false, isVerified = false }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean }) {
-  const categoryLabel = (warning.category_id ? (getCategoryById(warning.category_id)?.userLabel || null) : null) || categoryLabels[warning.category] || warning.category || 'Other';
+  // Safely get category label with fallbacks
+  let categoryLabel: string;
+  try {
+    categoryLabel = (warning.category_id ? getCategoryById(warning.category_id)?.userLabel : null) || categoryLabels[warning.category] || warning.category || 'Unknown Category';
+  } catch (error) {
+    console.error('Error getting category label:', error);
+    categoryLabel = categoryLabels[warning.category] || warning.category || 'Unknown Category';
+  }
+
+  // Safely get subcategory label
+  let subcategoryLabel: string | null = null;
+  try {
+    if (warning.category_id && warning.subcategory_id) {
+      subcategoryLabel = getSubcategoryById(warning.category_id, warning.subcategory_id)?.userLabel || null;
+    }
+  } catch (error) {
+    console.error('Error getting subcategory label:', error);
+    subcategoryLabel = null;
+  }
 
   return (
     <div className={cn(
-      "group py-6 border-b border-slate-100 last:border-0 transition-colors",
-      isVerified ? "hover:border-amber-200" : "hover:border-slate-300"
+      "group py-6 border-b border-border last:border-0 transition-colors",
+      isVerified ? "hover:border-amber-200 dark:hover:border-amber-800" : "hover:border-border"
     )}>
       <div className="flex flex-col md:flex-row md:items-baseline gap-4 md:gap-8">
 
@@ -245,17 +268,26 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                 className="h-4 w-4"
               />
             </div>
-            <h4 className="font-bold text-slate-900 text-sm uppercase tracking-wide">
-              {categoryLabel}
-            </h4>
+            <div className="flex flex-col gap-1">
+              <TagWithTooltip 
+                label={categoryLabel} 
+                className="font-bold text-foreground text-sm uppercase tracking-wide" 
+              />
+              {subcategoryLabel && (
+                <TagWithTooltip 
+                  label={subcategoryLabel} 
+                  className="text-xs text-muted-foreground font-medium" 
+                />
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-2 pl-9">
             <span className={cn(
               "text-[10px] font-bold uppercase tracking-widest",
-              warning.severity === "severe" && "text-red-600",
-              warning.severity === "moderate" && "text-orange-600",
-              warning.severity === "mild" && "text-yellow-600"
+              warning.severity === "severe" && "text-red-600 dark:text-red-500",
+              warning.severity === "moderate" && "text-orange-600 dark:text-orange-500",
+              warning.severity === "mild" && "text-yellow-600 dark:text-yellow-500"
             )}>
               {warning.severity} Intensity
             </span>
@@ -264,7 +296,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
 
         {/* Right: Description & Actions */}
         <div className="flex-1">
-          <p className="text-slate-600 text-base leading-relaxed font-serif mb-3">
+          <p className="text-muted-foreground text-base leading-relaxed font-serif mb-3">
             {warning.description}
           </p>
 
@@ -276,41 +308,50 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               userValidation={warning.user_validation}
             />
 
-            {isAi && warning.reasoning && (
+            {/* Reasoning / Sources - Always show if available */}
+            {(warning.reasoning || warning.source_url) && (
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs text-slate-400 hover:text-purple-600 px-2">
-                    <Info className="h-3 w-3 mr-1" /> Reasoning
+                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2">
+                    <Info className="h-3 w-3 mr-1" /> {warning.reasoning ? 'Reasoning' : 'Source'}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="max-w-xs p-4 text-xs bg-white border border-slate-100 shadow-xl text-slate-600">
-                  <p className="font-bold text-slate-900 mb-1 uppercase tracking-wider text-[10px]">AI Reasoning</p>
-                  {warning.reasoning}
-                  {warning.source_url && (
+                <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
+                  {warning.reasoning && (
                     <>
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <p className="font-bold text-slate-900 mb-1 uppercase tracking-wider text-[10px]">Source</p>
-                        <a
-                          href={warning.source_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-600 hover:text-purple-700 break-all"
-                        >
-                          {warning.source_url}
-                        </a>
-                      </div>
+                      <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">
+                        {isAi ? 'AI Reasoning' : 'Justification'}
+                      </p>
+                      <p className="mb-3">{warning.reasoning}</p>
                     </>
+                  )}
+                  {warning.source_url && (
+                    <div className={warning.reasoning ? "mt-3 pt-3 border-t border-border" : ""}>
+                      <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">Source</p>
+                      <a
+                        href={warning.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 break-all"
+                      >
+                        {warning.source_url}
+                      </a>
+                    </div>
+                  )}
+                  {!warning.reasoning && !warning.source_url && (
+                    <p className="text-muted-foreground italic">No source notes added yet.</p>
                   )}
                 </PopoverContent>
               </Popover>
             )}
 
-            {isAi && !warning.reasoning && warning.source_url && (
+            {/* Fallback: Show source link if no reasoning popover */}
+            {!warning.reasoning && warning.source_url && (
               <a
                 href={warning.source_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[10px] font-bold uppercase tracking-widest text-slate-400 hover:text-purple-600 flex items-center gap-1"
+                className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 flex items-center gap-1"
               >
                 Source <ExternalLink className="h-3 w-3" />
               </a>

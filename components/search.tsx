@@ -150,12 +150,12 @@ export function SearchComponent({ className }: SearchProps) {
 
       {/* Search Results Dropdown */}
       {showResults && (query.length >= 2 || results.length > 0) && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-lg shadow-lg z-[100] max-h-[500px] overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-lg shadow-lg z-[100] max-h-[500px] overflow-y-auto">
           {/* Severity Filters */}
           {query.length >= 2 && (
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+            <div className="px-4 py-3 border-b border-border bg-muted/50">
               <div className="flex items-center gap-4">
-                <span className="text-xs font-medium text-slate-600">Filter by tolerance:</span>
+                <span className="text-xs font-medium text-muted-foreground">Filter by tolerance:</span>
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5">
                     <Checkbox
@@ -223,13 +223,15 @@ export function SearchComponent({ className }: SearchProps) {
                   key={book.id}
                   href={`/book/${book.isbn}`}
                   onClick={handleResultClick}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-b-0"
+                  className="flex items-start gap-3 px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
                 >
                   {/* Cover */}
                   <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
                     {book.cover_url ? (
                       <Image
-                        src={book.cover_url}
+                        src={book.cover_url.startsWith('http') 
+                          ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                          : book.cover_url}
                         alt={`Cover of ${book.title}`}
                         fill
                         className="object-cover"
@@ -243,7 +245,7 @@ export function SearchComponent({ className }: SearchProps) {
 
                   {/* Book Info */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm text-slate-900 truncate">
+                    <h3 className="font-medium text-sm text-foreground truncate">
                       {book.title}
                     </h3>
                     {book.author && (
@@ -274,10 +276,24 @@ export function SearchComponent({ className }: SearchProps) {
                 </Link>
               ))}
               {results.length >= 20 && (
-                <div className="px-4 py-2 border-t border-slate-100 text-xs text-muted-foreground text-center">
+                <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground text-center">
                   Showing top 20 results
                 </div>
               )}
+              {/* Google Books Attribution for search results */}
+              <div className="px-4 py-2 border-t border-border">
+                <p className="text-xs text-muted-foreground text-center">
+                  Data sourced via{' '}
+                  <a
+                    href="https://books.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Google Books
+                  </a>
+                </p>
+              </div>
             </div>
           ) : null}
         </div>

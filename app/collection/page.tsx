@@ -1,15 +1,18 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle } from "lucide-react"
+import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle, ScanBarcode } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
 import { SeverityMild, SeverityModerate, SeveritySevere } from "@/components/severity-icons"
 import { SeverityLegend } from "@/components/severity-legend"
 import { CollectionSort } from "@/components/collection-sort"
+import { CollectionPagination } from "@/components/collection-pagination"
 import { compareBySeverity } from "@/lib/utils/severity-scoring"
 import { SeverityScoreWrapper } from "@/components/severity-score-wrapper"
+import { BookAdminControls } from "@/components/book-admin-controls"
+import { BookCardAdmin } from "@/components/book-card-admin"
 
 // Helper function to extract classification rating from categories
 function getClassificationFromCategories(categories?: string[]): string | null {
@@ -31,8 +34,10 @@ function getContentWarningSummary(contentWarnings?: any[]): { severe: number; mo
 }
 
 interface CollectionPageProps {
-  searchParams: Promise<{ author?: string; q?: string; sort?: string }>
+  searchParams: Promise<{ author?: string; q?: string; sort?: string; page?: string }>
 }
+
+const BOOKS_PER_PAGE = 12
 
 export default async function CollectionPage({ searchParams }: CollectionPageProps) {
   const supabase = await createClient()
@@ -40,7 +45,11 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
   const authorFilter = params?.author
   const searchQuery = params?.q
   const sortOption = params?.sort || "newest"
+  const currentPage = Math.max(1, parseInt(params?.page || "1"))
 
+  // Build base query for counting total books
+  let countQuery = supabase.from("books").select("*", { count: "exact", head: true })
+  
   // Build query with optional filters
   let query = supabase
     .from("books")
@@ -55,29 +64,52 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
   // Apply filters
   if (authorFilter) {
-    query = query.eq("author", decodeURIComponent(authorFilter))
+    const decodedAuthor = decodeURIComponent(authorFilter)
+    query = query.eq("author", decodedAuthor)
+    countQuery = countQuery.eq("author", decodedAuthor)
   } else if (searchQuery) {
     query = query.or(
       `title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,isbn.ilike.%${searchQuery}%`
     )
+    countQuery = countQuery.or(
+      `title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,isbn.ilike.%${searchQuery}%`
+    )
   }
 
-  // Apply sorting
-  switch (sortOption) {
-    case "title-asc":
-      query = query.order("title", { ascending: true })
-      break
-    case "title-desc":
-      query = query.order("title", { ascending: false })
-      break
-    case "author-asc":
-      query = query.order("author", { ascending: true, nullsFirst: false })
-      break
-    case "newest":
-    default:
-      query = query.order("created_at", { ascending: false })
-      break
+  // Check if we need to fetch all books for severity sorting
+  const needsSeveritySort = sortOption === "severity-desc" || sortOption === "severity-asc"
+  
+  if (!needsSeveritySort) {
+    // Apply database sorting for non-severity sorts
+    switch (sortOption) {
+      case "title-asc":
+        query = query.order("title", { ascending: true })
+        break
+      case "title-desc":
+        query = query.order("title", { ascending: false })
+        break
+      case "author-asc":
+        query = query.order("author", { ascending: true, nullsFirst: false })
+        break
+      case "newest":
+      default:
+        query = query.order("created_at", { ascending: false })
+        break
+    }
+
+    // Apply pagination at database level
+    const from = (currentPage - 1) * BOOKS_PER_PAGE
+    const to = from + BOOKS_PER_PAGE - 1
+    query = query.range(from, to)
+  } else {
+    // For severity sorting, we need all books to sort client-side
+    // Apply a default order for consistency (newest first)
+    query = query.order("created_at", { ascending: false })
   }
+
+  // Get total count for pagination
+  const { count: totalBooks } = await countQuery
+  const totalPages = Math.ceil((totalBooks || 0) / BOOKS_PER_PAGE)
 
   // Fetch books with content warnings
   const { data: books, error } = await query
@@ -91,6 +123,10 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
         { warnings: b.content_warnings || [] }
       )
     )
+    // Paginate after sorting
+    const from = (currentPage - 1) * BOOKS_PER_PAGE
+    const to = from + BOOKS_PER_PAGE
+    sortedBooks = sortedBooks.slice(from, to)
   } else if (sortOption === "severity-asc") {
     sortedBooks = [...sortedBooks].sort((a, b) => 
       compareBySeverity(
@@ -98,6 +134,10 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
         { warnings: a.content_warnings || [] }
       )
     )
+    // Paginate after sorting
+    const from = (currentPage - 1) * BOOKS_PER_PAGE
+    const to = from + BOOKS_PER_PAGE
+    sortedBooks = sortedBooks.slice(from, to)
   }
 
   if (error) {
@@ -122,27 +162,35 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="container mx-auto px-4 py-8 overflow-x-hidden">
+      <div className="max-w-6xl mx-auto w-full">
         <div className="mb-8">
-          <div className="flex items-start justify-between gap-4 mb-4">
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
-                <Library className="h-8 w-8" />
-                {authorFilter ? (
-                  <>
-                    Books by {decodeURIComponent(authorFilter)}
-                  </>
-                ) : searchQuery ? (
-                  <>
-                    Search Results for &quot;{searchQuery}&quot;
-                  </>
-                ) : (
-                  "Bookshelf"
-                )}
-              </h1>
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                  <Library className="h-6 w-6 sm:h-8 sm:w-8" />
+                  {authorFilter ? (
+                    <>
+                      Books by {decodeURIComponent(authorFilter)}
+                    </>
+                  ) : searchQuery ? (
+                    <>
+                      Search Results for &quot;{searchQuery}&quot;
+                    </>
+                  ) : (
+                    "Bookshelf"
+                  )}
+                </h1>
+                <Link href="/scan" className="self-start sm:self-auto">
+                  <Button size="sm" className="gap-2">
+                    <ScanBarcode className="h-4 w-4" />
+                    Scan Book
+                  </Button>
+                </Link>
+              </div>
               <p className="text-muted-foreground">
-                {books?.length || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
+                {totalBooks || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
                 {authorFilter && (
                   <Link 
                     href="/collection" 
@@ -154,25 +202,27 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               </p>
             </div>
             {/* Sort Selector */}
-            {books && books.length > 0 && (
-              <CollectionSort />
+            {totalBooks && totalBooks > 0 && (
+              <div className="flex-shrink-0">
+                <CollectionSort />
+              </div>
             )}
           </div>
 
           {/* Content Warning Legend */}
-          <div className="mt-8 border-t-2 border-slate-200 pt-6">
+          <div className="mt-8 border-t-2 border-border pt-6">
             <div className="flex items-center gap-4 mb-6">
-              <div className="h-px bg-slate-200 flex-1"></div>
-              <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400">
+              <div className="h-px bg-border flex-1"></div>
+              <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground">
                 Warning Legend
               </h3>
-              <div className="h-px bg-slate-200 flex-1"></div>
+              <div className="h-px bg-border flex-1"></div>
             </div>
             <SeverityLegend />
           </div>
         </div>
 
-        {!books || books.length === 0 ? (
+        {!sortedBooks || sortedBooks.length === 0 ? (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -206,8 +256,9 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               const hasWarnings = warningSummary.severe > 0 || warningSummary.moderate > 0 || warningSummary.mild > 0
 
               return (
-                <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full">
+                <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full relative">
                     <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+                      <BookCardAdmin isbn={book.isbn} title={book.title} />
                       <CardContent className="p-6 flex flex-col h-full">
                         <div className="flex gap-4 flex-1">
                           {/* Book Cover */}
@@ -215,7 +266,9 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                             <div className="w-20 h-32 bg-muted rounded-lg overflow-hidden relative">
                               {book.cover_url ? (
                                 <Image
-                                  src={book.cover_url}
+                                  src={book.cover_url.startsWith('http') 
+                                    ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                                    : book.cover_url}
                                   alt={`Cover of ${book.title}`}
                                   fill
                                   className="object-cover"
@@ -282,7 +335,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
                           {/* Classification Rating */}
                           {(() => {
-                            const classificationRating = (book as any).classification_rating || getClassificationFromCategories(book.categories || undefined)
+                            const classificationRating = getClassificationFromCategories(book.categories || undefined)
                             return classificationRating && (
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium">Classification:</span>
@@ -315,6 +368,16 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               )
             })}
           </div>
+        )}
+
+        {/* Pagination */}
+        {totalBooks && totalBooks > BOOKS_PER_PAGE && (
+          <CollectionPagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalBooks={totalBooks}
+            booksPerPage={BOOKS_PER_PAGE}
+          />
         )}
       </div>
     </div>

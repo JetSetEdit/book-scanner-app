@@ -27,12 +27,19 @@ export async function POST(request: NextRequest) {
 
       const customStream = new ReadableStream({
         async start(controller) {
-          const sendUpdate = (message: string) => {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`))
+          const sendUpdate = (message: string | any) => {
+            // Handle both string messages and detailed status updates
+            if (typeof message === 'string') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`))
+            } else {
+              // Detailed status update with action, AI response, result
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ statusUpdate: message })}\n\n`))
+            }
           }
 
           try {
             const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh, model || "gpt-4o")
+            
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : (error as any)?.message || 'Unknown error';
@@ -53,6 +60,8 @@ export async function POST(request: NextRequest) {
     } else {
       // Standard JSON response
       const result = await processIsbnScan(isbn, undefined, selectedCandidate, false, model || "gpt-4o")
+      
+      
       return NextResponse.json(result)
     }
 

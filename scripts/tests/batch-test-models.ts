@@ -1,0 +1,366 @@
+/**
+ * Batch test script to compare OpenAI models across old/new/hybrid agent modes
+ * Tests quality, speed, and cost for multiple ISBNs
+ * 
+ * Usage: npx tsx scripts/batch-test-models.ts
+ * 
+ * Priority: Quality > Speed > Cost
+ */
+
+import { performance } from 'perf_hooks'
+import * as fs from 'fs'
+import * as path from 'path'
+
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
+const RESULTS_FILE = path.join(process.cwd(), 'batch-model-test-results.json')
+
+// Test ISBNs
+const TEST_ISBNS = [
+  '9781649377159',
+  '9781546171461',
+  '9781546176183',
+  '9781035005697',
+  '9781649374172',
+  '9781649374042',
+  '9780593972700',
+  '9781538774229',
+  '9781538774700',
+  '9780385548984'
+]
+
+// OpenAI models to test
+const MODELS = [
+  'gpt-4o',
+  'gpt-4-turbo',
+  'gpt-4o-mini',
+  'gpt-3.5-turbo'
+]
+
+// Agent instruction modes
+const AGENT_MODES = [
+  { name: 'old', agentType: 'assumption-based' },
+  { name: 'new', agentType: 'evidence-based' },
+  { name: 'hybrid', agentType: 'hybrid' }
+]
+
+// OpenAI pricing (per million tokens) - as of Dec 2025
+const PRICING: Record<string, { input: number; output: number }> = {
+  'gpt-4o': { input: 5.00, output: 15.00 },
+  'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'gpt-4o-mini': { input: 2.50, output: 10.00 },
+  'gpt-3.5-turbo': { input: 0.50, output: 1.50 }
+}
+
+interface TestResult {
+  isbn: string
+  model: string
+  agentMode: string
+  timestamp: number
+  timings: {
+    total: number
+    apiCall: number
+  }
+  quality: {
+    bookFound: boolean
+    bookTitle?: string
+    warningCount: number
+    severeCount: number
+    moderateCount: number
+    mildCount: number
+    confidence: 'low' | 'medium' | 'high'
+    reasoningLength: number
+    hasReasoning: boolean
+  }
+  cost: {
+    estimatedInputTokens: number
+    estimatedOutputTokens: number
+    estimatedCostUSD: number
+  }
+  error?: string
+  rawResult?: any
+}
+
+async function testCombination(
+  isbn: string,
+  model: string,
+  agentMode: { name: string; agentType: string }
+): Promise<TestResult> {
+  const startTime = performance.now()
+  
+  try {
+    const response = await fetch(`${BASE_URL}/api/dev/scan-with-agent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        isbn,
+        agentType: agentMode.agentType,
+        model
+      })
+    })
+
+    const apiCallTime = performance.now() - startTime
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new Error(`HTTP ${response.status}: ${errorData.error || 'Unknown error'}`)
+    }
+
+    const data = await response.json()
+    const totalTime = performance.now() - startTime
+
+    // Extract quality metrics
+    const warnings = data.warnings || []
+    const severeCount = warnings.filter((w: any) => w.severity === 'severe').length
+    const moderateCount = warnings.filter((w: any) => w.severity === 'moderate').length
+    const mildCount = warnings.filter((w: any) => w.severity === 'mild').length
+
+    // Estimate token usage (rough approximation)
+    const reasoningLength = data.reasoning?.length || 0
+    const estimatedInputTokens = Math.ceil((reasoningLength + 2000) / 4)
+    const estimatedOutputTokens = Math.ceil((reasoningLength + warnings.length * 100) / 4)
+
+    // Calculate cost
+    const pricing = PRICING[model] || PRICING['gpt-4o']
+    const inputCost = (estimatedInputTokens / 1_000_000) * pricing.input
+    const outputCost = (estimatedOutputTokens / 1_000_000) * pricing.output
+    const totalCost = inputCost + outputCost
+
+    return {
+      isbn,
+      model,
+      agentMode: agentMode.name,
+      timestamp: Date.now(),
+      timings: {
+        total: totalTime,
+        apiCall: apiCallTime
+      },
+      quality: {
+        bookFound: data.success || false,
+        bookTitle: data.book?.title,
+        warningCount: warnings.length,
+        severeCount,
+        moderateCount,
+        mildCount,
+        confidence: data.confidence || 'medium',
+        reasoningLength,
+        hasReasoning: !!data.reasoning && data.reasoning.length > 0
+      },
+      cost: {
+        estimatedInputTokens,
+        estimatedOutputTokens,
+        estimatedCostUSD: totalCost
+      },
+      rawResult: data
+    }
+  } catch (error) {
+    return {
+      isbn,
+      model,
+      agentMode: agentMode.name,
+      timestamp: Date.now(),
+      timings: {
+        total: performance.now() - startTime,
+        apiCall: 0
+      },
+      quality: {
+        bookFound: false,
+        warningCount: 0,
+        severeCount: 0,
+        moderateCount: 0,
+        mildCount: 0,
+        confidence: 'low',
+        reasoningLength: 0,
+        hasReasoning: false
+      },
+      cost: {
+        estimatedInputTokens: 0,
+        estimatedOutputTokens: 0,
+        estimatedCostUSD: 0
+      },
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
+async function runBatchTest() {
+  console.log('\n🔬 Batch Model Comparison Test')
+  console.log('='.repeat(80))
+  console.log(`Testing ${TEST_ISBNS.length} ISBNs × ${MODELS.length} models × ${AGENT_MODES.length} agent modes`)
+  console.log(`Total combinations: ${TEST_ISBNS.length * MODELS.length * AGENT_MODES.length}`)
+  console.log('='.repeat(80))
+
+  const allResults: TestResult[] = []
+  let completed = 0
+  const total = TEST_ISBNS.length * MODELS.length * AGENT_MODES.length
+
+  for (const isbn of TEST_ISBNS) {
+    for (const model of MODELS) {
+      for (const agentMode of AGENT_MODES) {
+        completed++
+        console.log(`\n[${completed}/${total}] Testing: ${isbn} | ${model} | ${agentMode.name}`)
+        
+        const result = await testCombination(isbn, model, agentMode)
+        allResults.push(result)
+
+        if (result.error) {
+          console.log(`  ❌ Error: ${result.error}`)
+        } else {
+          console.log(`  ✅ Success | Time: ${(result.timings.total / 1000).toFixed(1)}s | Warnings: ${result.quality.warningCount} | Cost: $${result.cost.estimatedCostUSD.toFixed(6)}`)
+        }
+
+        // Delay to avoid rate limits (2 seconds between requests)
+        if (completed < total) {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      }
+    }
+  }
+
+  // Save results
+  fs.writeFileSync(RESULTS_FILE, JSON.stringify(allResults, null, 2))
+  console.log(`\n💾 Results saved to ${RESULTS_FILE}`)
+
+  // Generate summary report
+  generateSummaryReport(allResults)
+}
+
+function generateSummaryReport(results: TestResult[]) {
+  console.log('\n\n📊 SUMMARY REPORT')
+  console.log('='.repeat(80))
+
+  // Group by model and agent mode
+  const grouped: Record<string, Record<string, TestResult[]>> = {}
+  
+  for (const result of results) {
+    if (!grouped[result.model]) grouped[result.model] = {}
+    if (!grouped[result.model][result.agentMode]) grouped[result.model][result.agentMode] = []
+    grouped[result.model][result.agentMode].push(result)
+  }
+
+  // Calculate averages for each combination
+  const averages: Array<{
+    model: string
+    agentMode: string
+    avgTime: number
+    avgWarnings: number
+    avgCost: number
+    successRate: number
+    avgConfidence: number
+  }> = []
+
+  for (const [model, agentModes] of Object.entries(grouped)) {
+    for (const [agentMode, testResults] of Object.entries(agentModes)) {
+      const successful = testResults.filter(r => !r.error)
+      const avgTime = successful.reduce((sum, r) => sum + r.timings.total, 0) / successful.length || 0
+      const avgWarnings = successful.reduce((sum, r) => sum + r.quality.warningCount, 0) / successful.length || 0
+      const avgCost = successful.reduce((sum, r) => sum + r.cost.estimatedCostUSD, 0) / successful.length || 0
+      const successRate = (successful.length / testResults.length) * 100
+      
+      const confidenceScores = { low: 1, medium: 2, high: 3 }
+      const avgConfidence = successful.length > 0
+        ? successful.reduce((sum, r) => sum + confidenceScores[r.quality.confidence], 0) / successful.length
+        : 0
+
+      averages.push({
+        model,
+        agentMode,
+        avgTime,
+        avgWarnings,
+        avgCost,
+        successRate,
+        avgConfidence
+      })
+    }
+  }
+
+  // Sort by quality (confidence) > speed > cost
+  averages.sort((a, b) => {
+    if (Math.abs(a.avgConfidence - b.avgConfidence) > 0.1) {
+      return b.avgConfidence - a.avgConfidence // Higher confidence first
+    }
+    if (Math.abs(a.avgTime - b.avgTime) > 1000) {
+      return a.avgTime - b.avgTime // Faster first
+    }
+    return a.avgCost - b.avgCost // Cheaper first
+  })
+
+  console.log('\n🏆 TOP COMBINATIONS (Quality > Speed > Cost)')
+  console.log('-'.repeat(80))
+  console.log('Model'.padEnd(20) + 'Agent Mode'.padEnd(15) + 'Time (s)'.padEnd(12) + 'Warnings'.padEnd(12) + 'Cost ($)'.padEnd(12) + 'Success%'.padEnd(12) + 'Quality')
+  console.log('-'.repeat(80))
+
+  for (const avg of averages.slice(0, 10)) {
+    const qualityStars = '⭐'.repeat(Math.round(avg.avgConfidence))
+    console.log(
+      avg.model.padEnd(20) +
+      avg.agentMode.padEnd(15) +
+      (avg.avgTime / 1000).toFixed(1).padEnd(12) +
+      avg.avgWarnings.toFixed(1).padEnd(12) +
+      avg.avgCost.toFixed(6).padEnd(12) +
+      avg.successRate.toFixed(0) + '%'.padEnd(8) +
+      qualityStars
+    )
+  }
+
+  // Best by category
+  console.log('\n\n🎯 BEST BY CATEGORY')
+  console.log('-'.repeat(80))
+  
+  const bestQuality = averages.reduce((best, curr) => 
+    curr.avgConfidence > best.avgConfidence ? curr : best
+  )
+  console.log(`Best Quality: ${bestQuality.model} + ${bestQuality.agentMode} (Confidence: ${bestQuality.avgConfidence.toFixed(2)})`)
+
+  const bestSpeed = averages.reduce((best, curr) => 
+    curr.avgTime < best.avgTime ? curr : best
+  )
+  console.log(`Best Speed: ${bestSpeed.model} + ${bestSpeed.agentMode} (Time: ${(bestSpeed.avgTime / 1000).toFixed(1)}s)`)
+
+  const bestCost = averages.reduce((best, curr) => 
+    curr.avgCost < best.avgCost ? curr : best
+  )
+  console.log(`Best Cost: ${bestCost.model} + ${bestCost.agentMode} (Cost: $${bestCost.avgCost.toFixed(6)})`)
+
+  // Overall recommendation (quality > speed > cost)
+  const recommendation = averages[0]
+  console.log('\n\n💡 RECOMMENDATION')
+  console.log('-'.repeat(80))
+  console.log(`Model: ${recommendation.model}`)
+  console.log(`Agent Mode: ${recommendation.agentMode}`)
+  console.log(`Average Time: ${(recommendation.avgTime / 1000).toFixed(1)}s`)
+  console.log(`Average Warnings: ${recommendation.avgWarnings.toFixed(1)}`)
+  console.log(`Average Cost: $${recommendation.avgCost.toFixed(6)} per scan`)
+  console.log(`Success Rate: ${recommendation.successRate.toFixed(1)}%`)
+  console.log(`Quality Score: ${recommendation.avgConfidence.toFixed(2)}/3`)
+}
+
+// Run the test
+runBatchTest()
+  .then(() => {
+    console.log('\n✅ Batch test complete!')
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error('\n❌ Batch test failed:', error)
+    process.exit(1)
+  })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

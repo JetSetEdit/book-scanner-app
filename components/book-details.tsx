@@ -3,12 +3,17 @@
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ChevronDown, ChevronUp, Code } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import Link from "next/link"
 import { SeverityScoreBadge } from "@/components/severity-score-badge"
+import { GoogleBooksAttribution } from "@/components/google-books-attribution"
+import { ShareButton } from "@/components/ShareButton"
+import { BuyButton } from "@/components/BuyButton"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Info } from "lucide-react"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -74,19 +79,27 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
   }, [isDescriptionExpanded, book.description])
 
   return (
-    <div className="min-h-screen bg-white text-slate-950 font-sans selection:bg-slate-950 selection:text-white">
+    <div className="min-h-screen bg-background text-foreground font-sans selection:bg-foreground selection:text-background">
       <div className="container mx-auto px-4 py-12 max-w-6xl">
         {/* Navigation */}
-        <div className="mb-12 flex items-center justify-between border-b border-slate-200 pb-4">
+        <div className="mb-12 flex items-center justify-between border-b border-border pb-4">
           <Button
             variant="ghost"
             onClick={() => router.back()}
-            className="text-slate-500 hover:text-slate-950 hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
+            className="text-muted-foreground hover:text-foreground hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
           >
             ← Back to Bookshelf
           </Button>
-          <div className="text-xs font-bold tracking-widest uppercase text-slate-400">
-            Book Scanner v1.0
+          <div className="flex items-center gap-4">
+            <Link href="/scan">
+              <Button variant="outline" size="sm" className="gap-2 text-xs font-bold tracking-widest uppercase">
+                <ScanBarcode className="h-3 w-3" />
+                Scan Another
+              </Button>
+            </Link>
+            <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">
+              Book Scanner v1.0
+            </div>
           </div>
         </div>
 
@@ -94,46 +107,60 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
           {/* Left Column: Cover & Specs */}
           <div className="space-y-8 lg:sticky lg:top-8">
             {/* Cover Image - Sharp, elegant shadow */}
-            <div className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-slate-100">
+            <div className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-muted">
               {book.cover_url ? (
                 <img
-                  src={book.cover_url}
+                  src={book.cover_url.startsWith('http') 
+                    ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                    : book.cover_url}
                   alt={`Cover of ${book.title}`}
                   className="object-cover w-full h-full"
+                  onError={(e) => {
+                    // If image fails to load (CORS, broken URL, etc.), show placeholder
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent && !parent.querySelector('.cover-placeholder')) {
+                      const placeholder = document.createElement('div');
+                      placeholder.className = 'cover-placeholder w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-serif italic text-sm';
+                      placeholder.textContent = 'Image not available';
+                      parent.appendChild(placeholder);
+                    }
+                  }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400 font-serif italic">
+                <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-serif italic">
                   No Cover
                 </div>
               )}
             </div>
 
             {/* Specs Table - Clean, Modernist lines */}
-            <div className="border-t-2 border-slate-950 pt-6">
-              <h3 className="font-sans text-xs font-bold uppercase tracking-widest mb-6 text-slate-400">
+            <div className="border-t-2 border-border pt-6">
+              <h3 className="font-sans text-xs font-bold uppercase tracking-widest mb-6 text-muted-foreground">
                 Specifications
               </h3>
               <div className="space-y-4 font-sans text-sm">
-                <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
-                  <span className="font-medium text-slate-500">ISBN</span>
-                  <span className="font-mono text-slate-950">{book.isbn}</span>
+                <div className="flex justify-between items-baseline border-b border-border pb-2">
+                  <span className="font-medium text-muted-foreground">ISBN</span>
+                  <span className="font-mono text-foreground">{book.isbn}</span>
                 </div>
                 {book.publisher && (
-                  <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
-                    <span className="font-medium text-slate-500">Publisher</span>
-                    <span className="text-slate-950 text-right">{book.publisher}</span>
+                  <div className="flex justify-between items-baseline border-b border-border pb-2">
+                    <span className="font-medium text-muted-foreground">Publisher</span>
+                    <span className="text-foreground text-right">{book.publisher}</span>
                   </div>
                 )}
                 {book.published_date && (
-                  <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
-                    <span className="font-medium text-slate-500">Released</span>
-                    <span className="text-slate-950">{book.published_date}</span>
+                  <div className="flex justify-between items-baseline border-b border-border pb-2">
+                    <span className="font-medium text-muted-foreground">Released</span>
+                    <span className="text-foreground">{book.published_date}</span>
                   </div>
                 )}
                 {book.page_count && (
-                  <div className="flex justify-between items-baseline border-b border-slate-100 pb-2">
-                    <span className="font-medium text-slate-500">Length</span>
-                    <span className="text-slate-950">{book.page_count} pages</span>
+                  <div className="flex justify-between items-baseline border-b border-border pb-2">
+                    <span className="font-medium text-muted-foreground">Length</span>
+                    <span className="text-foreground">{book.page_count} pages</span>
                   </div>
                 )}
               </div>
@@ -152,7 +179,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                     .map((category: string, i: number) => (
                       <span
                         key={i}
-                        className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-slate-200 text-slate-500 rounded-full bg-white"
+                        className="px-3 py-1 text-[10px] font-bold uppercase tracking-widest border border-border text-muted-foreground rounded-full bg-card"
                       >
                         {category}
                       </span>
@@ -162,15 +189,15 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
 
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <h1 className="text-5xl md:text-7xl font-serif font-medium tracking-tight text-slate-950 leading-[1.1]">
+                  <h1 className="text-5xl md:text-7xl font-serif font-medium tracking-tight text-foreground leading-[1.1]">
                     {book.title}
                   </h1>
-                  <div className="text-xl md:text-2xl font-serif italic text-slate-500 border-l-2 border-slate-950 pl-6 py-1 mt-4">
+                  <div className="text-xl md:text-2xl font-serif italic text-muted-foreground border-l-2 border-border pl-6 py-1 mt-4">
                     by{" "}
                     {book.author ? (
                       <Link
                         href={`/collection?author=${encodeURIComponent(book.author)}`}
-                        className="hover:text-slate-950 transition-colors underline-offset-4 hover:underline"
+                        className="hover:text-foreground transition-colors underline-offset-4 hover:underline"
                       >
                         {book.author}
                       </Link>
@@ -178,6 +205,84 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                       "Unknown Author"
                     )}
                   </div>
+                  <div className="flex gap-2 mt-4">
+                    <BuyButton isbn={book.isbn} />
+                    <ShareButton 
+                      title={book.title} 
+                      author={book.author || "Unknown Author"} 
+                      isbn={book.isbn} 
+                    />
+                  </div>
+                  {/* Australian Classification Rating */}
+                  {(() => {
+                    const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
+                    const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+                    
+                    // Generate explanation based on classification and warnings
+                    const getClassificationExplanation = (rating: string): { main: string; process: string; disclaimer: string } => {
+                      const severeCount = warnings.filter((w: any) => w.severity === 'severe').length
+                      const moderateCount = warnings.filter((w: any) => w.severity === 'moderate').length
+                      const mildCount = warnings.filter((w: any) => w.severity === 'mild').length
+                      
+                      let mainExplanation = ''
+                      switch (rating) {
+                        case 'G':
+                          mainExplanation = 'General: Suitable for all ages. Contains no material likely to offend or harm.'
+                          break
+                        case 'PG':
+                          mainExplanation = `Parental Guidance: May contain mild themes or content. ${mildCount > 0 ? `Includes ${mildCount} mild content warning${mildCount > 1 ? 's' : ''}.` : 'No specific content warnings.'}`
+                          break
+                        case 'M':
+                          mainExplanation = `Mature: Recommended for ages 15+. ${moderateCount > 0 ? `Contains ${moderateCount} moderate content warning${moderateCount > 1 ? 's' : ''}.` : severeCount > 0 ? `Contains ${severeCount} severe content warning${severeCount > 1 ? 's' : ''}.` : 'Contains mature themes.'}`
+                          break
+                        case 'MA15+':
+                          mainExplanation = `Mature Accompanied: Restricted to ages 15+. ${severeCount > 0 ? `Contains ${severeCount} severe content warning${severeCount > 1 ? 's' : ''} including graphic or intense content.` : moderateCount > 0 ? `Contains ${moderateCount} moderate content warning${moderateCount > 1 ? 's' : ''} with mature themes.` : 'Contains intense or graphic content.'}`
+                          break
+                        case 'R18+':
+                          mainExplanation = `Restricted: Adults only (18+). Contains explicit content including ${severeCount > 0 ? `${severeCount} severe warning${severeCount > 1 ? 's' : ''}` : 'graphic material'} that may be disturbing or offensive.`
+                          break
+                        default:
+                          mainExplanation = `Content Rating: ${rating}. Based on content analysis.`
+                      }
+                      
+                      const processExplanation = 'How it works: Our AI analyzes the book\'s content and assigns severity scores (0.0-1.0) to each warning. The classification is determined by the highest severity found—severe warnings indicate MA15+/R18+, moderate indicates M, mild indicates PG, and no warnings indicates G.'
+                      
+                      const disclaimer = 'This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.'
+                      
+                      return { main: mainExplanation, process: processExplanation, disclaimer }
+                    }
+                    
+                    return classificationRating && (
+                      <div className="flex items-center gap-2 mt-4">
+                        <span className="text-sm font-medium text-muted-foreground">Content Rating:</span>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-1.5 cursor-help">
+                                <span className="text-sm font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
+                                  {classificationRating}
+                                </span>
+                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="max-w-sm">
+                              <div className="text-sm space-y-3">
+                                <p>{getClassificationExplanation(classificationRating).main}</p>
+                                <div className="border-t border-border pt-2">
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    {getClassificationExplanation(classificationRating).process}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground italic">
+                                    {getClassificationExplanation(classificationRating).disclaimer}
+                                  </p>
+                                </div>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                    )
+                  })()}
                 </div>
                 {/* Severity Score Badge - Dev Only */}
                 <div className="flex-shrink-0">
@@ -222,20 +327,20 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                           : '200px',
                       }}
                     >
-                      <p className="text-slate-600 leading-relaxed text-lg">
+                      <p className="text-muted-foreground leading-relaxed text-lg">
                         {cleanDescription}
                       </p>
                     </div>
                     {shouldTruncate && !isDescriptionExpanded && (
                       <div 
-                        className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white via-white/95 to-transparent pointer-events-none transition-opacity duration-300 ease-in-out"
+                        className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background via-background/95 to-transparent pointer-events-none transition-opacity duration-300 ease-in-out"
                       />
                     )}
                   </div>
                   {shouldTruncate && (
                     <button
                       onClick={handleToggle}
-                      className="mt-4 text-sm font-medium text-slate-500 hover:text-slate-950 transition-colors underline-offset-4 hover:underline"
+                      className="mt-4 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
                     >
                       {isDescriptionExpanded ? 'Show less' : 'Read more'}
                     </button>
@@ -246,11 +351,16 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
 
             {/* Content Warnings - The "Feature" Block */}
             <div className="mt-16">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-px bg-slate-200 flex-1"></div>
-                <h3 className="font-serif text-2xl text-slate-950 italic">Content Analysis</h3>
-                <div className="h-px bg-slate-200 flex-1"></div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="h-px bg-border flex-1"></div>
+                <h3 className="font-serif text-2xl text-foreground italic">Content Analysis</h3>
+                <div className="h-px bg-border flex-1"></div>
               </div>
+              
+              {/* Disclaimer */}
+              <p className="text-sm text-muted-foreground italic mb-8 text-center max-w-2xl mx-auto">
+                Content warnings help readers make informed choices — they're not judgments about books or readers.
+              </p>
 
               <ContentWarningsList
                 warnings={warnings}
@@ -258,18 +368,21 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
               />
             </div>
 
+            {/* Google Books Attribution (TOS Compliance) */}
+            <GoogleBooksAttribution isbn={book.isbn} className="mt-8" />
+
             {/* Dev-Only: Collapsible Audit History */}
             {isDev && showAuditTrail && (
-              <div className="mt-12 border-t border-slate-100 pt-8">
+              <div className="mt-12 border-t border-border pt-8">
                 <Collapsible open={isAuditOpen} onOpenChange={setIsAuditOpen} className="w-full space-y-4">
                   <div className="flex items-center justify-between group cursor-pointer" onClick={() => setIsAuditOpen(!isAuditOpen)}>
                     <div className="flex items-center gap-2">
-                      <Code className="h-3 w-3 text-slate-400" />
-                      <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-slate-400 group-hover:text-slate-600 transition-colors">
+                      <Code className="h-3 w-3 text-muted-foreground" />
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">
                         [DEV] System Logs & Audit Trail
                       </h3>
                     </div>
-                    <Button variant="ghost" size="sm" className="w-9 p-0 text-slate-400 group-hover:text-slate-600">
+                    <Button variant="ghost" size="sm" className="w-9 p-0 text-muted-foreground group-hover:text-foreground">
                       {isAuditOpen ? (
                         <ChevronUp className="h-4 w-4" />
                       ) : (
@@ -279,7 +392,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                     </Button>
                   </div>
                   <CollapsibleContent className="space-y-2">
-                    <div className="bg-slate-50 rounded-lg p-6 border border-slate-100 font-mono text-sm">
+                    <div className="bg-muted rounded-lg p-6 border border-border font-mono text-sm">
                       <AuditHistory bookId={book.id} />
                     </div>
                   </CollapsibleContent>

@@ -1,4 +1,4 @@
-import { Agent, run, tool } from "@openai/agents";
+import { Agent, run, tool, setDefaultOpenAIKey } from "@openai/agents";
 import { z } from "zod";
 import { 
   WARNING_CATEGORIES, 
@@ -11,11 +11,29 @@ import {
   type PresenceType,
   type DetailLevel
 } from "./config/taxonomy-v2";
+import { classifySeverity, type ClassificationContext } from "./services/severity-classification-agent";
 
-// Configure OpenAI API key
-
-// Note: We don't check for OPENAI_API_KEY here to avoid build-time errors.
-// The Agent class will handle missing keys or we can check inside the function.
+// Helper function to ensure API key is set at runtime
+// In Next.js serverless functions, env vars are available at runtime, not module load
+function ensureOpenAIKey(): string | null {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    console.error('[Agent Config] ❌ OPENAI_API_KEY not found in process.env');
+    console.error('[Agent Config] Available env vars:', Object.keys(process.env).filter(k => k.includes('OPENAI') || k.includes('API')));
+    return null;
+  }
+  
+  // Trim whitespace and validate format (OpenAI keys start with 'sk-')
+  const trimmedKey = apiKey.trim();
+  if (!trimmedKey.startsWith('sk-')) {
+    console.warn('[Agent Config] ⚠️ OPENAI_API_KEY format looks invalid (should start with sk-)');
+  }
+  
+  setDefaultOpenAIKey(trimmedKey);
+  console.log('[Agent Config] ✅ OpenAI API key configured (length:', trimmedKey.length, ')');
+  return trimmedKey;
+}
 
 // Web search tool for the AI agent
 export const performWebSearch = async (args: any) => {
@@ -318,8 +336,226 @@ const webSearchTool = tool({
   execute: performWebSearch
 });
 
+// Old assumption-based instructions (for comparison)
+const getOldInstructions = () => `
+**REMEMBER**: 
+1. If the description is short or missing, ALWAYS use web search to find the full plot summary.
+2. **CRITICAL: Use Your Internal Knowledge**: If the web search returns limited results or "no results", **YOU MUST use your internal training data** to fill in the gaps. You know about popular books like "Twisted Love" (dark romance, abuse themes), "The Catcher in the Rye" (mental health, language), "1984" (violence, torture), etc. DO NOT say "no warnings" just because the search tool failed.
+3. **CRITICAL: Romance/Fantasy Books**: Romance and fantasy romance books typically contain sexual content, violence, and mature themes. Even if web search fails, you MUST generate appropriate warnings based on genre conventions.
+4. **Well-Known Books**: For books you recognize from your training, generate warnings based on what you know about them.
+5. **When Web Search Fails**: If web search returns no results but you have a book title and author, you MUST still generate warnings based on genre conventions, author's typical content, and title keywords.
+6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
+7. Err on the side of caution - better to warn than to miss important content.
+8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
+9. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+`;
+
+// New evidence-based instructions
+const getNewInstructions = () => `
+**CRITICAL RULES - NO ASSUMPTIONS**:
+1. **ONLY analyze THIS SPECIFIC BOOK** - Do NOT make assumptions based on:
+   - Author's other works or reputation
+   - Genre conventions or typical themes
+   - Similar book titles or authors
+   - Your internal knowledge about other books
+
+2. **Evidence-Based Analysis Only**:
+   - Base warnings ONLY on the book description provided
+   - If description is short/missing, use web search to find THIS SPECIFIC BOOK's plot summary
+   - Only use verified information from web search results about THIS BOOK
+   - If web search fails to find information about THIS SPECIFIC BOOK, return empty warnings with confidence set to 'low' and reasoning explaining insufficient information
+
+3. **When Information is Insufficient**:
+   - If you cannot find verified information about THIS SPECIFIC BOOK, return an empty warnings array: []
+   - Set confidence to 'low'
+   - In reasoning, explain: "Insufficient information available about this specific book. Unable to generate content warnings without verified content details."
+   - DO NOT generate warnings based on assumptions, author reputation, or genre conventions
+
+4. **AUTHOR AUTHORITY**: If you find content warnings on the author's official website FOR THIS SPECIFIC BOOK, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
+
+5. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
+
+6. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+
+7. **Reasoning must be specific**: In your reasoning field, cite the specific evidence from the book description or web search that led to each warning. Do NOT reference author's other works or genre conventions.
+`;
+
+// Hybrid instructions - combines evidence-based rigor with assumption-based comprehensiveness
+const getHybridInstructions = () => `
+## HYBRID APPROACH - EVIDENCE FIRST, THEN INFERENCE
+
+### PHASE 1: Evidence-Based Analysis (Primary)
+
+**1. Source Reliability Hierarchy (In Order of Priority):**
+
+1. **Author/Publisher Authority**: Official "Content Notes" or "Trigger Warnings" from the author's website or publisher page. (Gold Standard).
+2. **Professional Reviews**: Kirkus, Publishers Weekly, Common Sense Media.
+3. **User Consensus**: Goodreads/StoryGraph (Only if multiple reviews cite specific details).
+
+**2. Execution:**
+
+- Base warnings on the book description provided.
+- Use web search to verify details for THIS SPECIFIC BOOK.
+- **Conflict Resolution**: If the Author says "clean" but >70% of user reviews cite a specific graphic trigger, flag it as Verified (User Consensus).
+
+**3. Verification Marking:**
+
+- If found in Source type 1 (Author/Publisher), set \`is_author_verified\` to \`true\` and include \`source_url\`.
+
+### PHASE 2: Inference-Based Analysis (Secondary)
+
+**4. Inference Logic:**
+
+- Use ONLY when verified info is insufficient.
+- **Inference Rules**:
+  - *Romance Genre*: Do NOT infer explicit sex unless "Steamy", "Spice", or "Erotica" is indicated.
+  - *Thriller/Mystery*: Do NOT infer graphic gore unless "Horror", "Slasher", or "Dark" is indicated.
+- Set confidence score lower (0.5 - 0.69) for inferred warnings.
+
+### PHASE 3: Calibration & False Positive Checks
+
+**5. False Positive Logic (Run before outputting):**
+
+- **Death ≠ Grief**: Character death alone is not "Grief" unless the *processing* of loss is a theme.
+- **Action ≠ Violence**: Fantasy battles/Action sequences are usually "Mild/Moderate" unless gore is described.
+- **Non-Fiction**: Clinical discussion of sensitive topics (e.g., history, psychology) uses the \`clinical\` detail level and lower severity than graphic fiction.
+
+**6. Classification Requirement:**
+
+- ALWAYS include a \`classification_rating\` (G/PG/etc.) even if the list of warnings is empty.
+
+**7. Cultural Appropriation & Colonial Themes Detection (CRITICAL):**
+
+- **Watch for**: Books that appropriate or exploit Indigenous, First Nations, or marginalized cultures
+- **Examples**: 
+  - Fantasy/sci-fi books that borrow heavily from real-world cultures (e.g., Middle Eastern, Indigenous, African) without proper context or respect
+  - Colonial narratives where colonizers are portrayed as heroes
+  - "White savior" tropes or narratives that center colonizers over Indigenous peoples
+  - Books that use cultural elements as exotic "flavor" without meaningful representation
+- **Use**: \`category_id: "discrimination"\`, \`subcategory_id: "cultural_appropriation"\`
+- **Set \`has_indigenous_deceased\` flag**: If the book contains Indigenous/First Nations content that may include names/images of deceased persons (Australian cultural protocol)
+- **Note**: This is important for Australian readers, especially in educational contexts. 
+- **SPECIFIC EXAMPLES TO FLAG**:
+  - **"Dune" by Frank Herbert**: The Fremen are heavily based on Middle Eastern and North African desert cultures (Bedouin, Arabic influences). The narrative centers on a colonizer (Paul Atreides) becoming a messianic figure to the Fremen, which has been criticized as a "white savior" narrative and cultural appropriation.
+  - **Books with colonial themes**: Any book where colonizers/outsiders "save" or "lead" Indigenous or marginalized groups
+  - **Cultural borrowing without context**: Fantasy worlds that directly lift real-world cultural elements without acknowledgment or respect
+- **When in doubt, flag it**: If a book has been criticized for cultural appropriation in reviews or academic discussions, include this warning.
+
+**8. Reasoning Transparency:**
+
+- \`reasoning\` field must clearly state:
+  - **evidence_type**: "verified" or "inferred"
+  - **sources_checked**: List sources you checked (e.g., "Author Site", "Kirkus", "Goodreads")
+  - **key_evidence**: Direct quote or specific plot point that led to this warning
+  - **conflict_resolution**: Why you chose this severity if sources disagreed (if applicable)
+  - **confidence_rationale**: Why you assigned this confidence score
+
+**8. Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+
+## Subtle Trigger Detection (CRITICAL)
+
+**1. Phobia Detection:**
+- Look for explicit mentions: "snake", "spider", "needle", "drowning", "heights", "darkness", "blood", "enclosed spaces", "claustrophobic", "vomit", "vomiting", "nausea", "sick", "teeth", "dental", "trypophobia"
+- Check for phobia-related language: "fear of", "terrified by", "panic at the sight of", "phobia", "afraid of"
+- Consider context: 
+  - Medical scenes → needles, dental procedures
+  - Underwater scenes → drowning
+  - Dark scenes → darkness
+  - High places → heights
+  - Sickness scenes → vomiting/emetophobia
+  - Dental scenes → dental trauma
+- If phobia is central to plot or character, flag it even if not explicitly stated
+- Use category: \`phobias\` with appropriate subcategory (snakes, spiders, needles, heights, water, enclosed_spaces, darkness, blood, vomiting, trypophobia, dental_trauma)
+- **Note:** Animal death is now in \`death_or_grief\` category, not phobias
+
+**2. Dark Romance / Kink Detection (CRITICAL):**
+- **CNC (Consensual Non-Consent)**: Look for negotiated non-consent, CNC play, or consensual non-consent scenarios. This is distinct from actual non-consent and is very popular in dark romance. Use \`sexual_content\` → \`cnc\`
+- **Dub-Con (Dubious Consent)**: Same as "Ambiguous Consent" but use the term "Dub-Con" in reasoning if it's the industry term. Use \`sexual_content\` → \`consent_ambiguity\`
+- **Somnophilia**: Sexual acts while one partner is sleeping/unconscious. Very common in dark college romances. Use \`sexual_content\` → \`somnophilia\`
+- **Breeding Kink**: Sexual focus on impregnation as kink (distinct from actual pregnancy). Use \`sexual_content\` → \`breeding_kink\`
+- **Knife Play / Blood Play**: Sexualized use of knives or blood in sexual contexts. Use \`sexual_content\` → \`knife_play\`
+- **Primal Play**: Hunting/chasing dynamics, "touch her and you die" tropes. Use \`sexual_content\` → \`primal_play\`
+- **Grooming**: Predatory behavior, manipulation of vulnerable individuals (often age-gap). Use \`emotional_abuse_or_toxic_relationships\` → \`grooming\`
+- **Human Trafficking**: Distinct from general kidnapping, often in dark mafia romance. Use \`violence\` → \`human_trafficking\`
+- **Cannibalism**: Eating human flesh, cannibalistic themes (horror romance niche). Use \`violence\` → \`cannibalism\`
+- **Incest / Pseudo-Incest**: Step-siblings, blood relations, or pseudo-incest. Use \`family_dynamics\` → \`incest_taboo\`
+
+**3. LGBTQ+ Specific Discrimination:**
+- **Acephobia**: Look for invalidation of asexuality, pressure to be sexual, "just hasn't met the right person", questioning asexual identity
+- **Lesbophobia**: Specific discrimination against lesbians, fetishization, invalidation, or "corrective" behavior
+- **Misgendering**: Deadnaming, wrong pronouns, refusal to use correct pronouns, or intentional misgendering of trans/non-binary characters
+- **Biphobia**: Biphobic stereotypes, "not really bi", "just confused", or invalidation of bisexuality
+- **Queerphobia**: General anti-queer sentiment, queerphobic language, or discrimination against LGBTQ+ people beyond specific categories
+- Use category: \`discrimination\` with appropriate subcategory (acephobia, lesbophobia, misgendering, biphobia, queerphobia)
+
+**4. Cultural Sensitivities & Discrimination:**
+- Beyond cultural appropriation, look for:
+  - Stereotyping of marginalized groups
+  - Problematic representation of Indigenous/First Nations people
+  - Orientalism or exoticization
+  - White savior narratives
+  - Tokenism or lack of meaningful representation
+  - **Fatphobia**: Body shaming, weight-based discrimination, anti-fat bias (use \`discrimination\` → \`fatphobia\`)
+  - **Classism**: Poverty, homelessness, economic discrimination (use \`discrimination\` → \`classism\`)
+  - **Antisemitism**: Anti-Jewish discrimination, Jewish stereotypes (use \`discrimination\` → \`antisemitism\`)
+  - **Islamophobia**: Anti-Muslim discrimination, Muslim stereotypes (use \`discrimination\` → \`islamophobia\`)
+  - Use category: \`discrimination\` with appropriate subcategory
+
+**5. Subtle Emotional Triggers:**
+- **Grief Processing**: Not just death, but the emotional journey of processing loss, detailed mourning, or grief therapy
+- **Divorce/Separation**: Relationship breakdown, family separation, or divorce as a central theme
+- **Infertility**: Not just mentioned, but as a central theme or trauma (use category: \`medical_health\`, subcategory: \`infertility\`)
+- **Medical Trauma**: Hospital scenes, medical procedures, medical emergencies (use category: \`medical_health\`, subcategory: \`medical_procedures\`)
+- Use category: \`death_or_grief\` with subcategories: \`grief_processing\` or \`divorce\`
+
+**6. Niche Themes:**
+- **Cults**: Cult dynamics, indoctrination, cult manipulation (use category: \`religious_cult\`, subcategory: \`cult_content\`)
+- **Religious Trauma**: Religious abuse, religious-based harm (use category: \`religious_cult\`, subcategory: \`religious_trauma\`)
+- **Occult**: Occult themes, supernatural elements, dark magic (use category: \`religious_cult\`, subcategory: \`occult\`)
+- **Police Brutality**: Police violence, state violence, systemic violence by authorities (use category: \`violence\`, subcategory: \`police_brutality\`)
+- **School Shootings**: Mass shootings, school violence (use category: \`violence\`, subcategory: \`school_shootings\`)
+- **Stalking**: Obsessive following, unwanted surveillance (use category: \`emotional_abuse_or_toxic_relationships\`, subcategory: \`stalking\`)
+- **Financial Abuse**: Economic control, financial manipulation (use category: \`emotional_abuse_or_toxic_relationships\`, subcategory: \`financial_abuse\`)
+- **Family Dynamics**: Parental abandonment, foster care trauma (use category: \`family_dynamics\`, subcategories: \`parental_abandonment\`, \`foster_care_adoption\`)
+- **Accidents**: Car crashes, plane crashes, vehicle accidents (use category: \`other\`, subcategory: \`accidents\`)
+
+**7. Context Clues for Detection:**
+- **Genre Signals**: 
+  - Horror → check for phobias (snakes, spiders, darkness, enclosed spaces), cannibalism
+  - Dark romance → check for CNC, dub-con, somnophilia, breeding kink, knife play, grooming, human trafficking
+  - Horror romance → check for cannibalism, extreme kinks
+  - Mafia romance → check for human trafficking, violence
+  - Medical thrillers → check for medical procedures, needles, blood
+  - Police procedurals → check for police brutality
+  - Religious fiction → check for religious trauma, cult content
+  - Age-gap romance → check for grooming, power imbalance
+- **Setting Signals**: 
+  - Hospital → medical trauma, needles
+  - Underwater → drowning, water phobia
+  - Dark places → darkness phobia
+  - High places → heights phobia
+  - Cults/religious communities → cult content, religious trauma
+- **Character Signals**: 
+  - Trans character → check for misgendering, transphobia
+  - Ace character → check for acephobia
+  - Lesbian characters → check for lesbophobia
+  - Bi character → check for biphobia
+  - Medical professionals → check for medical procedures
+  - Fat characters → check for fatphobia
+  - Jewish/Muslim characters → check for antisemitism/islamophobia
+  - Poor characters → check for classism
+  - Children in care → check for foster care/adoption trauma
+  - Characters with parents leaving → check for parental abandonment
+
+**7. When in Doubt:**
+- If a trigger is commonly requested but not explicitly mentioned, flag it with lower confidence (0.4-0.6)
+- Use \`presence: implied\` for subtle triggers
+- Use \`detail_level: vague\` for implied but not explicit content
+- Better to flag with lower confidence than miss an important trigger
+`;
+
 // Define the base agent config
-const getBaseAgentConfig = (model: string = "gpt-4o") => ({
+const getBaseAgentConfig = (model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid') => ({
   name: "Content Warning Agent",
   model: model,
   instructions: `
@@ -403,7 +639,7 @@ ${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (defaul
 - **graphic**: Detailed, explicit, or graphic description of the content
 - **moderate**: Moderate level of detail, not overly explicit but clear
 - **vague**: Vague or minimal description, mostly implied
-- **clinical**: Clinical or matter-of-fact description without emotional detail
+- **clinical**: Clinical or matter-of-fact description (common in non-fiction/educational)
 
 **NOTE**: The \`detail_level\` field describes how the content appears IN THE BOOK. The \`reasoning\` field should ALWAYS use clinical language regardless of the book's detail_level.
 
@@ -414,36 +650,43 @@ ${cat.subcategories.map(sub => `- \`${sub.id}\`: ${sub.shortDescription} (defaul
 - When in doubt, set to \`false\`
 - **CRITICAL**: If your reasoning field contains plot-specific information, you MUST set \`is_spoiler: true\` AND rewrite the reasoning to be categorical
 
-## Scoring & Severity
-For each category, assign a score from 0.0 to 1.0 based on the intensity and frequency of the content:
-- 0.0 - 0.30: None (No significant content)
-- 0.31 - 0.55: Mild (Infrequent or low impact)
-- 0.56 - 0.80: Moderate (Frequent or moderate impact)
-- 0.81 - 1.0: Severe (High impact, graphic, or pervasive)
+## Scoring & Severity (ACB Alignment)
+
+For each category, assign a score from 0.0 to 1.0 based on the intensity and frequency, aligned with Australian Classification Board impact tests:
+
+- **0.0 - 0.30: None / Very Mild (G)**
+  *(Context is comedic, educational, or highly stylized)*
+- **0.31 - 0.55: Mild (PG)**
+  *(Infrequent, low impact, implied violence, vague sexual references)*
+- **0.56 - 0.80: Moderate (M)**
+  *(Mature themes, moderate impact, non-graphic sexual scenes, detailed but not prolonged violence)*
+- **0.81 - 1.0: Severe (MA15+ / R18+)**
+  *(High impact, graphic/prolonged violence, explicit sexual activity, sexual violence)*
 
 ## Classification Ratings
-Based on the highest severity score:
-- None/Mild → "G" or "PG"
-- Moderate → "M" or "MA15+"
-- Severe → "MA15+" or "R18+"
 
-**REMEMBER**: 
-1. If the description is short or missing, ALWAYS use web search to find the full plot summary.
-2. **CRITICAL: Use Your Internal Knowledge**: If the web search returns limited results or "no results", **YOU MUST use your internal training data** to fill in the gaps. You know about popular books like "Twisted Love" (dark romance, abuse themes), "The Catcher in the Rye" (mental health, language), "1984" (violence, torture), etc. DO NOT say "no warnings" just because the search tool failed.
-3. **CRITICAL: Romance/Fantasy Books**: Romance and fantasy romance books typically contain sexual content, violence, and mature themes. Even if web search fails, you MUST generate appropriate warnings based on genre conventions.
-4. **Well-Known Books**: For books you recognize from your training, generate warnings based on what you know about them.
-5. **When Web Search Fails**: If web search returns no results but you have a book title and author, you MUST still generate warnings based on genre conventions, author's typical content, and title keywords.
-6. **ALWAYS include a classification_rating** - even if there are no warnings, assign "G" or "PG".
-7. Err on the side of caution - better to warn than to miss important content.
-8. **AUTHOR AUTHORITY**: If you see a result starting with "Source: Direct Author Site Scrape" or find content warnings on the author's official website, these are the **GOLD STANDARD**. Prioritize them over all other sources. You MUST set is_author_verified to true (boolean) and provide the source_url if you use such a source. DO NOT FORGET TO SET THE BOOLEAN FLAG.
-9. **Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
-10. **CRITICAL: Categorical Reasoning Enforcement**: Before submitting any warning, review the \`reasoning\` field. If it contains ANY of the following, rewrite it to be categorical:
-    - Character names or specific relationships
-    - Plot events or story beats
-    - Chapter numbers or timing
-    - Specific methods or details of events
-    - Story outcomes or character fates
-    Replace narrative descriptions with categorical taxonomy language (e.g., "themes of", "depictions of", "references to").
+Based on the highest severity score found:
+
+- **G**: 0.0 - 0.20
+- **PG**: 0.21 - 0.40
+- **M**: 0.41 - 0.70
+- **MA15+**: 0.71 - 0.90
+- **R18+**: 0.91 - 1.0
+
+${instructionMode === 'old' ? getOldInstructions() : instructionMode === 'new' ? getNewInstructions() : getHybridInstructions()}
+
+**CRITICAL: Categorical Reasoning Enforcement**
+- For each warning's \`reasoning\` field, use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
+- DO NOT include specific plot points, character names, story events, or narrative details
+- Example: "Contains pervasive themes of sexual violence and exploitation" NOT "Character is sold as a prostitute"
+- The reasoning should describe the TYPE of content, not specific plot occurrences
+- Before submitting any warning, review the \`reasoning\` field. If it contains ANY of the following, rewrite it to be categorical:
+  - Character names or specific relationships
+  - Plot events or story beats
+  - Chapter numbers or timing
+  - Specific methods or details of events
+  - Story outcomes or character fates
+  Replace narrative descriptions with categorical taxonomy language (e.g., "themes of", "depictions of", "references to").
 
 If no content warnings are needed after thorough analysis (including web search if needed), return an empty array: []`
 });
@@ -545,7 +788,7 @@ type WorkflowOutput = z.infer<typeof WorkflowOutputSchema> & {
 };
 
 // Main workflow entrypoint
-export const findBookAndGenerateWarnings = async (isbn: string, model: string = "gpt-4o"): Promise<{
+export const findBookAndGenerateWarnings = async (isbn: string, model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid'): Promise<{
   book_found: boolean;
   book_title?: string;
   book_author?: string;
@@ -558,6 +801,20 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
   reasoning: string;
   raw_output?: any; // For debug
 }> => {
+  // Ensure API key is set before creating agent (check at runtime, not module load)
+  const apiKey = ensureOpenAIKey();
+  if (!apiKey) {
+    console.error('[findBookAndGenerateWarnings] ❌ OPENAI_API_KEY not available');
+    console.error('[findBookAndGenerateWarnings] process.env keys:', Object.keys(process.env).filter(k => k.includes('OPENAI') || k.includes('API')).join(', '));
+    return {
+      book_found: false,
+      content_warnings: [],
+      confidence: 'low',
+      reasoning: 'Configuration error: OPENAI_API_KEY environment variable is not set or not accessible. Please configure it in Vercel environment variables and ensure it is available for Production environment.'
+    };
+  }
+  
+  console.log('[findBookAndGenerateWarnings] ✅ API key available, creating agent...');
   let capturedOutput: z.infer<typeof FindBookOutputSchema> | null = null;
 
   const submitTool = tool({
@@ -570,19 +827,24 @@ export const findBookAndGenerateWarnings = async (isbn: string, model: string = 
     }
   });
 
-  const agentConfig = getBaseAgentConfig(model);
+  // Double-check API key is set right before creating agent
+  if (!apiKey) {
+    const recheckKey = ensureOpenAIKey();
+    if (!recheckKey) {
+      throw new Error('OPENAI_API_KEY not available when creating agent');
+    }
+  }
+
+  const agentConfig = getBaseAgentConfig(model, instructionMode);
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
     instructions: agentConfig.instructions + "\n\nWhen you have gathered all information and generated warnings, you MUST call the `submit_findings` tool with your results.\n\n**FINAL CHECK**: Before submitting, review each warning's \`reasoning\` field. If it contains plot-specific information (character names, events, story beats), rewrite it to use categorical taxonomy language only."
   });
 
-  console.log('Agent created inside function:', agent);
-  console.log('Agent prototype inside function:', Object.getPrototypeOf(agent));
-  // @ts-ignore
-  console.log('Agent has getEnabledHandoffs:', typeof agent.getEnabledHandoffs);
+  console.log('[findBookAndGenerateWarnings] Agent created successfully');
 
-  const inputText = `
+  const inputText = instructionMode === 'old' ? `
 I need you to find information about a book with ISBN: ${isbn}
 
 **SEARCH STRATEGY:**
@@ -602,6 +864,31 @@ I need you to find information about a book with ISBN: ${isbn}
 - DO NOT include specific plot points, character names, story events, or narrative details
 - Example: "Contains pervasive themes of sexual violence and exploitation" NOT "Character is sold as a prostitute"
 - The reasoning should describe the TYPE of content, not specific plot occurrences
+` : `
+I need you to find information about a book with ISBN: ${isbn}
+
+**SEARCH STRATEGY:**
+1. Use web search with the ISBN directly: "${isbn}" or "isbn ${isbn}" - the search tool will automatically detect ISBNs and search Google Books
+2. Also try searching for variations like "ISBN ${isbn} book" or "${isbn} book title author"
+3. If the ISBN search fails to return a description or cover, try searching for the book by Title + Author if you can find that information.
+
+**CRITICAL - NO ASSUMPTIONS:**
+- Only generate warnings based on verified information about THIS SPECIFIC BOOK (identified by ISBN ${isbn})
+- Do NOT make assumptions based on author's other works, genre conventions, or similar books
+- If you cannot find verified information about THIS SPECIFIC BOOK, set book_found: false or return empty warnings with confidence: 'low'
+
+**OUTPUT REQUIREMENTS:**
+1. Return the book metadata (title, author, description, cover URL) ONLY if you can verify this is the correct book for ISBN ${isbn}.
+2. Analyze the content of THIS SPECIFIC BOOK and return a list of warnings with scores (0.0-1.0) based ONLY on verified information about THIS BOOK.
+3. Assign a classification rating (G, PG, M, MA15+, R18+) based on THIS BOOK's content.
+4. Provide a confidence level and reasoning that cites specific evidence from THIS BOOK's description or verified sources.
+5. CALL THE submit_findings TOOL WITH THE RESULT.
+
+**CRITICAL: Categorical Reasoning Enforcement**
+- For each warning's \`reasoning\` field, use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
+- DO NOT include specific plot points, character names, story events, or narrative details
+- Example: "Contains pervasive themes of sexual violence and exploitation" NOT "Character is sold as a prostitute"
+- The reasoning should describe the TYPE of content, not specific plot occurrences
 `;
 
   try {
@@ -614,7 +901,36 @@ I need you to find information about a book with ISBN: ${isbn}
     const parsed = capturedOutput as z.infer<typeof FindBookOutputSchema>;
 
     // Map to legacy format and add derived fields
-    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map(w => {
+    // Classify severity for each warning using classification agent
+    const classificationContexts: ClassificationContext[] = (parsed.content_warnings || []).map(w => ({
+      category_id: w.category_id,
+      subcategory_id: w.subcategory_id || null,
+      description: w.description,
+      score: w.score,
+      presence: w.presence || 'on_page',
+      detail_level: w.detail_level || null,
+      book_genre: parsed.book_categories?.join(', ') || undefined,
+      book_description: parsed.book_description || undefined
+    }));
+
+    // Classify all warnings (in parallel for efficiency)
+    let classificationResults;
+    try {
+      if (classificationContexts.length > 0) {
+        classificationResults = await Promise.all(
+          classificationContexts.map(context => classifySeverity(context, model))
+        );
+        console.log(`[Content Warning Agent] Classified ${classificationResults.length} warnings using classification agent`);
+      } else {
+        classificationResults = null;
+      }
+    } catch (error) {
+      console.warn('[Content Warning Agent] Classification agent failed, falling back to score-based mapping:', error);
+      // Fallback to score-based mapping if classification fails
+      classificationResults = null;
+    }
+
+    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map((w, index) => {
       // Validate subcategory_id matches parent (post-validation)
       let validatedSubcategoryId = w.subcategory_id;
       if (w.subcategory_id && !validateSubcategoryParent(w.category_id, w.subcategory_id)) {
@@ -622,10 +938,24 @@ I need you to find information about a book with ISBN: ${isbn}
         validatedSubcategoryId = null;
       }
 
+      // Use classification result if available, otherwise fallback to score-based mapping
+      let severity: 'mild' | 'moderate' | 'severe';
+      if (classificationResults && classificationResults[index]) {
+        severity = classificationResults[index].severity;
+        // Update reasoning with classification reasoning if available
+        if (classificationResults[index].reasoning) {
+          w.reasoning = `${w.reasoning || ''} [Classification: ${classificationResults[index].reasoning}]`.trim();
+        }
+      } else {
+        // Fallback to score-based mapping
+        const scoreBasedSeverity = getSeverityFromScore(w.score);
+        severity = scoreBasedSeverity === 'none' ? 'mild' : scoreBasedSeverity as 'mild' | 'moderate' | 'severe';
+      }
+
       return {
         ...w,
         subcategory_id: validatedSubcategoryId,
-        severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe', // Fallback for legacy type
+        severity: severity,
         category: w.category_id, // Map id to legacy category field
         id: crypto.randomUUID(), // Temp ID
         helpful_count: 0,
@@ -666,16 +996,45 @@ I need you to find information about a book with ISBN: ${isbn}
 
   } catch (error) {
     console.error("AI book search failed:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for different error types
+    const isMissingKey = errorMessage.includes('apiKey') || errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('Missing credentials');
+    const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('exceeded') || errorMessage.includes('billing');
+    const isRateLimitError = errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('TPM') || errorMessage.includes('RPM');
+    
+    let reasoning = `Error during AI search: ${errorMessage}`;
+    if (isMissingKey) {
+      reasoning = `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`;
+    } else if (isQuotaError) {
+      reasoning = `Error during AI search: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.`;
+    } else if (isRateLimitError) {
+      reasoning = `Error: ${errorMessage} (Note: Deep web search could not confirm this safety rating due to lack of online results. Manual review recommended.)`;
+    }
+    
     return {
       book_found: false,
       content_warnings: [],
       confidence: 'low',
-      reasoning: `Error during AI search: ${error instanceof Error ? error.message : 'Unknown error'}`
+      reasoning
     };
   }
 };
 
-export const generateContentWarnings = async (workflow: WorkflowInput, model: string = "gpt-4o"): Promise<WorkflowOutput> => {
+export const generateContentWarnings = async (workflow: WorkflowInput, model: string = "gpt-4o", instructionMode: 'old' | 'new' | 'hybrid' = 'hybrid'): Promise<WorkflowOutput> => {
+  // Ensure API key is set before creating agent (check at runtime, not module load)
+  const apiKey = ensureOpenAIKey();
+  if (!apiKey) {
+    console.error('[generateContentWarnings] ❌ OPENAI_API_KEY not available');
+    console.error('[generateContentWarnings] process.env keys:', Object.keys(process.env).filter(k => k.includes('OPENAI') || k.includes('API')).join(', '));
+    return {
+      content_warnings: [],
+      confidence: 'low',
+      reasoning: 'Configuration error: OPENAI_API_KEY environment variable is not set or not accessible. Please configure it in Vercel environment variables and ensure it is available for Production environment.'
+    };
+  }
+  
+  console.log('[generateContentWarnings] ✅ API key available, creating agent...');
   let capturedOutput: z.infer<typeof WorkflowOutputSchema> | null = null;
 
   const submitTool = tool({
@@ -688,12 +1047,22 @@ export const generateContentWarnings = async (workflow: WorkflowInput, model: st
     }
   });
 
-  const agentConfig = getBaseAgentConfig(model);
+  // Double-check API key is set right before creating agent
+  if (!apiKey) {
+    const recheckKey = ensureOpenAIKey();
+    if (!recheckKey) {
+      throw new Error('OPENAI_API_KEY not available when creating agent');
+    }
+  }
+
+  const agentConfig = getBaseAgentConfig(model, instructionMode);
   const agent = new Agent({
     ...agentConfig,
     tools: [webSearchTool, submitTool],
     instructions: agentConfig.instructions + "\n\nWhen you have generated warnings, you MUST call the `submit_warnings` tool with your results.\n\n**FINAL CHECK**: Before submitting, review each warning's \`reasoning\` field. If it contains plot-specific information (character names, events, story beats), rewrite it to use categorical taxonomy language only."
   });
+
+  console.log('[generateContentWarnings] Agent created successfully');
 
   // Check if description is thin (less than 150 chars or just a quote)
   const isThinDescription = !workflow.book_description || workflow.book_description.length < 150;
@@ -707,7 +1076,7 @@ ${workflow.book_description ? `- Description: ${workflow.book_description}` : '-
 ${workflow.book_categories ? `- Categories: ${workflow.book_categories.join(', ')}` : ''}
 ${workflow.book_isbn ? `- ISBN: ${workflow.book_isbn}` : ''}
 
-${isThinDescription ? `
+${isThinDescription ? (instructionMode === 'old' ? `
 ⚠️ IMPORTANT: The book description provided is very short or missing. You MUST use web search to find:
 1. A full plot summary of this book
 2. Reviews or analyses that discuss the book's themes
@@ -716,10 +1085,19 @@ ${isThinDescription ? `
 DO NOT rely on the short description above. Search for "[${workflow.book_title}] ${workflow.book_author} plot summary" and "[${workflow.book_title}] content warnings" to get complete information.
 
 This book may be a well-known classic or controversial work that requires thorough analysis.
-` : ''}
+` : `
+⚠️ IMPORTANT: The book description provided is very short or missing. You MUST use web search to find:
+1. A full plot summary of THIS SPECIFIC BOOK: "${workflow.book_title}" by ${workflow.book_author}
+2. Reviews or analyses that discuss THIS BOOK's themes
+3. Any known content warnings or controversies about THIS SPECIFIC BOOK
 
-Please analyze this book and generate appropriate content warnings using Australian Classification Board standards. 
-${isThinDescription ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : ''}
+Search for "[${workflow.book_title}] ${workflow.book_author} plot summary" and "[${workflow.book_title}] content warnings" to get complete information.
+
+**CRITICAL**: Only generate warnings based on verified information about THIS SPECIFIC BOOK. Do NOT make assumptions based on the author's other works, genre conventions, or similar books. If you cannot find verified information about THIS BOOK, return empty warnings with low confidence.
+`) : ''}
+
+Please analyze ${instructionMode === 'old' ? 'this book' : 'THIS SPECIFIC BOOK'} and generate appropriate content warnings using Australian Classification Board standards. 
+${isThinDescription ? (instructionMode === 'old' ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : instructionMode === 'new' ? 'Since the description is brief, you MUST use web search to find verified information about THIS SPECIFIC BOOK first. Do NOT assume content based on author reputation or genre.' : 'Since the description is brief, you MUST use web search to find verified information first. If verified information is insufficient, you may apply genre-aware inference but must clearly mark inferred warnings.') : (instructionMode === 'old' ? '' : instructionMode === 'new' ? 'Base your analysis ONLY on the book description provided above. Do NOT make assumptions based on author reputation or genre conventions.' : 'Start with evidence-based analysis from the description. If information is insufficient, you may apply genre-aware inference but must clearly distinguish verified vs inferred warnings.')}
 
 **CRITICAL: Categorical Reasoning Enforcement**
 - For each warning's \`reasoning\` field, use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
@@ -741,8 +1119,46 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
 
     const parsed = capturedOutput as z.infer<typeof WorkflowOutputSchema>;
 
+    // Classify severity for each warning using classification agent
+    const classificationContexts: ClassificationContext[] = (parsed.content_warnings || []).map(w => ({
+      category_id: w.category_id,
+      subcategory_id: w.subcategory_id || null,
+      description: w.description,
+      score: w.score,
+      presence: w.presence || 'on_page',
+      detail_level: w.detail_level || null,
+      book_genre: workflow.book_categories?.join(', ') || undefined,
+      book_description: workflow.book_description || undefined
+    }));
+
+    // Classify all warnings (in parallel for efficiency)
+    let classificationResults;
+    try {
+      if (classificationContexts.length > 0) {
+        const settledResults = await Promise.allSettled(
+          classificationContexts.map(context => classifySeverity(context, model))
+        );
+        classificationResults = settledResults.map((result, index) => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          } else {
+            console.warn(`[Content Warning Agent] Classification failed for warning ${index}, using score-based mapping:`, result.reason);
+            return null; // Will trigger fallback to score-based mapping
+          }
+        });
+        const successCount = classificationResults.filter(r => r !== null).length;
+        console.log(`[Content Warning Agent] Classified ${successCount}/${classificationContexts.length} warnings using classification agent`);
+      } else {
+        classificationResults = null;
+      }
+    } catch (error) {
+      console.warn('[Content Warning Agent] Classification agent failed, falling back to score-based mapping:', error);
+      // Fallback to score-based mapping if classification fails
+      classificationResults = null;
+    }
+
     // Map to legacy format and add derived fields
-    const mappedWarnings: ContentWarning[] = parsed.content_warnings.map(w => {
+    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map((w, index) => {
       // Validate subcategory_id matches parent (post-validation)
       let validatedSubcategoryId = w.subcategory_id;
       if (w.subcategory_id && !validateSubcategoryParent(w.category_id, w.subcategory_id)) {
@@ -750,10 +1166,24 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
         validatedSubcategoryId = null;
       }
 
+      // Use classification result if available, otherwise fallback to score-based mapping
+      let severity: 'mild' | 'moderate' | 'severe';
+      if (classificationResults && classificationResults[index] && classificationResults[index] !== null) {
+        severity = classificationResults[index].severity;
+        // Update reasoning with classification reasoning if available
+        if (classificationResults[index].reasoning) {
+          w.reasoning = `${w.reasoning || ''} [Classification: ${classificationResults[index].reasoning}]`.trim();
+        }
+      } else {
+        // Fallback to score-based mapping
+        const scoreBasedSeverity = getSeverityFromScore(w.score);
+        severity = scoreBasedSeverity === 'none' ? 'mild' : scoreBasedSeverity as 'mild' | 'moderate' | 'severe';
+      }
+
       return {
         ...w,
         subcategory_id: validatedSubcategoryId,
-        severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe',
+        severity: severity,
         category: w.category_id,
         id: crypto.randomUUID(),
         helpful_count: 0,
@@ -772,10 +1202,26 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
 
   } catch (error) {
     console.error("AI content warning generation failed:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Check for different error types
+    const isMissingKey = errorMessage.includes('apiKey') || errorMessage.includes('OPENAI_API_KEY') || errorMessage.includes('Missing credentials');
+    const isQuotaError = errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('exceeded') || errorMessage.includes('billing');
+    const isRateLimitError = errorMessage.includes('rate limit') || errorMessage.includes('Rate limit') || errorMessage.includes('TPM') || errorMessage.includes('RPM');
+    
+    let reasoning = `Error: ${errorMessage}`;
+    if (isMissingKey) {
+      reasoning = `Configuration error: OpenAI API key is not set. Please configure OPENAI_API_KEY in your environment variables. ${errorMessage}`;
+    } else if (isQuotaError) {
+      reasoning = `Error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.`;
+    } else if (isRateLimitError) {
+      reasoning = `Error: ${errorMessage}`;
+    }
+    
     return {
       content_warnings: [],
       confidence: 'low',
-      reasoning: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+      reasoning
     };
   }
 };

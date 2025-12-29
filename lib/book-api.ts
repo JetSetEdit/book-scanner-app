@@ -13,6 +13,8 @@ interface OpenLibraryBook {
   excerpts?: Array<{ text: string }>
 }
 
+import { isPlaceholderTitle, filterPlaceholderCandidates } from './utils/placeholder-detection'
+
 interface BookData {
   isbn: string
   title: string
@@ -24,6 +26,7 @@ interface BookData {
   page_count?: number
   categories?: string[]
   classification_rating?: string
+  source?: 'openlibrary' | 'googlebooks' // Track data source for TOS compliance
 }
 
 export interface BookCandidate extends BookData {
@@ -74,8 +77,8 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
     const data = await response.json()
     if (!data.items || data.items.length === 0) return []
 
-    // Map top 3 results
-    return data.items.slice(0, 3).map((item: any) => {
+    // Map top 3 results and filter out placeholder titles
+    const candidates = data.items.slice(0, 3).map((item: any) => {
       const book = item.volumeInfo
       return {
         isbn,
@@ -94,7 +97,10 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
         source: 'googlebooks',
         source_id: item.id
       }
-    }).filter((b: BookCandidate) => b.title !== 'Unknown Title')
+    })
+    
+    // Filter out placeholder titles (like "Untitled TBC 202325")
+    return filterPlaceholderCandidates(candidates).filter((b: BookCandidate) => b.title !== 'Unknown Title')
   } catch (error) {
     console.error("[Book API] Google Books candidates error:", error)
     return []
@@ -175,6 +181,7 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
       published_date: bookData.publish_date,
       page_count: bookData.number_of_pages,
       categories: bookData.subjects?.slice(0, 5).map((s) => s.name),
+      source: 'openlibrary', // Mark as Open Library source (TOS-compliant to store)
     }
   } catch (error) {
     console.error("[Book API] Open Library error:", error)
@@ -201,9 +208,17 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       return null
     }
 
-    const book = data.items[0].volumeInfo
+    // Find first non-placeholder book
+    let book = null
+    for (const item of data.items) {
+      const volumeInfo = item.volumeInfo
+      if (volumeInfo.title && !isPlaceholderTitle(volumeInfo.title)) {
+        book = volumeInfo
+        break
+      }
+    }
 
-    if (!book.title) {
+    if (!book || !book.title) {
       return null
     }
 
@@ -218,17 +233,32 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
         imageLinks.small,
         imageLinks.thumbnail,
         imageLinks.smallThumbnail
-      ];
+      ].filter(Boolean);
+
+      if (candidates.length === 0) return undefined;
+
+      // Try validation in parallel for faster results
+      const validationResults = await Promise.allSettled(
+        candidates.map(async (url) => {
+          const secureUrl = url.replace("http:", "https:").replace("&edge=curl", "");
+          const isValid = await validateImageUrl(secureUrl);
+          return { url: secureUrl, valid: isValid };
+        })
+      );
 
       // Return the first valid URL found
-      for (const url of candidates) {
-        if (url) {
-          const secureUrl = url.replace("http:", "https:").replace("&edge=curl", "");
-          if (await validateImageUrl(secureUrl)) {
-            return secureUrl;
-          }
+      for (const result of validationResults) {
+        if (result.status === 'fulfilled' && result.value.valid) {
+          return result.value.url;
         }
       }
+
+      // If all validations failed, don't return a fallback - it might be a placeholder
+      // Better to return undefined and let the system try other sources or AI agent
+      if (candidates.length > 0) {
+        console.warn(`[Book API] All cover validations failed for ${isbn}. Not using fallback to avoid placeholders.`);
+      }
+
       return undefined;
     }
 
@@ -242,6 +272,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       published_date: book.publishedDate,
       page_count: book.pageCount,
       categories: book.categories?.slice(0, 5),
+      source: 'googlebooks', // Mark as Google Books source (TOS violation to store permanently)
     }
   } catch (error) {
     console.error("[Book API] Google Books error:", error)
@@ -253,7 +284,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
 async function validateImageUrl(url: string): Promise<boolean> {
   try {
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    const id = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     const response = await fetch(url, {
       method: 'HEAD',
@@ -261,12 +292,14 @@ async function validateImageUrl(url: string): Promise<boolean> {
       headers: {
         'User-Agent': 'Book-Scanner-App/1.0'
       },
-      redirect: 'follow' // Explicitly follow redirects
+      redirect: 'follow'
     });
 
     clearTimeout(id);
 
-    if (!response.ok) return false;
+    if (!response.ok) {
+      return false;
+    }
 
     const contentType = response.headers.get('content-type');
     const contentLength = response.headers.get('content-length');
@@ -287,8 +320,11 @@ async function validateImageUrl(url: string): Promise<boolean> {
       if (size === 15567) return false;
     }
 
+    // If no content-length header, assume it's valid (some servers don't send it)
     return true;
   } catch (error) {
+    // If validation fails (CORS, timeout, etc.), return false
+    // The caller (getBestCover) will fall back to accepting the URL anyway
     return false;
   }
 }

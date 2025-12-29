@@ -2,8 +2,61 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { fetchBookByISBN, fetchCandidatesByISBN, BookCandidate } from '@/lib/book-api'
 import { normalizeISBN } from '@/lib/isbn-validation'
 import { findBookAndGenerateWarnings, generateContentWarnings } from '@/lib/content-warning-agent'
-import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById, requiresMediation } from '@/lib/config/taxonomy-v2'
+import { TAXONOMY_VERSION, MODEL_VERSION, getCategoryById, requiresMediation, validateSubcategory } from '@/lib/config/taxonomy-v2'
 import { Database } from '@/types/supabase'
+import { isStale, refreshBookMetadata } from '@/lib/book-cache'
+
+// Helper to validate cover URL is not a placeholder
+async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
+  if (!url) return null;
+  
+  try {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 5000);
+    
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+      redirect: 'follow'
+    });
+    
+    clearTimeout(id);
+    
+    if (!response.ok) {
+      console.log(`[Cover Validation] Invalid response for ${url.substring(0, 80)}...: ${response.status}`);
+      return null;
+    }
+    
+    const contentType = response.headers.get('content-type');
+    const contentLength = response.headers.get('content-length');
+    
+    // Check if it's an image
+    if (contentType && !contentType.startsWith('image/')) {
+      console.log(`[Cover Validation] Not an image: ${contentType}`);
+      return null;
+    }
+    
+    // Check for placeholders
+    if (contentLength) {
+      const size = parseInt(contentLength);
+      if (size < 1000) {
+        console.log(`[Cover Validation] Too small (${size} bytes) - likely placeholder`);
+        return null;
+      }
+      if (size === 15567) {
+        console.log(`[Cover Validation] Google Books placeholder detected (${size} bytes)`);
+        return null;
+      }
+    }
+    
+    return url;
+  } catch (error) {
+    console.log(`[Cover Validation] Failed to validate ${url.substring(0, 80)}...:`, error instanceof Error ? error.message : 'Unknown error');
+    // If validation fails (CORS, timeout), don't save the cover - it might be a placeholder
+    return null;
+  }
+}
 
 // Performance API is available globally in Node.js 16+ and Next.js
 declare const performance: { now(): number }
@@ -41,7 +94,18 @@ export type ScanResult = {
   }
 }
 
-export type ProgressCallback = (message: string) => void;
+export type DetailedStatusUpdate = {
+  action: string
+  aiResponse?: string | any
+  result?: string | any
+  timestamp?: number
+  metadata?: Record<string, any>
+}
+
+// Re-export for use in other files
+export type { DetailedStatusUpdate as DetailedStatusUpdateType }
+
+export type ProgressCallback = (message: string | DetailedStatusUpdate) => void;
 
 async function logAuditDecision(params: {
   bookId: string
@@ -123,8 +187,12 @@ export async function processIsbnScan(
   // Store the result of any web search we perform so we don't do it twice
   let cachedWebSearchResult: any = null;
 
-  // Check if book already exists
+  // Check if book already exists (the "Cache" lookup)
   console.log('Checking for existing book with ISBN:', cleanIsbn)
+  onProgress?.({
+    action: 'Checking local database for existing book',
+    timestamp: performance.now()
+  })
   let existingBook = null
 
   // Only check DB if we aren't forcing a candidate
@@ -142,6 +210,26 @@ export async function processIsbnScan(
       throw fetchError
     }
     existingBook = data
+    
+    onProgress?.({
+      action: 'Database lookup completed',
+      result: existingBook ? `Found existing book: "${existingBook.title}" (ID: ${existingBook.id})` : 'No existing book found in database',
+      timestamp: performance.now(),
+      metadata: { found: !!existingBook, bookId: existingBook?.id }
+    })
+    
+    // --- COMPLIANCE CHECK: Staleness Check ---
+    // If data is stale (>30 days), refresh in background
+    if (existingBook && isStale(existingBook.last_synced_at)) {
+      console.log(`[Cache] Book ${cleanIsbn} is stale (>30 days). Refreshing in background...`);
+      // Fire-and-forget refresh (don't block the user)
+      refreshBookMetadata(cleanIsbn, async (isbn, data) => {
+        await supabaseAdmin
+          .from('books')
+          .update(data)
+          .eq('isbn', isbn);
+      }).catch(console.error);
+    }
   }
 
   console.log('Existing book found:', !!existingBook)
@@ -155,11 +243,24 @@ export async function processIsbnScan(
 
     if (!bookData) {
       console.log('Fetching book candidates for ISBN:', cleanIsbn)
-      onProgress?.('Book not found locally. Fetching metadata from external libraries...');
+      onProgress?.({
+        action: 'Fetching book metadata from external libraries (Google Books, Open Library)',
+        timestamp: performance.now()
+      })
 
       const metadataFetchStart = performance.now()
       const candidates = await fetchCandidatesByISBN(cleanIsbn)
       timings.externalMetadataFetch = performance.now() - metadataFetchStart
+      
+      onProgress?.({
+        action: 'External API fetch completed',
+        result: `Found ${candidates.length} candidate(s) from external libraries`,
+        timestamp: performance.now(),
+        metadata: { 
+          candidateCount: candidates.length,
+          candidates: candidates.map(c => ({ title: c.title, author: c.author, source: c.source }))
+        }
+      })
 
       if (candidates.length > 1) {
         console.log(`Found ${candidates.length} candidates for ISBN ${cleanIsbn}, returning ambiguity.`)
@@ -209,19 +310,34 @@ export async function processIsbnScan(
         : 'Book not found in standard libraries. Initiating AI web search...');
 
       // Create a minimal book record with just the ISBN (or the thin data we have)
+      // Hybrid cache strategy: Store data but mark with last_synced_at for staleness checking
+      // Validate cover URL before saving (reject placeholders)
+      const validatedCoverUrl = await validateCoverUrl(bookData?.cover_url);
+      
+      const insertData: any = {
+        isbn: cleanIsbn,
+        title: bookData?.title || `Unknown Book (ISBN: ${cleanIsbn})`,
+        author: bookData?.author || 'Unknown Author',
+        cover_url: validatedCoverUrl, // Use validated cover (null if placeholder)
+        description: bookData?.description || null,
+        publisher: bookData?.publisher || null,
+        published_date: bookData?.published_date || null,
+        page_count: bookData?.page_count || null,
+        categories: bookData?.categories || null,
+        last_synced_at: new Date().toISOString(), // Set sync date for staleness checking
+      }
+      
+      if (bookData?.cover_url && !validatedCoverUrl) {
+        onProgress?.({
+          action: 'Cover validation rejected placeholder image',
+          result: 'Cover URL was rejected as placeholder, will try AI agent to find cover',
+          timestamp: performance.now()
+        });
+      }
+      
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
-        .insert({
-          isbn: cleanIsbn,
-          title: bookData?.title || `Unknown Book (ISBN: ${cleanIsbn})`,
-          author: bookData?.author || 'Unknown Author',
-          cover_url: bookData?.cover_url || null,
-          description: bookData?.description || null,
-          publisher: bookData?.publisher || null,
-          published_date: bookData?.published_date || null,
-          page_count: bookData?.page_count || null,
-          categories: bookData?.categories || null
-        })
+        .insert(insertData)
         .select()
         .single()
 
@@ -252,6 +368,10 @@ export async function processIsbnScan(
 
       // Try AI agent to find book information via web search
       console.log('Asking AI agent to find book information via web search...')
+      onProgress?.({
+        action: 'Initiating AI web search agent to find book information',
+        timestamp: performance.now()
+      })
       try {
         // Perform the search and CACHE the result
         // findBookAndGenerateWarnings does both web search AND AI generation
@@ -263,6 +383,26 @@ export async function processIsbnScan(
         timings.aiContentWarningGeneration += webSearchTotalTime * 0.7
         usedWebSearch = true
         pipelinePath = 'web_search_initial'
+
+        onProgress?.({
+          action: 'AI agent completed web search and analysis',
+          aiResponse: {
+            book_found: cachedWebSearchResult.book_found,
+            book_title: cachedWebSearchResult.book_title,
+            book_author: cachedWebSearchResult.book_author,
+            confidence: cachedWebSearchResult.confidence,
+            reasoning: cachedWebSearchResult.reasoning,
+            warnings_count: cachedWebSearchResult.content_warnings?.length || 0
+          },
+          result: cachedWebSearchResult.book_found 
+            ? `AI found book: "${cachedWebSearchResult.book_title}" with ${cachedWebSearchResult.content_warnings?.length || 0} content warnings (confidence: ${cachedWebSearchResult.confidence})`
+            : 'AI could not find book information via web search',
+          timestamp: performance.now(),
+          metadata: {
+            duration: webSearchTotalTime,
+            confidence: cachedWebSearchResult.confidence
+          }
+        })
 
         if (cachedWebSearchResult.book_found) {
           onProgress?.(`AI found book: "${cachedWebSearchResult.book_title}". Analyzing content...`);
@@ -293,7 +433,8 @@ export async function processIsbnScan(
               author: cachedWebSearchResult.book_author || 'Unknown Author',
               description: cachedWebSearchResult.book_description || null,
               categories: cachedWebSearchResult.book_categories || null,
-              cover_url: cachedWebSearchResult.book_cover_url || null
+              cover_url: cachedWebSearchResult.book_cover_url || null,
+              last_synced_at: new Date().toISOString(), // Update sync date when refreshing
             })
             .eq('id', bookId)
             .select()
@@ -311,6 +452,19 @@ export async function processIsbnScan(
 
           // Insert the generated warnings
           if (cachedWebSearchResult.content_warnings && cachedWebSearchResult.content_warnings.length > 0) {
+            onProgress?.({
+              action: 'Saving AI-generated content warnings to database',
+              result: `Successfully saved ${cachedWebSearchResult.content_warnings.length} content warnings`,
+              timestamp: performance.now(),
+              metadata: {
+                warningCount: cachedWebSearchResult.content_warnings.length,
+                warnings: cachedWebSearchResult.content_warnings.map((w: any) => ({
+                  category: w.category_id,
+                  severity: w.severity,
+                  description: w.description?.substring(0, 100) + '...'
+                }))
+              }
+            })
             onProgress?.(`Generated ${cachedWebSearchResult.content_warnings.length} content warnings via AI.`);
 
             // Log warnings generated
@@ -385,10 +539,14 @@ export async function processIsbnScan(
         console.error('Error with AI agent book search:', warningError)
       }
     } else {
-      // Insert book with real metadata
+      // Hybrid cache strategy: Store all metadata with last_synced_at timestamp
+      // Data is treated as a temporary cache that expires after 30 days
       console.log('Creating new book record with metadata:', bookData.title)
       onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
 
+      // Validate cover URL before saving (reject placeholders)
+      const validatedCoverUrl = await validateCoverUrl(bookData.cover_url);
+      
       const dbWriteStart = performance.now()
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
@@ -396,16 +554,25 @@ export async function processIsbnScan(
           isbn: bookData.isbn,
           title: bookData.title,
           author: bookData.author || null,
-          cover_url: bookData.cover_url || null,
+          cover_url: validatedCoverUrl, // Use validated cover (null if placeholder)
           description: bookData.description || null,
           publisher: bookData.publisher || null,
           published_date: bookData.published_date || null,
           page_count: bookData.page_count || null,
-          categories: bookData.categories || null
+          categories: bookData.categories || null,
+          last_synced_at: new Date().toISOString(), // CRITICAL: Set sync date for staleness checking
         })
         .select()
         .single()
       timings.dbWrites += performance.now() - dbWriteStart
+      
+      if (bookData.cover_url && !validatedCoverUrl) {
+        onProgress?.({
+          action: 'Cover validation rejected placeholder image',
+          result: 'Cover URL was rejected as placeholder, saved book without cover',
+          timestamp: performance.now()
+        });
+      }
 
       if (insertError) {
         console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
@@ -466,6 +633,16 @@ export async function processIsbnScan(
       // If we have no warnings (or we just deleted them), generate new ones
       if (!existingWarnings || existingWarnings.length === 0 || forceRefresh || isStale) {
         console.log('🤖 Generating content warnings with AI agent...')
+        onProgress?.({
+          action: 'Starting AI content warning analysis',
+          timestamp: performance.now(),
+          metadata: {
+            bookTitle: currentBook?.title,
+            bookAuthor: currentBook?.author,
+            hasDescription: !!currentBook?.description,
+            descriptionLength: currentBook?.description?.length || 0
+          }
+        })
         onProgress?.('Analyzing book content with AI...');
 
         if (currentBook) {
@@ -504,6 +681,13 @@ export async function processIsbnScan(
             } else {
               // Always use web search for existing books (can find official author content notes)
               // or if metadata is thin
+              onProgress?.({
+                action: 'Initiating AI web search for comprehensive content analysis',
+                timestamp: performance.now(),
+                metadata: {
+                  reason: isExistingBook ? 'existing_book' : isThinMetadata ? 'thin_metadata' : 'force_refresh'
+                }
+              })
               onProgress?.(isExistingBook || forceRefresh
                 ? 'Performing comprehensive web search for content warnings...'
                 : 'Book description is brief. AI performing web search for deeper analysis...');
@@ -522,6 +706,26 @@ export async function processIsbnScan(
               usedWebSearch = true
               pipelinePath = isExistingBook ? 'web_search_existing' : (isThinMetadata ? 'web_search_thin_metadata' : 'web_search_force_refresh')
 
+              onProgress?.({
+                action: 'AI web search and analysis completed',
+                aiResponse: {
+                  book_found: searchResult.book_found,
+                  confidence: searchResult.confidence,
+                  reasoning: searchResult.reasoning,
+                  warnings_count: searchResult.content_warnings?.length || 0,
+                  classification_rating: (searchResult as any).classification_rating
+                },
+                result: `AI analysis found ${searchResult.content_warnings?.length || 0} content warnings with ${searchResult.confidence} confidence`,
+                timestamp: performance.now(),
+                metadata: {
+                  duration: webSearchTotalTime,
+                  warnings: searchResult.content_warnings?.map((w: any) => ({
+                    category: w.category_id,
+                    severity: w.severity
+                  })) || []
+                }
+              })
+
               // Map the result format
               result = {
                 content_warnings: searchResult.content_warnings,
@@ -535,6 +739,14 @@ export async function processIsbnScan(
           } else {
             // For new books with good metadata: Use metadata-based generation first (faster)
             // Then verify with web search if no warnings found (catches false negatives)
+            onProgress?.({
+              action: 'Analyzing book metadata with AI (metadata-based analysis)',
+              timestamp: performance.now(),
+              metadata: {
+                hasDescription: !!currentBook.description,
+                descriptionLength: currentBook.description?.length || 0
+              }
+            })
             onProgress?.('Analyzing book metadata for content warnings...');
 
             const aiStart = performance.now()
@@ -545,14 +757,39 @@ export async function processIsbnScan(
               book_categories: currentBook.categories || undefined,
               book_isbn: currentBook.isbn
             }, model);
-            timings.aiContentWarningGeneration += performance.now() - aiStart
+            const aiDuration = performance.now() - aiStart
+            timings.aiContentWarningGeneration += aiDuration
             classificationRating = (result as any).classification_rating || null;
             pipelinePath = 'metadata_only'
+            
+            onProgress?.({
+              action: 'AI metadata analysis completed',
+              aiResponse: {
+                confidence: result.confidence,
+                reasoning: result.reasoning,
+                warnings_count: result.content_warnings?.length || 0,
+                classification_rating: (result as any).classification_rating
+              },
+              result: `AI found ${result.content_warnings?.length || 0} content warnings from metadata analysis`,
+              timestamp: performance.now(),
+              metadata: {
+                duration: aiDuration,
+                warnings: result.content_warnings?.map((w: any) => ({
+                  category: w.category_id,
+                  severity: w.severity
+                })) || []
+              }
+            })
 
             // DOUBLE CHECK: If standard analysis says "Safe" (no warnings),
             // force a web search verification to avoid false negatives.
             if (result.content_warnings.length === 0) {
               console.log("Initial analysis found no warnings. Performing deep search verification...");
+              onProgress?.({
+                action: 'Initial analysis found no warnings - performing deep web search verification',
+                result: 'Starting verification to avoid false negatives',
+                timestamp: performance.now()
+              })
               onProgress?.("Initial text analysis safe. Verifying with web search...");
 
               // findBookAndGenerateWarnings does both web search AND AI generation
@@ -568,6 +805,15 @@ export async function processIsbnScan(
               // Handle "Book Not Found" in Deep Search
               if (!searchResult.book_found) {
                 console.log("Deep search failed to find book info.");
+                onProgress?.({
+                  action: 'Deep search verification completed',
+                  aiResponse: {
+                    book_found: false,
+                    reasoning: searchResult.reasoning
+                  },
+                  result: 'Deep search could not verify book details - keeping initial "safe" verdict with low confidence',
+                  timestamp: performance.now()
+                })
                 onProgress?.("⚠️ Deep search could not verify book details.");
 
                 // If we have local metadata, we keep the "Safe" verdict but with Low confidence and a warning in reasoning
@@ -578,6 +824,23 @@ export async function processIsbnScan(
               // If search found something, OVERRIDE the initial result
               else if (searchResult.content_warnings.length > 0) {
                 console.log("Deep search found warnings that initial analysis missed!");
+                onProgress?.({
+                  action: 'Deep search verification found hidden warnings',
+                  aiResponse: {
+                    book_found: true,
+                    warnings_count: searchResult.content_warnings.length,
+                    confidence: searchResult.confidence,
+                    reasoning: searchResult.reasoning
+                  },
+                  result: `Deep search found ${searchResult.content_warnings.length} warnings that initial analysis missed - overriding result`,
+                  timestamp: performance.now(),
+                  metadata: {
+                    warnings: searchResult.content_warnings.map((w: any) => ({
+                      category: w.category_id,
+                      severity: w.severity
+                    }))
+                  }
+                })
                 onProgress?.(`Deep search found ${searchResult.content_warnings.length} hidden warnings.`);
 
                 result = {
@@ -591,6 +854,16 @@ export async function processIsbnScan(
                 usedSearch = true;
               } else {
                 // If search ALSO found nothing, update reasoning to show we double checked
+                onProgress?.({
+                  action: 'Deep search verification confirmed no warnings',
+                  aiResponse: {
+                    book_found: true,
+                    warnings_count: 0,
+                    reasoning: searchResult.reasoning
+                  },
+                  result: 'Web search verification confirmed initial "safe" verdict',
+                  timestamp: performance.now()
+                })
                 result.reasoning = `${result.reasoning} (Web search verification confirmed no significant warnings found).`;
                 usedSearch = true;
               }
@@ -610,9 +883,15 @@ export async function processIsbnScan(
           }
 
           // Update cover if we found one and the current one is missing
+          // Validate the AI-found cover to ensure it's not a placeholder
           if (foundCoverUrl && !currentBook.cover_url && foundCoverUrl !== "No cover available") {
-            console.log(`Found new cover URL from AI: ${foundCoverUrl}`);
-            updates.cover_url = foundCoverUrl;
+            const validatedCover = await validateCoverUrl(foundCoverUrl);
+            if (validatedCover) {
+              console.log(`Found new cover URL from AI: ${foundCoverUrl}`);
+              updates.cover_url = validatedCover;
+            } else {
+              console.log(`AI-found cover was rejected as placeholder: ${foundCoverUrl}`);
+            }
           }
 
           if (Object.keys(updates).length > 0) {
@@ -647,29 +926,50 @@ export async function processIsbnScan(
 
           if (result.content_warnings.length > 0) {
             // Insert the generated warnings
+            onProgress?.({
+              action: 'Saving AI-generated content warnings to database',
+              result: `Preparing to save ${result.content_warnings.length} warnings`,
+              timestamp: performance.now(),
+              metadata: {
+                warningCount: result.content_warnings.length
+              }
+            })
             onProgress?.(`AI analysis complete. Saving ${result.content_warnings.length} warnings...`);
 
-            const warningsToInsert: ContentWarningInsert[] = result.content_warnings.map((warning: any) => ({
-              book_id: bookId,
-              category: getCategoryById(warning.category_id || warning.category)?.legacyCategory || 'other',
-              category_id: warning.category_id || warning.category,
-              subcategory_id: warning.subcategory_id || null,
-              confidence_score: warning.score,
-              description: warning.description,
-              severity: warning.severity,
-              presence: warning.presence || 'on_page',
-              detail_level: warning.detail_level || null,
-              is_spoiler: warning.is_spoiler || false,
-              requires_mediation: requiresMediation([{
-                category_id: warning.category_id || warning.category,
-                severity: warning.severity,
-                detail_level: warning.detail_level || null
-              }]),
-              user_id: null,
-              reasoning: warning.reasoning || null,
-              is_author_verified: warning.is_author_verified || false,
-              source_url: warning.source_url || null
-            }))
+            const warningsToInsert: ContentWarningInsert[] = result.content_warnings
+              .map((warning: any) => {
+                const categoryId = warning.category_id || warning.category;
+                const subcategoryId = warning.subcategory_id || null;
+                
+                // Validate subcategory_id exists in taxonomy
+                if (subcategoryId && !validateSubcategory(categoryId, subcategoryId)) {
+                  console.warn(`[Scan Service] Invalid subcategory_id "${subcategoryId}" for category "${categoryId}", skipping subcategory`);
+                  // Continue without subcategory_id rather than failing
+                }
+
+                return {
+                  book_id: bookId,
+                  category: getCategoryById(categoryId)?.legacyCategory || 'other',
+                  category_id: categoryId,
+                  subcategory_id: validateSubcategory(categoryId, subcategoryId) ? subcategoryId : null,
+                  confidence_score: warning.score,
+                  description: warning.description,
+                  severity: warning.severity,
+                  presence: warning.presence || 'on_page',
+                  detail_level: warning.detail_level || null,
+                  is_spoiler: warning.is_spoiler || false,
+                  requires_mediation: requiresMediation([{
+                    category_id: categoryId,
+                    severity: warning.severity,
+                    detail_level: warning.detail_level || null
+                  }]),
+                  user_id: null,
+                  reasoning: warning.reasoning || null,
+                  is_author_verified: warning.is_author_verified || false,
+                  source_url: warning.source_url || null
+                };
+              })
+              .filter((w: any) => w !== null) // Remove any null entries from validation failures
 
             const dbWriteStart = performance.now()
             const { error: insertError } = await supabaseAdmin
@@ -680,11 +980,41 @@ export async function processIsbnScan(
             if (!insertError) {
               contentWarningsGenerated = true
               console.log(`Generated ${result.content_warnings.length} content warnings`)
+              onProgress?.({
+                action: 'Content warnings saved to database',
+                result: `Successfully saved ${result.content_warnings.length} content warnings`,
+                timestamp: performance.now(),
+                metadata: {
+                  warningCount: result.content_warnings.length,
+                  warnings: warningsToInsert.map(w => ({
+                    category: w.category_id,
+                    severity: w.severity
+                  }))
+                }
+              })
             } else {
               console.error('Failed to insert AI-generated warnings:', insertError)
+              onProgress?.({
+                action: 'Failed to save content warnings',
+                result: `Error: ${insertError.message}`,
+                timestamp: performance.now()
+              })
             }
           } else {
-            onProgress?.('AI analysis complete. No specific warnings generated.');
+            // Check if the failure was due to missing API key, quota, or rate limits
+            const isConfigError = result.reasoning?.includes('OPENAI_API_KEY') || result.reasoning?.includes('Configuration error');
+            const isQuotaError = result.reasoning?.includes('quota') || result.reasoning?.includes('429') || result.reasoning?.includes('exceeded');
+            const isRateLimitError = result.reasoning?.includes('rate limit') || result.reasoning?.includes('Rate limit');
+            
+            if (isConfigError) {
+              onProgress?.('⚠️ AI analysis failed: OpenAI API key not configured. Please set OPENAI_API_KEY in environment variables.');
+              console.error('❌ OpenAI API key missing:', result.reasoning);
+            } else if (isQuotaError || isRateLimitError) {
+              onProgress?.('⚠️ AI analysis failed: OpenAI API quota exceeded or rate limit reached. Please check your OpenAI account billing and limits.');
+              console.error('❌ OpenAI API quota/rate limit error:', result.reasoning);
+            } else {
+              onProgress?.('AI analysis complete. No specific warnings generated.');
+            }
           }
         }
       } else {

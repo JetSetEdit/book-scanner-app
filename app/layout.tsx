@@ -3,8 +3,13 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Libre_Baskerville } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
 import { Navbar } from '@/components/navbar'
 import { Footer } from '@/components/footer'
+import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
+import { PWARegister } from '@/components/pwa-register'
+import { ThemeProvider } from '@/components/theme-provider'
+import { BetaBanner } from '@/components/beta-banner'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -16,6 +21,24 @@ const libreBaskerville = Libre_Baskerville({
 export const metadata: Metadata = {
   title: 'Subtext',
   description: 'Reveal the hidden content in every book.',
+  manifest: '/manifest.json',
+  themeColor: '#fef3c7',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Subtext',
+  },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
+  icons: {
+    icon: '/logo_var_2.png',
+    apple: '/logo_var_2.png',
+  },
 }
 
 export default function RootLayout({
@@ -24,14 +47,25 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${libreBaskerville.variable} flex flex-col min-h-screen`}>
-        <Navbar />
-        <main className="flex-1">
-          {children}
-        </main>
-        <Footer />
-        <Analytics />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
+          <BetaBanner />
+          <Navbar />
+          <main className="flex-1 pb-16 md:pb-0">
+            {children}
+          </main>
+          <Footer />
+          <PWARegister />
+          <PWAInstallPrompt />
+          <Analytics />
+          <Toaster position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   )

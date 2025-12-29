@@ -7,6 +7,7 @@ export interface UserPreferences {
   showRawApiResponse?: boolean
   autoSelectSingleCandidate?: boolean
   theme?: 'light' | 'dark' | 'system'
+  showCameraScanner?: boolean
 }
 
 const PREFERENCES_KEY = 'book-scanner-preferences'
@@ -16,6 +17,7 @@ const defaultPreferences: UserPreferences = {
   showRawApiResponse: false,
   autoSelectSingleCandidate: true,
   theme: 'system',
+  showCameraScanner: false, // Default to manual entry, camera is opt-in
 }
 
 /**
@@ -47,4 +49,9 @@ export function useUserPreferences() {
     resetPreferences,
   }
 }
+
+
+
+
+
 

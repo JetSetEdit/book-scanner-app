@@ -21,6 +21,7 @@ export function BarcodeScanner({ onScanSuccess, onError, onClose }: BarcodeScann
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [permissionRequested, setPermissionRequested] = useState(false)
   const [showPermissionButton, setShowPermissionButton] = useState(false)
+  const [hasStarted, setHasStarted] = useState(false)
   const viewfinderId = "barcode-scanner-viewfinder"
 
   const requestCameraPermission = async () => {
@@ -45,6 +46,11 @@ export function BarcodeScanner({ onScanSuccess, onError, onClose }: BarcodeScann
       setShowPermissionButton(true)
       onError?.(errorMsg)
     }
+  }
+
+  const handleStartScanning = async () => {
+    setHasStarted(true)
+    await startScanning()
   }
 
   const startScanning = async () => {
@@ -187,9 +193,7 @@ export function BarcodeScanner({ onScanSuccess, onError, onClose }: BarcodeScann
     }
 
   useEffect(() => {
-    // Auto-start scanning on mount (will prompt for permission if needed)
-    startScanning()
-
+    // Cleanup on unmount
     return () => {
       if (scannerRef.current && isRunningRef.current) {
         isRunningRef.current = false
@@ -203,7 +207,7 @@ export function BarcodeScanner({ onScanSuccess, onError, onClose }: BarcodeScann
         })
       }
     }
-  }, [onScanSuccess, onError, viewfinderId])
+  }, [])
 
   const handleClose = () => {
     if (scannerRef.current && isRunningRef.current) {
@@ -257,22 +261,43 @@ export function BarcodeScanner({ onScanSuccess, onError, onClose }: BarcodeScann
         </Alert>
       )}
 
+      {/* Start Scanner Button - Show if not started */}
+      {!hasStarted && !scanning && (
+        <div className="space-y-4">
+          <div className="text-center py-8 border-2 border-dashed border-muted-foreground/30 rounded-lg">
+            <Camera className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mb-4">
+              Click the button below to start the camera scanner
+            </p>
+            <Button 
+              onClick={handleStartScanning}
+              className="w-full sm:w-auto"
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Start Camera Scanner
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Viewfinder */}
-      <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden">
-        <div
-          id={viewfinderId}
-          className="w-full h-full"
-        />
-        {scanning && !cameraError && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="border-2 border-white/50 rounded-lg w-[250px] h-[250px] flex items-center justify-center">
-              <div className="text-white/70 text-sm text-center px-4">
-                Point camera at barcode
+      {hasStarted && (
+        <div className="relative w-full aspect-square bg-black rounded-lg overflow-hidden">
+          <div
+            id={viewfinderId}
+            className="w-full h-full"
+          />
+          {scanning && !cameraError && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-white/50 rounded-lg w-[250px] h-[250px] flex items-center justify-center">
+                <div className="text-white/70 text-sm text-center px-4">
+                  Point camera at barcode
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Instructions */}
       {scanning && !cameraError && (
