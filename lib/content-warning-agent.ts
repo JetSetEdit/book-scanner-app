@@ -1054,10 +1054,19 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
     let classificationResults;
     try {
       if (classificationContexts.length > 0) {
-        classificationResults = await Promise.all(
+        const settledResults = await Promise.allSettled(
           classificationContexts.map(context => classifySeverity(context, model))
         );
-        console.log(`[Content Warning Agent] Classified ${classificationResults.length} warnings using classification agent`);
+        classificationResults = settledResults.map((result, index) => {
+          if (result.status === 'fulfilled') {
+            return result.value;
+          } else {
+            console.warn(`[Content Warning Agent] Classification failed for warning ${index}, using score-based mapping:`, result.reason);
+            return null; // Will trigger fallback to score-based mapping
+          }
+        });
+        const successCount = classificationResults.filter(r => r !== null).length;
+        console.log(`[Content Warning Agent] Classified ${successCount}/${classificationContexts.length} warnings using classification agent`);
       } else {
         classificationResults = null;
       }
@@ -1078,7 +1087,7 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
 
       // Use classification result if available, otherwise fallback to score-based mapping
       let severity: 'mild' | 'moderate' | 'severe';
-      if (classificationResults && classificationResults[index]) {
+      if (classificationResults && classificationResults[index] && classificationResults[index] !== null) {
         severity = classificationResults[index].severity;
         // Update reasoning with classification reasoning if available
         if (classificationResults[index].reasoning) {
