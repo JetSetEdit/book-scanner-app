@@ -33,16 +33,26 @@ export function SparksCounter() {
 
   const fetchSparksProfile = async () => {
     try {
-      const response = await fetch('/api/sparks/profile')
+      const response = await fetch('/api/sparks/profile', {
+        // Suppress error logging for 401s (expected when not logged in)
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      })
       if (response.ok) {
         const data = await response.json()
         setProfile(data)
       } else if (response.status === 401) {
-        // User not authenticated - this is expected, don't show error
+        // User not authenticated - this is expected, silently fail
         setProfile(null)
       }
     } catch (error) {
-      console.error('Failed to fetch sparks profile:', error)
+      // Silently fail - sparks is optional/legacy feature
+      if (error instanceof Error && error.name !== 'AbortError') {
+        // Only log non-timeout errors in dev
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('Sparks profile fetch failed (optional feature):', error)
+        }
+      }
+      setProfile(null)
     } finally {
       setLoading(false)
     }

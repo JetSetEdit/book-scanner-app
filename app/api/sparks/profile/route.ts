@@ -12,8 +12,17 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
+    // Return empty profile instead of 401 - sparks is optional/legacy
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({
+        sparks: {
+          total_sparks: 0,
+          scans_count: 0,
+          pivots_count: 0,
+          validations_count: 0,
+        },
+        badges: [],
+      })
     }
 
     const [sparks, badges] = await Promise.all([
