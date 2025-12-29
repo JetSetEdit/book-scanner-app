@@ -57,7 +57,12 @@ async function generateWarningsWithGemini(
 }> {
   const apiKey = getGeminiApiKey()
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY not configured in environment variables')
+    console.warn('[Multi-Model] GEMINI_API_KEY not configured, returning empty result')
+    return {
+      content_warnings: [],
+      confidence: 'low',
+      reasoning: 'Gemini API key not configured. Please set GEMINI_API_KEY in environment variables to use multi-model analysis.'
+    }
   }
 
   const genAI = new GoogleGenerativeAI(apiKey)
@@ -310,38 +315,75 @@ export async function runMultiModelAnalysis(
 ): Promise<CombinedResult> {
   const startTime = Date.now()
 
-  // Run both models in parallel
-  const [gpt4oResult, geminiResult] = await Promise.all([
+  // Run both models in parallel with error handling
+  const [gpt4oResult, geminiResult] = await Promise.allSettled([
     (async () => {
       const start = Date.now()
-      const result = await findBookAndGenerateWarnings(isbn, 'gpt-4o', 'hybrid')
-      return {
-        model: 'gpt-4o',
-        content_warnings: result.content_warnings || [],
-        classification_rating: result.classification_rating,
-        confidence: result.confidence,
-        reasoning: result.reasoning,
-        timing: Date.now() - start
-      } as ModelResult
+      try {
+        const result = await findBookAndGenerateWarnings(isbn, 'gpt-4o', 'hybrid')
+        return {
+          model: 'gpt-4o',
+          content_warnings: result.content_warnings || [],
+          classification_rating: result.classification_rating,
+          confidence: result.confidence,
+          reasoning: result.reasoning,
+          timing: Date.now() - start
+        } as ModelResult
+      } catch (error) {
+        console.error('[Multi-Model] GPT-4o error:', error)
+        return {
+          model: 'gpt-4o',
+          content_warnings: [],
+          confidence: 'low' as const,
+          reasoning: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timing: Date.now() - start
+        } as ModelResult
+      }
     })(),
     (async () => {
       const start = Date.now()
-      const result = await generateWarningsWithGemini(
-        isbn,
-        bookTitle,
-        bookAuthor,
-        bookDescription,
-        bookCategories
-      )
-      return {
-        model: 'gemini-2.5-flash',
-        content_warnings: result.content_warnings || [],
-        classification_rating: result.classification_rating,
-        confidence: result.confidence,
-        reasoning: result.reasoning,
-        timing: Date.now() - start
-      } as ModelResult
+      try {
+        const result = await generateWarningsWithGemini(
+          isbn,
+          bookTitle,
+          bookAuthor,
+          bookDescription,
+          bookCategories
+        )
+        return {
+          model: 'gemini-2.5-flash',
+          content_warnings: result.content_warnings || [],
+          classification_rating: result.classification_rating,
+          confidence: result.confidence,
+          reasoning: result.reasoning,
+          timing: Date.now() - start
+        } as ModelResult
+      } catch (error) {
+        console.error('[Multi-Model] Gemini error:', error)
+        return {
+          model: 'gemini-2.5-flash',
+          content_warnings: [],
+          confidence: 'low' as const,
+          reasoning: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          timing: Date.now() - start
+        } as ModelResult
+      }
     })()
+  ]).then(results => [
+    results[0].status === 'fulfilled' ? results[0].value : {
+      model: 'gpt-4o',
+      content_warnings: [],
+      confidence: 'low' as const,
+      reasoning: `Failed: ${results[0].status === 'rejected' ? results[0].reason : 'Unknown error'}`,
+      timing: 0
+    } as ModelResult,
+    results[1].status === 'fulfilled' ? results[1].value : {
+      model: 'gemini-2.5-flash',
+      content_warnings: [],
+      confidence: 'low' as const,
+      reasoning: `Failed: ${results[1].status === 'rejected' ? results[1].reason : 'Unknown error'}`,
+      timing: 0
+    } as ModelResult
   ])
 
   // Combine warnings
