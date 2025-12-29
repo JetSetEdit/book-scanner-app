@@ -4,7 +4,7 @@ import { fetchCandidatesByISBN } from '@/lib/book-api'
 import { runMultiModelAnalysis } from '@/lib/services/multi-model-service'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { normalizeISBN } from '@/lib/isbn-validation'
-import { getCategoryById, requiresMediation } from '@/lib/config/taxonomy-v2'
+import { getCategoryById, requiresMediation, validateSubcategory } from '@/lib/config/taxonomy-v2'
 
 /**
  * Multi-Model Scan Endpoint
@@ -112,27 +112,47 @@ export async function POST(request: NextRequest) {
 
     // Save combined warnings to database
     if (result.combined_warnings.length > 0) {
-      const warningsToInsert = result.combined_warnings.map((warning: any) => ({
-        book_id: bookId,
-        category: getCategoryById(warning.category_id)?.legacyCategory || 'other',
-        category_id: warning.category_id,
-        subcategory_id: warning.subcategory_id || null,
-        confidence_score: warning.score || 0,
-        description: warning.description,
-        severity: warning.severity,
-        presence: warning.presence || 'on_page',
-        detail_level: warning.detail_level || null,
-        is_spoiler: warning.is_spoiler || false,
-        requires_mediation: requiresMediation([{
-          category_id: warning.category_id,
-          severity: warning.severity,
-          detail_level: warning.detail_level || null
-        }]),
-        user_id: null,
-        reasoning: warning.reasoning || null,
-        is_author_verified: warning.is_author_verified || false,
-        source_url: warning.source_url || null
-      }))
+      const warningsToInsert = result.combined_warnings
+        .filter((warning: any) => {
+          // Filter out warnings with invalid category_id
+          if (!warning.category_id) {
+            console.warn('[Multi-Model] Warning missing category_id, skipping:', warning)
+            return false
+          }
+          return true
+        })
+        .map((warning: any) => {
+          const categoryId = warning.category_id
+          const subcategoryId = warning.subcategory_id || null
+          
+          // Validate subcategory_id exists in taxonomy
+          const validSubcategory = validateSubcategory(categoryId, subcategoryId)
+          if (subcategoryId && !validSubcategory) {
+            console.warn(`[Multi-Model] Invalid subcategory_id "${subcategoryId}" for category "${categoryId}", removing subcategory`)
+          }
+          
+          return {
+            book_id: bookId,
+            category: getCategoryById(categoryId)?.legacyCategory || 'other',
+            category_id: categoryId,
+            subcategory_id: validSubcategory ? subcategoryId : null,
+            confidence_score: warning.score || 0,
+            description: warning.description,
+            severity: warning.severity,
+            presence: warning.presence || 'on_page',
+            detail_level: warning.detail_level || null,
+            is_spoiler: warning.is_spoiler || false,
+            requires_mediation: requiresMediation([{
+              category_id: categoryId,
+              severity: warning.severity,
+              detail_level: warning.detail_level || null
+            }]),
+            user_id: null,
+            reasoning: warning.reasoning || null,
+            is_author_verified: warning.is_author_verified || false,
+            source_url: warning.source_url || null
+          }
+        })
 
       const { error: warningsError } = await supabaseAdmin
         .from('content_warnings')
