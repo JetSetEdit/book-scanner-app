@@ -7,7 +7,6 @@ import { useTheme } from "next-themes"
 import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun, Image as ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
-import { SparksCounter } from "@/components/sparks-counter"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import {
   DropdownMenu,
@@ -151,10 +150,6 @@ export function Navbar() {
               <SearchComponent />
             </div>
 
-            {/* Sparks Counter - Mobile (if needed) */}
-            <div className="md:hidden">
-              <SparksCounter />
-            </div>
 
             {/* Navigation Links - Desktop */}
             <div className="hidden md:flex items-center space-x-1">
@@ -176,9 +171,6 @@ export function Navbar() {
                   </Link>
                 )
               })}
-              
-              {/* Sparks Counter */}
-              <SparksCounter />
               
               {/* Theme Toggle */}
               {mounted && (

@@ -47,25 +47,6 @@ export async function POST(request: NextRequest) {
               const supabase = await import('@/lib/supabase/server').then(m => m.createClient())
               const { data: { user } } = await supabase.auth.getUser()
               
-              if (user) {
-                // Award sparks asynchronously - don't block the response
-                fetch('/api/sparks/award', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    sparksAmount: 10,
-                    actionType: 'scan',
-                    actionMetadata: {
-                      isbn: result.book.isbn,
-                      book_id: result.book.id,
-                      book_title: result.book.title,
-                      is_new_book: result.isNewBook,
-                    },
-                  }),
-                }).catch(err => {
-                  console.warn('Failed to award scan sparks (non-critical):', err)
-                })
-              }
             }
             
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
@@ -89,30 +70,6 @@ export async function POST(request: NextRequest) {
       // Standard JSON response
       const result = await processIsbnScan(isbn, undefined, selectedCandidate, false, model || "gpt-4o")
       
-      // Award sparks for scan (non-blocking)
-      if (result.success && result.book) {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        
-        if (user) {
-          fetch('/api/sparks/award', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sparksAmount: 10,
-              actionType: 'scan',
-              actionMetadata: {
-                isbn: result.book.isbn,
-                book_id: result.book.id,
-                book_title: result.book.title,
-                is_new_book: result.isNewBook,
-              },
-            }),
-          }).catch(err => {
-            console.warn('Failed to award scan sparks (non-critical):', err)
-          })
-        }
-      }
       
       return NextResponse.json(result)
     }
