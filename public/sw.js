@@ -3,7 +3,7 @@ const CACHE_NAME = 'subtext-v1'
 const urlsToCache = [
   '/',
   '/collection',
-  '/scan-test',
+  '/scan',
   '/logo.png',
   '/manifest.json',
 ]
@@ -70,6 +70,15 @@ self.addEventListener('fetch', (event) => {
     })
   )
 })
+
+
+
+
+
+
+
+
+
 
 
 

@@ -9,6 +9,7 @@ import { Footer } from '@/components/footer'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { PWARegister } from '@/components/pwa-register'
 import { ThemeProvider } from '@/components/theme-provider'
+import { BetaBanner } from '@/components/beta-banner'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -54,6 +55,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
+          <BetaBanner />
           <Navbar />
           <main className="flex-1 pb-16 md:pb-0">
             {children}

@@ -83,3 +83,12 @@ The scraping provides minimal value and poses legal/ethical risks. We should:
 
 
 
+
+
+
+
+
+
+
+
+

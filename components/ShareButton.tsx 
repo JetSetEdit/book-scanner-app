@@ -1,0 +1,48 @@
+'use client';
+
+import { Share2 } from 'lucide-react';
+
+interface ShareButtonProps {
+  title: string;
+  author: string;
+  isbn: string;
+}
+
+export function ShareButton({ title, author, isbn }: ShareButtonProps) {
+  const handleShare = async () => {
+    // Construct the URL to your specific book page
+    // Ensure this domain matches your actual Vercel domain
+    const url = `https://subtext-books.vercel.app/book/${isbn}`;
+    
+    const shareData = {
+      title: `Content Warnings for ${title}`,
+      text: `Check content warnings for ${title} by ${author} on Subtext.`,
+      url: url,
+    };
+
+    try {
+      // 1. Try Native Share (Mobile)
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // 2. Fallback for Desktop (Copy to Clipboard)
+        await navigator.clipboard.writeText(url);
+        // You can replace this alert with a nice toast notification if you have one
+        alert('Link copied to clipboard!'); 
+      }
+    } catch (err) {
+      console.error('Error sharing:', err);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      className="flex items-center gap-2 px-4 py-2 bg-secondary/50 hover:bg-secondary border border-border rounded-full text-sm font-medium transition-colors"
+      aria-label="Share this book"
+    >
+      <Share2 className="w-4 h-4" />
+      <span>Share</span>
+    </button>
+  );
+}

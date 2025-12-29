@@ -11,6 +11,7 @@ import {
   type PresenceType,
   type DetailLevel
 } from "./config/taxonomy-v2";
+import { classifySeverity, type ClassificationContext } from "./services/severity-classification-agent";
 
 // Helper function to ensure API key is set at runtime
 // In Next.js serverless functions, env vars are available at runtime, not module load
@@ -450,6 +451,107 @@ const getHybridInstructions = () => `
   - **confidence_rationale**: Why you assigned this confidence score
 
 **8. Use subcategories**: Always try to use specific subcategories rather than just parent categories for better granularity.
+
+## Subtle Trigger Detection (CRITICAL)
+
+**1. Phobia Detection:**
+- Look for explicit mentions: "snake", "spider", "needle", "drowning", "heights", "darkness", "blood", "enclosed spaces", "claustrophobic", "vomit", "vomiting", "nausea", "sick", "teeth", "dental", "trypophobia"
+- Check for phobia-related language: "fear of", "terrified by", "panic at the sight of", "phobia", "afraid of"
+- Consider context: 
+  - Medical scenes → needles, dental procedures
+  - Underwater scenes → drowning
+  - Dark scenes → darkness
+  - High places → heights
+  - Sickness scenes → vomiting/emetophobia
+  - Dental scenes → dental trauma
+- If phobia is central to plot or character, flag it even if not explicitly stated
+- Use category: \`phobias\` with appropriate subcategory (snakes, spiders, needles, heights, water, enclosed_spaces, darkness, blood, vomiting, trypophobia, dental_trauma)
+- **Note:** Animal death is now in \`death_or_grief\` category, not phobias
+
+**2. Dark Romance / Kink Detection (CRITICAL):**
+- **CNC (Consensual Non-Consent)**: Look for negotiated non-consent, CNC play, or consensual non-consent scenarios. This is distinct from actual non-consent and is very popular in dark romance. Use \`sexual_content\` → \`cnc\`
+- **Dub-Con (Dubious Consent)**: Same as "Ambiguous Consent" but use the term "Dub-Con" in reasoning if it's the industry term. Use \`sexual_content\` → \`consent_ambiguity\`
+- **Somnophilia**: Sexual acts while one partner is sleeping/unconscious. Very common in dark college romances. Use \`sexual_content\` → \`somnophilia\`
+- **Breeding Kink**: Sexual focus on impregnation as kink (distinct from actual pregnancy). Use \`sexual_content\` → \`breeding_kink\`
+- **Knife Play / Blood Play**: Sexualized use of knives or blood in sexual contexts. Use \`sexual_content\` → \`knife_play\`
+- **Primal Play**: Hunting/chasing dynamics, "touch her and you die" tropes. Use \`sexual_content\` → \`primal_play\`
+- **Grooming**: Predatory behavior, manipulation of vulnerable individuals (often age-gap). Use \`emotional_abuse_or_toxic_relationships\` → \`grooming\`
+- **Human Trafficking**: Distinct from general kidnapping, often in dark mafia romance. Use \`violence\` → \`human_trafficking\`
+- **Cannibalism**: Eating human flesh, cannibalistic themes (horror romance niche). Use \`violence\` → \`cannibalism\`
+- **Incest / Pseudo-Incest**: Step-siblings, blood relations, or pseudo-incest. Use \`family_dynamics\` → \`incest_taboo\`
+
+**3. LGBTQ+ Specific Discrimination:**
+- **Acephobia**: Look for invalidation of asexuality, pressure to be sexual, "just hasn't met the right person", questioning asexual identity
+- **Lesbophobia**: Specific discrimination against lesbians, fetishization, invalidation, or "corrective" behavior
+- **Misgendering**: Deadnaming, wrong pronouns, refusal to use correct pronouns, or intentional misgendering of trans/non-binary characters
+- **Biphobia**: Biphobic stereotypes, "not really bi", "just confused", or invalidation of bisexuality
+- **Queerphobia**: General anti-queer sentiment, queerphobic language, or discrimination against LGBTQ+ people beyond specific categories
+- Use category: \`discrimination\` with appropriate subcategory (acephobia, lesbophobia, misgendering, biphobia, queerphobia)
+
+**4. Cultural Sensitivities & Discrimination:**
+- Beyond cultural appropriation, look for:
+  - Stereotyping of marginalized groups
+  - Problematic representation of Indigenous/First Nations people
+  - Orientalism or exoticization
+  - White savior narratives
+  - Tokenism or lack of meaningful representation
+  - **Fatphobia**: Body shaming, weight-based discrimination, anti-fat bias (use \`discrimination\` → \`fatphobia\`)
+  - **Classism**: Poverty, homelessness, economic discrimination (use \`discrimination\` → \`classism\`)
+  - **Antisemitism**: Anti-Jewish discrimination, Jewish stereotypes (use \`discrimination\` → \`antisemitism\`)
+  - **Islamophobia**: Anti-Muslim discrimination, Muslim stereotypes (use \`discrimination\` → \`islamophobia\`)
+  - Use category: \`discrimination\` with appropriate subcategory
+
+**5. Subtle Emotional Triggers:**
+- **Grief Processing**: Not just death, but the emotional journey of processing loss, detailed mourning, or grief therapy
+- **Divorce/Separation**: Relationship breakdown, family separation, or divorce as a central theme
+- **Infertility**: Not just mentioned, but as a central theme or trauma (use category: \`medical_health\`, subcategory: \`infertility\`)
+- **Medical Trauma**: Hospital scenes, medical procedures, medical emergencies (use category: \`medical_health\`, subcategory: \`medical_procedures\`)
+- Use category: \`death_or_grief\` with subcategories: \`grief_processing\` or \`divorce\`
+
+**6. Niche Themes:**
+- **Cults**: Cult dynamics, indoctrination, cult manipulation (use category: \`religious_cult\`, subcategory: \`cult_content\`)
+- **Religious Trauma**: Religious abuse, religious-based harm (use category: \`religious_cult\`, subcategory: \`religious_trauma\`)
+- **Occult**: Occult themes, supernatural elements, dark magic (use category: \`religious_cult\`, subcategory: \`occult\`)
+- **Police Brutality**: Police violence, state violence, systemic violence by authorities (use category: \`violence\`, subcategory: \`police_brutality\`)
+- **School Shootings**: Mass shootings, school violence (use category: \`violence\`, subcategory: \`school_shootings\`)
+- **Stalking**: Obsessive following, unwanted surveillance (use category: \`emotional_abuse_or_toxic_relationships\`, subcategory: \`stalking\`)
+- **Financial Abuse**: Economic control, financial manipulation (use category: \`emotional_abuse_or_toxic_relationships\`, subcategory: \`financial_abuse\`)
+- **Family Dynamics**: Parental abandonment, foster care trauma (use category: \`family_dynamics\`, subcategories: \`parental_abandonment\`, \`foster_care_adoption\`)
+- **Accidents**: Car crashes, plane crashes, vehicle accidents (use category: \`other\`, subcategory: \`accidents\`)
+
+**7. Context Clues for Detection:**
+- **Genre Signals**: 
+  - Horror → check for phobias (snakes, spiders, darkness, enclosed spaces), cannibalism
+  - Dark romance → check for CNC, dub-con, somnophilia, breeding kink, knife play, grooming, human trafficking
+  - Horror romance → check for cannibalism, extreme kinks
+  - Mafia romance → check for human trafficking, violence
+  - Medical thrillers → check for medical procedures, needles, blood
+  - Police procedurals → check for police brutality
+  - Religious fiction → check for religious trauma, cult content
+  - Age-gap romance → check for grooming, power imbalance
+- **Setting Signals**: 
+  - Hospital → medical trauma, needles
+  - Underwater → drowning, water phobia
+  - Dark places → darkness phobia
+  - High places → heights phobia
+  - Cults/religious communities → cult content, religious trauma
+- **Character Signals**: 
+  - Trans character → check for misgendering, transphobia
+  - Ace character → check for acephobia
+  - Lesbian characters → check for lesbophobia
+  - Bi character → check for biphobia
+  - Medical professionals → check for medical procedures
+  - Fat characters → check for fatphobia
+  - Jewish/Muslim characters → check for antisemitism/islamophobia
+  - Poor characters → check for classism
+  - Children in care → check for foster care/adoption trauma
+  - Characters with parents leaving → check for parental abandonment
+
+**7. When in Doubt:**
+- If a trigger is commonly requested but not explicitly mentioned, flag it with lower confidence (0.4-0.6)
+- Use \`presence: implied\` for subtle triggers
+- Use \`detail_level: vague\` for implied but not explicit content
+- Better to flag with lower confidence than miss an important trigger
 `;
 
 // Define the base agent config
@@ -726,7 +828,36 @@ I need you to find information about a book with ISBN: ${isbn}
     const parsed = capturedOutput as z.infer<typeof FindBookOutputSchema>;
 
     // Map to legacy format and add derived fields
-    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map(w => {
+    // Classify severity for each warning using classification agent
+    const classificationContexts: ClassificationContext[] = (parsed.content_warnings || []).map(w => ({
+      category_id: w.category_id,
+      subcategory_id: w.subcategory_id || null,
+      description: w.description,
+      score: w.score,
+      presence: w.presence || 'on_page',
+      detail_level: w.detail_level || null,
+      book_genre: parsed.book_categories?.join(', ') || undefined,
+      book_description: parsed.book_description || undefined
+    }));
+
+    // Classify all warnings (in parallel for efficiency)
+    let classificationResults;
+    try {
+      if (classificationContexts.length > 0) {
+        classificationResults = await Promise.all(
+          classificationContexts.map(context => classifySeverity(context, model))
+        );
+        console.log(`[Content Warning Agent] Classified ${classificationResults.length} warnings using classification agent`);
+      } else {
+        classificationResults = null;
+      }
+    } catch (error) {
+      console.warn('[Content Warning Agent] Classification agent failed, falling back to score-based mapping:', error);
+      // Fallback to score-based mapping if classification fails
+      classificationResults = null;
+    }
+
+    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map((w, index) => {
       // Validate subcategory_id matches parent (post-validation)
       let validatedSubcategoryId = w.subcategory_id;
       if (w.subcategory_id && !validateSubcategoryParent(w.category_id, w.subcategory_id)) {
@@ -734,10 +865,24 @@ I need you to find information about a book with ISBN: ${isbn}
         validatedSubcategoryId = null;
       }
 
+      // Use classification result if available, otherwise fallback to score-based mapping
+      let severity: 'mild' | 'moderate' | 'severe';
+      if (classificationResults && classificationResults[index]) {
+        severity = classificationResults[index].severity;
+        // Update reasoning with classification reasoning if available
+        if (classificationResults[index].reasoning) {
+          w.reasoning = `${w.reasoning || ''} [Classification: ${classificationResults[index].reasoning}]`.trim();
+        }
+      } else {
+        // Fallback to score-based mapping
+        const scoreBasedSeverity = getSeverityFromScore(w.score);
+        severity = scoreBasedSeverity === 'none' ? 'mild' : scoreBasedSeverity as 'mild' | 'moderate' | 'severe';
+      }
+
       return {
         ...w,
         subcategory_id: validatedSubcategoryId,
-        severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe', // Fallback for legacy type
+        severity: severity,
         category: w.category_id, // Map id to legacy category field
         id: crypto.randomUUID(), // Temp ID
         helpful_count: 0,
@@ -893,8 +1038,37 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
 
     const parsed = capturedOutput as z.infer<typeof WorkflowOutputSchema>;
 
+    // Classify severity for each warning using classification agent
+    const classificationContexts: ClassificationContext[] = (parsed.content_warnings || []).map(w => ({
+      category_id: w.category_id,
+      subcategory_id: w.subcategory_id || null,
+      description: w.description,
+      score: w.score,
+      presence: w.presence || 'on_page',
+      detail_level: w.detail_level || null,
+      book_genre: workflow.book_categories?.join(', ') || undefined,
+      book_description: workflow.book_description || undefined
+    }));
+
+    // Classify all warnings (in parallel for efficiency)
+    let classificationResults;
+    try {
+      if (classificationContexts.length > 0) {
+        classificationResults = await Promise.all(
+          classificationContexts.map(context => classifySeverity(context, model))
+        );
+        console.log(`[Content Warning Agent] Classified ${classificationResults.length} warnings using classification agent`);
+      } else {
+        classificationResults = null;
+      }
+    } catch (error) {
+      console.warn('[Content Warning Agent] Classification agent failed, falling back to score-based mapping:', error);
+      // Fallback to score-based mapping if classification fails
+      classificationResults = null;
+    }
+
     // Map to legacy format and add derived fields
-    const mappedWarnings: ContentWarning[] = parsed.content_warnings.map(w => {
+    const mappedWarnings: ContentWarning[] = (parsed.content_warnings || []).map((w, index) => {
       // Validate subcategory_id matches parent (post-validation)
       let validatedSubcategoryId = w.subcategory_id;
       if (w.subcategory_id && !validateSubcategoryParent(w.category_id, w.subcategory_id)) {
@@ -902,10 +1076,24 @@ CALL THE submit_warnings TOOL WITH THE RESULT.
         validatedSubcategoryId = null;
       }
 
+      // Use classification result if available, otherwise fallback to score-based mapping
+      let severity: 'mild' | 'moderate' | 'severe';
+      if (classificationResults && classificationResults[index]) {
+        severity = classificationResults[index].severity;
+        // Update reasoning with classification reasoning if available
+        if (classificationResults[index].reasoning) {
+          w.reasoning = `${w.reasoning || ''} [Classification: ${classificationResults[index].reasoning}]`.trim();
+        }
+      } else {
+        // Fallback to score-based mapping
+        const scoreBasedSeverity = getSeverityFromScore(w.score);
+        severity = scoreBasedSeverity === 'none' ? 'mild' : scoreBasedSeverity as 'mild' | 'moderate' | 'severe';
+      }
+
       return {
         ...w,
         subcategory_id: validatedSubcategoryId,
-        severity: getSeverityFromScore(w.score) === 'none' ? 'mild' : getSeverityFromScore(w.score) as 'mild' | 'moderate' | 'severe',
+        severity: severity,
         category: w.category_id,
         id: crypto.randomUUID(),
         helpful_count: 0,

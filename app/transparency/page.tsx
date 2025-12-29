@@ -202,7 +202,7 @@ export default function TransparencyPage() {
             Ready to explore books with confidence?
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/scan-test">
+            <Link href="/scan">
               <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
                 Start Scanning
               </Button>

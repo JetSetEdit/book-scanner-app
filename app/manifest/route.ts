@@ -30,7 +30,7 @@ export async function GET() {
         name: 'Scan Book',
         short_name: 'Scan',
         description: 'Scan a book barcode',
-        url: '/scan-test',
+        url: '/scan',
         icons: [{ src: '/logo.png', sizes: '96x96' }],
       },
       {

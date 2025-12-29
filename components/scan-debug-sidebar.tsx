@@ -15,15 +15,24 @@ function isDevMode(): boolean {
   )
 }
 
+interface DetailedStatusUpdate {
+  action: string
+  aiResponse?: string | any
+  result?: string | any
+  timestamp?: number
+  metadata?: Record<string, any>
+}
+
 interface ScanDebugSidebarProps {
   statusUpdates: string[]
+  detailedStatusUpdates?: DetailedStatusUpdate[]
   loading: boolean
   result: any
   error: string | null
   onClear?: () => void
 }
 
-export function ScanDebugSidebar({ statusUpdates, loading, result, error, onClear }: ScanDebugSidebarProps) {
+export function ScanDebugSidebar({ statusUpdates, detailedStatusUpdates = [], loading, result, error, onClear }: ScanDebugSidebarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
 
@@ -103,41 +112,157 @@ export function ScanDebugSidebar({ statusUpdates, loading, result, error, onClea
                 </div>
               </div>
 
-              {/* Progress Messages */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Backend Messages ({statusUpdates.length})
-                  </span>
-                </div>
-                {statusUpdates.length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No messages yet...</p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {statusUpdates.map((update, i) => (
+              {/* Stream of Consciousness - Detailed Updates */}
+              {detailedStatusUpdates.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Stream of Consciousness ({detailedStatusUpdates.length})
+                    </span>
+                  </div>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                    {detailedStatusUpdates.map((update, i) => (
                       <div
                         key={i}
                         className={cn(
-                          "text-xs p-2 rounded border bg-card",
-                          i === statusUpdates.length - 1 && loading && "border-primary bg-primary/5"
+                          "text-xs p-3 rounded border bg-card",
+                          i === detailedStatusUpdates.length - 1 && loading && "border-primary bg-primary/5"
                         )}
                       >
-                        <div className="flex items-start gap-2">
-                          <span className="text-muted-foreground font-mono text-[10px] mt-0.5">
-                            {String(i + 1).padStart(2, '0')}
-                          </span>
-                          <span className={cn(
-                            "flex-1 break-words",
-                            i === statusUpdates.length - 1 && loading && "font-medium text-foreground"
-                          )}>
-                            {update}
-                          </span>
+                        <div className="space-y-2">
+                          {/* Action */}
+                          <div className="flex items-start gap-2">
+                            <span className="text-muted-foreground font-mono text-[10px] mt-0.5 flex-shrink-0">
+                              {String(i + 1).padStart(2, '0')}
+                            </span>
+                            <div className="flex-1 space-y-1.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <span className="text-muted-foreground text-[10px] uppercase">Action:</span>
+                                  <p className="font-medium text-foreground mt-0.5">{update.action}</p>
+                                </div>
+                                {update.timestamp && i > 0 && detailedStatusUpdates[i - 1]?.timestamp && (
+                                  <span className="text-[10px] text-muted-foreground font-mono flex-shrink-0">
+                                    +{((update.timestamp - detailedStatusUpdates[i - 1].timestamp) / 1000).toFixed(1)}s
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* AI Response */}
+                              {update.aiResponse && (
+                                <div className="mt-2 pt-2 border-t border-border/50">
+                                  <span className="text-muted-foreground text-[10px] uppercase">AI Response:</span>
+                                  <div className="mt-1 p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded border border-blue-500/20">
+                                    {typeof update.aiResponse === 'string' ? (
+                                      <p className="text-foreground">{update.aiResponse}</p>
+                                    ) : (
+                                      <div className="space-y-1">
+                                        {update.aiResponse.book_found !== undefined && (
+                                          <p><span className="text-muted-foreground">Book Found:</span> {update.aiResponse.book_found ? 'Yes' : 'No'}</p>
+                                        )}
+                                        {update.aiResponse.book_title && (
+                                          <p><span className="text-muted-foreground">Title:</span> {update.aiResponse.book_title}</p>
+                                        )}
+                                        {update.aiResponse.book_author && (
+                                          <p><span className="text-muted-foreground">Author:</span> {update.aiResponse.book_author}</p>
+                                        )}
+                                        {update.aiResponse.confidence && (
+                                          <p><span className="text-muted-foreground">Confidence:</span> <span className="font-mono">{update.aiResponse.confidence}</span></p>
+                                        )}
+                                        {update.aiResponse.warnings_count !== undefined && (
+                                          <p><span className="text-muted-foreground">Warnings:</span> {update.aiResponse.warnings_count}</p>
+                                        )}
+                                        {update.aiResponse.reasoning && (
+                                          <div className="mt-1 pt-1 border-t border-blue-500/20">
+                                            <p className="text-muted-foreground text-[10px] mb-0.5">Reasoning:</p>
+                                            <p className="text-foreground italic">{update.aiResponse.reasoning}</p>
+                                          </div>
+                                        )}
+                                        {update.aiResponse.classification_rating && (
+                                          <p><span className="text-muted-foreground">Rating:</span> {update.aiResponse.classification_rating}</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Result */}
+                              {update.result && (
+                                <div className="mt-2 pt-2 border-t border-border/50">
+                                  <span className="text-muted-foreground text-[10px] uppercase">Result:</span>
+                                  <p className="text-foreground mt-0.5">{update.result}</p>
+                                </div>
+                              )}
+                              
+                              {/* Metadata */}
+                              {update.metadata && Object.keys(update.metadata).length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-border/50">
+                                  <span className="text-muted-foreground text-[10px] uppercase">Metadata:</span>
+                                  <div className="mt-1 font-mono text-[10px] space-y-0.5">
+                                    {Object.entries(update.metadata).map(([key, value]) => {
+                                      if (key === 'warnings' && Array.isArray(value)) {
+                                        return (
+                                          <div key={key} className="ml-2">
+                                            <span className="text-muted-foreground">{key}:</span> {value.length} warning(s)
+                                          </div>
+                                        )
+                                      }
+                                      return (
+                                        <div key={key} className="ml-2">
+                                          <span className="text-muted-foreground">{key}:</span> {String(value)}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Simple Progress Messages (fallback) */}
+              {detailedStatusUpdates.length === 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Backend Messages ({statusUpdates.length})
+                    </span>
+                  </div>
+                  {statusUpdates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic">No messages yet...</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {statusUpdates.map((update, i) => (
+                        <div
+                          key={i}
+                          className={cn(
+                            "text-xs p-2 rounded border bg-card",
+                            i === statusUpdates.length - 1 && loading && "border-primary bg-primary/5"
+                          )}
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-muted-foreground font-mono text-[10px] mt-0.5">
+                              {String(i + 1).padStart(2, '0')}
+                            </span>
+                            <span className={cn(
+                              "flex-1 break-words",
+                              i === statusUpdates.length - 1 && loading && "font-medium text-foreground"
+                            )}>
+                              {update}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Error Display */}
               {error && (

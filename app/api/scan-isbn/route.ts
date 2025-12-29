@@ -28,8 +28,14 @@ export async function POST(request: NextRequest) {
 
       const customStream = new ReadableStream({
         async start(controller) {
-          const sendUpdate = (message: string) => {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`))
+          const sendUpdate = (message: string | any) => {
+            // Handle both string messages and detailed status updates
+            if (typeof message === 'string') {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`))
+            } else {
+              // Detailed status update with action, AI response, result
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ statusUpdate: message })}\n\n`))
+            }
           }
 
           try {

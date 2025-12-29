@@ -158,3 +158,12 @@ The scan process shows these status updates (from console):
 
 
 
+
+
+
+
+
+
+
+
+

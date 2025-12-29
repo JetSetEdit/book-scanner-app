@@ -351,11 +351,16 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
 
             {/* Content Warnings - The "Feature" Block */}
             <div className="mt-16">
-              <div className="flex items-center gap-4 mb-8">
+              <div className="flex items-center gap-4 mb-4">
                 <div className="h-px bg-border flex-1"></div>
                 <h3 className="font-serif text-2xl text-foreground italic">Content Analysis</h3>
                 <div className="h-px bg-border flex-1"></div>
               </div>
+              
+              {/* Disclaimer */}
+              <p className="text-sm text-muted-foreground italic mb-8 text-center max-w-2xl mx-auto">
+                Content warnings help readers make informed choices — they're not judgments about books or readers.
+              </p>
 
               <ContentWarningsList
                 warnings={warnings}

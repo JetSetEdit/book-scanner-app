@@ -2,6 +2,7 @@ import { BookOpen, Shield, Users, ScanBarcode, Search, AlertTriangle } from "luc
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { BookSpineLogo } from "@/components/book-spine-logo"
 
 export default function HomePage() {
   return (
@@ -11,7 +12,7 @@ export default function HomePage() {
         <div className="max-w-4xl mx-auto space-y-8">
           <div className="flex flex-col items-center justify-center mb-12">
             <div className="mb-6">
-              <img src="/logo_var_2.png" alt="Subtext Logo" className="h-48 w-48 md:h-64 md:w-64 object-contain" />
+              <BookSpineLogo className="h-48 w-48 md:h-64 md:w-64 text-foreground" />
             </div>
             <span className="text-5xl md:text-7xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
           </div>
@@ -26,7 +27,7 @@ export default function HomePage() {
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link href="/scan-test">
+            <Link href="/scan">
               <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105">
                 <ScanBarcode className="mr-2 h-5 w-5" />
                 Start Scanning

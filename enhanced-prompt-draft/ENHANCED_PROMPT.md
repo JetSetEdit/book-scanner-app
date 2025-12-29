@@ -103,3 +103,12 @@ Now analyze: Blurb: [Input blurb]. Genre: [Input genre]. Strictness: [Input mode
 
 
 
+
+
+
+
+
+
+
+
+

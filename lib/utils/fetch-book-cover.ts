@@ -10,41 +10,65 @@ export async function fetchBookCover(isbn: string, title?: string): Promise<stri
         const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`);
         const data = await response.json();
         if (data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail) {
-            const coverUrl = data.items[0].volumeInfo.imageLinks.thumbnail.replace('http:', 'https:');
-            // Try to get higher quality version
-            const highQualityCover = coverUrl.replace('&zoom=1', '&zoom=2');
+            const baseUrl = data.items[0].volumeInfo.imageLinks.thumbnail.replace('http:', 'https:');
+            
+            // Try different zoom levels in order of preference (zoom=2 is often the placeholder!)
+            // zoom=4 is highest quality, zoom=1 is standard, zoom=2 is often placeholder
+            const zoomLevels = [4, 1, 3, 5];
+            
+            for (const zoom of zoomLevels) {
+                const testUrl = baseUrl.replace(/&zoom=\d+/, `&zoom=${zoom}`);
+                
+                try {
+                    const imageResponse = await fetch(testUrl, { method: 'HEAD' });
+                    const contentType = imageResponse.headers.get('content-type');
+                    const contentLength = imageResponse.headers.get('content-length');
 
-            // CRITICAL: Validate the image is actually available (not a placeholder)
-            try {
-                const imageResponse = await fetch(highQualityCover, { method: 'HEAD' });
-                const contentType = imageResponse.headers.get('content-type');
-                const contentLength = imageResponse.headers.get('content-length');
-
-                // Google Books placeholder images are usually very small (< 1KB)
-                // Real covers are typically > 5KB
-                if (imageResponse.ok && contentType?.includes('image') &&
-                    contentLength && parseInt(contentLength) > 5000) {
-                    console.log(`✅ Google Books cover validated (${contentLength} bytes)`);
-                    return highQualityCover;
-                } else {
-                    console.log(`❌ Google Books cover is a placeholder (${contentLength} bytes), trying fallback...`);
+                    // Google Books placeholder images are usually very small (< 1KB)
+                    // Real covers are typically > 5KB
+                    // Block specific Google Books "Image Not Available" placeholder size (15567 bytes)
+                    const size = contentLength ? parseInt(contentLength) : 0;
+                    if (imageResponse.ok && contentType?.includes('image') &&
+                        size > 5000 && size !== 15567) {
+                        console.log(`✅ Google Books cover validated (zoom=${zoom}, ${size} bytes)`);
+                        return testUrl;
+                    }
+                } catch (e) {
+                    // Continue to next zoom level
+                    continue;
                 }
-            } catch (e) {
-                console.log('Google Books cover validation failed:', e);
             }
+            
+            console.log(`❌ Google Books cover validation failed for all zoom levels, trying fallback...`);
         }
     } catch (e) {
         console.log('Google Books cover fetch failed:', e);
     }
 
-    // 2. Try Open Library
+    // 2. Try Open Library (without ?default=false to avoid 404s)
     try {
-        const response = await fetch(`https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg?default=false`);
-        if (response.ok && response.headers.get('content-type')?.includes('image')) {
+        const url = `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`;
+        const response = await fetch(url, { method: 'HEAD' });
+        // Open Library HEAD requests don't always return content-type, so check if response is OK
+        // If it's OK, assume it's a valid image (Open Library only returns images for this endpoint)
+        if (response.ok) {
+            const contentType = response.headers.get('content-type');
             const contentLength = response.headers.get('content-length');
-            if (contentLength && parseInt(contentLength) > 5000) {
-                console.log(`✅ Open Library cover found (${contentLength} bytes)`);
-                return `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`;
+            const size = contentLength ? parseInt(contentLength) : null;
+            
+            // If content-type is provided and it's not an image, reject
+            if (contentType && !contentType.includes('image')) {
+                console.log(`❌ Open Library cover rejected: not an image (${contentType})`);
+            } else if (size !== null && size < 1000) {
+                // Reject very small images (< 1KB) - likely placeholders
+                console.log(`❌ Open Library cover rejected: too small (${size} bytes)`);
+            } else if (size === 15567) {
+                // Reject Google Books placeholder size
+                console.log(`❌ Open Library cover rejected: placeholder size (${size} bytes)`);
+            } else {
+                // Accept the cover - Open Library covers are generally valid if response is OK
+                console.log(`✅ Open Library cover found${size ? ` (${size} bytes)` : ' (no size header)'}`);
+                return url;
             }
         }
     } catch (e) {
@@ -57,8 +81,9 @@ export async function fetchBookCover(isbn: string, title?: string): Promise<stri
         const response = await fetch(amazonCoverUrl, { method: 'HEAD' });
         if (response.ok) {
             const contentLength = response.headers.get('content-length');
-            if (contentLength && parseInt(contentLength) > 5000) {
-                console.log(`✅ Amazon cover found (${contentLength} bytes)`);
+            const size = contentLength ? parseInt(contentLength) : 0;
+            if (size > 5000 && size !== 15567) {
+                console.log(`✅ Amazon cover found (${size} bytes)`);
                 return amazonCoverUrl;
             }
         }
@@ -71,8 +96,9 @@ export async function fetchBookCover(isbn: string, title?: string): Promise<stri
         const response = await fetch(`https://isbndb.com/book-image/${cleanIsbn}`);
         if (response.ok) {
             const contentLength = response.headers.get('content-length');
-            if (contentLength && parseInt(contentLength) > 5000) {
-                console.log(`✅ ISBN DB cover found (${contentLength} bytes)`);
+            const size = contentLength ? parseInt(contentLength) : 0;
+            if (size > 5000 && size !== 15567) {
+                console.log(`✅ ISBN DB cover found (${size} bytes)`);
                 return `https://isbndb.com/book-image/${cleanIsbn}`;
             }
         }
