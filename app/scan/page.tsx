@@ -101,15 +101,21 @@ export default function ScanTestPage() {
         const transformedResult = {
           success: data.success,
           book: data.book,
-          isNewBook: false, // Multi-model doesn't save to DB
-          contentWarningsGenerated: data.combined_warnings.length > 0,
+          isNewBook: data.isNewBook || false,
+          contentWarningsGenerated: data.combined_warnings?.length > 0 || false,
           authorContextInvestigated: false,
           multiModelAnalysis: {
-            combined_warnings: data.combined_warnings,
+            combined_warnings: data.combined_warnings || [],
             classification_rating: data.classification_rating,
             confidence: data.confidence,
-            model_results: data.model_results,
-            analysis: data.analysis
+            model_results: data.model_results || [],
+            analysis: data.analysis || {
+              agreement_score: 0,
+              unique_to_gpt4o: [],
+              unique_to_gemini: [],
+              severity_differences: [],
+              reasoning_insights: 'Analysis unavailable'
+            }
           }
         }
         
@@ -124,7 +130,7 @@ export default function ScanTestPage() {
             isbn: isbnToScan,
             title: data.book.title || "Unknown",
             author: data.book.author || undefined,
-            bookId: `multi-${isbnToScan}`, // Temporary ID for multi-model
+            bookId: data.book.id || `multi-${isbnToScan}`,
           })
         }
         

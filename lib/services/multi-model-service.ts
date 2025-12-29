@@ -316,7 +316,7 @@ export async function runMultiModelAnalysis(
   const startTime = Date.now()
 
   // Run both models in parallel with error handling
-  const [gpt4oResult, geminiResult] = await Promise.allSettled([
+  const results = await Promise.allSettled([
     (async () => {
       const start = Date.now()
       try {
@@ -369,33 +369,31 @@ export async function runMultiModelAnalysis(
         } as ModelResult
       }
     })()
-  ]).then(results => {
-    const gpt4oResult = results[0].status === 'fulfilled' 
-      ? results[0].value 
-      : {
-          model: 'gpt-4o',
-          content_warnings: [],
-          confidence: 'low' as const,
-          reasoning: `Failed: ${results[0].status === 'rejected' 
-            ? (results[0].reason instanceof Error ? results[0].reason.message : String(results[0].reason))
-            : 'Unknown error'}`,
-          timing: 0
-        } as ModelResult
-    
-    const geminiResult = results[1].status === 'fulfilled'
-      ? results[1].value
-      : {
-          model: 'gemini-2.5-flash',
-          content_warnings: [],
-          confidence: 'low' as const,
-          reasoning: `Failed: ${results[1].status === 'rejected'
-            ? (results[1].reason instanceof Error ? results[1].reason.message : String(results[1].reason))
-            : 'Unknown error'}`,
-          timing: 0
-        } as ModelResult
-    
-    return [gpt4oResult, geminiResult]
-  })
+  ])
+
+  const gpt4oResult = results[0].status === 'fulfilled' 
+    ? results[0].value 
+    : {
+        model: 'gpt-4o',
+        content_warnings: [],
+        confidence: 'low' as const,
+        reasoning: `Failed: ${results[0].status === 'rejected' 
+          ? (results[0].reason instanceof Error ? results[0].reason.message : String(results[0].reason))
+          : 'Unknown error'}`,
+        timing: 0
+      } as ModelResult
+  
+  const geminiResult = results[1].status === 'fulfilled'
+    ? results[1].value
+    : {
+        model: 'gemini-2.5-flash',
+        content_warnings: [],
+        confidence: 'low' as const,
+        reasoning: `Failed: ${results[1].status === 'rejected'
+          ? (results[1].reason instanceof Error ? results[1].reason.message : String(results[1].reason))
+          : 'Unknown error'}`,
+        timing: 0
+      } as ModelResult
 
   // Combine warnings
   const combinedWarnings = combineWarnings(
