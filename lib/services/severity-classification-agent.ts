@@ -1,4 +1,4 @@
-import { Agent, run, tool, setDefaultOpenAIKey } from "@openai/agents";
+import { Agent, run, setDefaultOpenAIKey } from "@openai/agents";
 import { z } from "zod";
 import { WARNING_CATEGORIES, getCategoryById, getSubcategoryById } from "@/lib/config/taxonomy-v2";
 
@@ -254,13 +254,12 @@ Based on all these factors, determine the appropriate severity level.
 `;
 
   try {
-    const result = await run(agentConfig, {
-      messages: [
-        {
-          role: "user",
-          content: classificationPrompt
-        }
-      ],
+    const agent = new Agent({
+      ...agentConfig,
+      tools: []
+    });
+
+    const result = await run(agent, classificationPrompt, {
       response_format: { type: "json_object" },
       temperature: 0.3, // Lower temperature for more consistent classification
     });

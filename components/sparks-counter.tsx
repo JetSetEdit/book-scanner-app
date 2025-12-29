@@ -37,6 +37,9 @@ export function SparksCounter() {
       if (response.ok) {
         const data = await response.json()
         setProfile(data)
+      } else if (response.status === 401) {
+        // User not authenticated - this is expected, don't show error
+        setProfile(null)
       }
     } catch (error) {
       console.error('Failed to fetch sparks profile:', error)
