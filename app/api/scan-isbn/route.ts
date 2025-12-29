@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateISBN } from '@/lib/isbn-validation'
 import { processIsbnScan } from '@/lib/services/scan-service'
-import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,14 +39,6 @@ export async function POST(request: NextRequest) {
 
           try {
             const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh, model || "gpt-4o")
-            
-            // Award sparks for scan (non-blocking)
-            if (result.success && result.book) {
-              // Get user from session
-              const supabase = await import('@/lib/supabase/server').then(m => m.createClient())
-              const { data: { user } } = await supabase.auth.getUser()
-              
-            }
             
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
           } catch (error) {
