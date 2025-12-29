@@ -259,14 +259,21 @@ Based on all these factors, determine the appropriate severity level.
       tools: []
     });
 
-    const result = await run(agent, classificationPrompt, {
-      response_format: { type: "json_object" },
-      temperature: 0.3, // Lower temperature for more consistent classification
-    });
+    const result = await run(agent, classificationPrompt);
 
-    // Parse the response
-    const responseText = result.messages[result.messages.length - 1].content;
-    const parsed = JSON.parse(responseText);
+    // Parse the response - handle both message format and direct text
+    let responseText: string;
+    if (result.messages && result.messages.length > 0) {
+      responseText = result.messages[result.messages.length - 1].content;
+    } else if (typeof result === 'string') {
+      responseText = result;
+    } else {
+      throw new Error('Unexpected response format from classification agent');
+    }
+    
+    // Extract JSON if wrapped in text
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(responseText);
     
     // Validate against schema
     const validated = ClassificationSchema.parse(parsed);
