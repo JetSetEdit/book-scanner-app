@@ -100,6 +100,10 @@ ${bookCategories ? `- Categories: ${bookCategories.join(', ')}` : ''}
      * ✅ GOOD: "Protective/obsessive stalking behavior (dark romance trope) - possessive surveillance, not threatening"
      * ❌ BAD: "Dubious consent common in Dark Romance genre" (doesn't clarify trope vs trigger)
      * ❌ BAD: "Stalking behavior frequent in Enemies to Lovers" (doesn't clarify protective vs threatening)
+   - **Description Requirements**: The description field MUST answer these questions for dark romance readers:
+     * Is this within the main couple's power dynamic, or assault from outside party?
+     * Is it framed as fantasy/power play or actual trauma?
+     * Example: "Contains dubious consent scenes where power dynamics blur consent (common in dark romance). Framed as fantasy/power play within the relationship, not traumatic assault."
 
 3. **When Description is Missing**:
    - Set confidence to 'low'

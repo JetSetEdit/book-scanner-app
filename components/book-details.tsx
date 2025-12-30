@@ -14,6 +14,8 @@ import { ShareButton } from "@/components/ShareButton"
 import { BuyButton } from "@/components/BuyButton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
+import { useUserPreferences } from "@/hooks/use-user-preferences"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -41,6 +43,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const descriptionRef = useRef<HTMLDivElement>(null)
   const [fullHeight, setFullHeight] = useState<number | null>(null)
+  const { preferences, updatePreference } = useUserPreferences()
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -358,9 +361,42 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
               </div>
               
               {/* Disclaimer */}
-              <p className="text-sm text-muted-foreground italic mb-8 text-center max-w-2xl mx-auto">
+              <p className="text-sm text-muted-foreground italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
               </p>
+
+              {/* Trope vs Trigger Toggle for Dark Romance Readers */}
+              <div className="mb-8 p-4 border rounded-lg bg-muted/30 max-w-md mx-auto">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <label className="text-sm font-medium text-foreground mb-1 block">
+                      Show Warnings For:
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Dark romance readers can filter by tropes they seek vs. triggers they avoid
+                    </p>
+                  </div>
+                  <Select
+                    value={preferences.tropeMode || 'both'}
+                    onValueChange={(value: 'tropes' | 'triggers' | 'both') => {
+                      updatePreference('tropeMode', value)
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="both">Both</SelectItem>
+                      <SelectItem value="tropes">Tropes Only</SelectItem>
+                      <SelectItem value="triggers">Triggers Only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-3 text-xs text-muted-foreground space-y-1">
+                  <p><strong>Tropes:</strong> CNC, protective stalking, power play dynamics (what dark romance readers seek)</p>
+                  <p><strong>Triggers:</strong> Actual assault, predatory stalking, real trauma (what readers need to avoid)</p>
+                </div>
+              </div>
 
               <ContentWarningsList
                 warnings={warnings}

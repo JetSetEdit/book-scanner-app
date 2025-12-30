@@ -31,6 +31,8 @@ import { ThumbsButtons } from "@/components/thumbs-buttons"
 import { getCategoryById, getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { TagWithTooltip } from "@/components/tag-with-tooltip"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/utils/dark-romance-context"
+import { useUserPreferences } from "@/hooks/use-user-preferences"
 
 interface ContentWarning {
   id: string
@@ -99,15 +101,24 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
 };
 
 export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarningsListProps) {
-  // Check for sensitive topics to show resources
-  const showMentalHealthResources = warnings.some(w =>
+  const { preferences } = useUserPreferences()
+  const tropeMode = preferences.tropeMode || 'both'
+  
+  // Filter warnings based on trope mode
+  const filteredWarnings = warnings.filter(warning => {
+    const context = getWarningContext(warning.category_id, warning.subcategory_id, warning.description)
+    return shouldShowWarning(context, tropeMode)
+  })
+  
+  // Check for sensitive topics to show resources (use filtered warnings)
+  const showMentalHealthResources = filteredWarnings.some(w =>
     ['mental_health', 'suicide', 'self_harm', 'abuse', 'substance_abuse'].includes(w.category) ||
     (w.category_id && ['mental_health', 'substance_use_or_alcohol', 'emotional_abuse_or_toxic_relationships'].includes(w.category_id)) ||
     w.description.toLowerCase().includes('suicide') ||
     w.description.toLowerCase().includes('depression')
   );
 
-  if (!warnings || warnings.length === 0) {
+  if (!filteredWarnings || filteredWarnings.length === 0) {
     return (
       <div className="py-12 text-center border-y border-border">
         <div className="flex justify-center mb-4">
@@ -119,11 +130,11 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
     )
   }
 
-  // Separate warnings by type
-  const authorApprovedWarnings = warnings.filter(w => w.is_author_approved === true)
-  const communityWarnings = warnings.filter(w => w.source === 'user_submitted' || (w.user_id !== null && w.source !== 'ai_generated' && w.is_author_approved !== true))
-  const aiWarnings = warnings.filter(w => w.source === 'ai_generated' || w.user_id === null)
-  const officialVerifiedWarnings = warnings.filter(w => w.is_author_verified === true)
+  // Separate warnings by type (using filtered warnings)
+  const authorApprovedWarnings = filteredWarnings.filter(w => w.is_author_approved === true)
+  const communityWarnings = filteredWarnings.filter(w => w.source === 'user_submitted' || (w.user_id !== null && w.source !== 'ai_generated' && w.is_author_approved !== true))
+  const aiWarnings = filteredWarnings.filter(w => w.source === 'ai_generated' || w.user_id === null)
+  const officialVerifiedWarnings = filteredWarnings.filter(w => w.is_author_verified === true)
   const standardAiWarnings = aiWarnings.filter(w => w.is_author_verified !== true)
 
   return (
@@ -296,6 +307,26 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
 
         {/* Right: Description & Actions */}
         <div className="flex-1">
+          {/* Context Badge for Dark Romance */}
+          {(() => {
+            const context = getWarningContext(warning.category_id, warning.subcategory_id, warning.description)
+            const contextInfo = getContextInfo(context)
+            if (contextInfo.label) {
+              return (
+                <div className="mb-2">
+                  <Badge 
+                    variant="outline" 
+                    className={cn("text-xs font-medium", contextInfo.color)}
+                    title={contextInfo.description}
+                  >
+                    {contextInfo.label}
+                  </Badge>
+                </div>
+              )
+            }
+            return null
+          })()}
+          
           <p className="text-muted-foreground text-base leading-relaxed font-serif mb-3">
             {warning.description}
           </p>

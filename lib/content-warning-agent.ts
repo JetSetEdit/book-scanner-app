@@ -817,7 +817,13 @@ const ContentWarningSchema = z.object({
     "If not provided, the warning will use the parent category only. " +
     "See valid subcategories per category in the instructions."
   ),
-  description: z.string().describe("User-facing description of the content"),
+  description: z.string().describe(
+    "User-facing description that MUST clarify context for dark romance readers. " +
+    "For sexual content: Specify if it's 'CNC/power play dynamics (consensual roleplay)', 'Dubious consent within relationship (dark romance trope)', or 'Actual sexual assault (not consensual roleplay)'. " +
+    "For stalking: Specify if it's 'Protective/obsessive surveillance (dark romance trope)' or 'Threatening stalking behavior'. " +
+    "Answer: Is this within the main couple's power dynamic, or assault from outside party? Is it framed as fantasy/power play or actual trauma? " +
+    "Example: 'Contains dubious consent scenes where power dynamics blur consent (common in dark romance). Framed as fantasy/power play within the relationship, not traumatic assault.'"
+  ),
   score: z.number().min(0).max(1).describe("Severity score from 0.0 to 1.0"),
   reasoning: z.string().describe(
     "Categorical explanation for the score using standardized taxonomy terms. " +
@@ -1202,7 +1208,18 @@ ${isThinDescription ? (instructionMode === 'old' ? 'Since the description is bri
   3. DO NOT include specific plot points, character names, story events, or narrative details
   4. DO NOT generalize based on author reputation (e.g., "Author is known for..." is NOT allowed)
   5. **FOR DARK ROMANCE TROPES**: MUST clarify if it's a trope (what readers seek) vs actual trigger (what readers avoid)
-- Examples:
+- For each warning's \`description\` field (user-facing text):
+  - **MUST answer these questions for dark romance readers:**
+    * Is this within the main couple's power dynamic, or assault from outside party?
+    * Is it framed as fantasy/power play or actual trauma?
+    * Does the stalking feel romantic/protective or genuinely scary?
+  - **Examples of good descriptions:**
+    * ✅ "Contains dubious consent scenes where power dynamics blur consent (common in dark romance). Framed as fantasy/power play within the relationship, not traumatic assault."
+    * ✅ "Protective/obsessive stalking behavior where the MMC watches from afar, framed as protective/romantic (dark romance trope), not threatening."
+    * ✅ "Actual sexual assault scenes (not consensual roleplay) - contains depictions of non-consensual sexual acts from outside parties."
+    * ❌ BAD: "Non-consensual sexual acts, including dubious consent and sexual coercion" (doesn't clarify trope vs trigger)
+    * ❌ BAD: "Stalking behavior" (doesn't clarify protective vs threatening)
+- Examples of good reasoning:
   * ✅ GOOD: "Book description mentions 'graphic violence and sexual assault' - contains themes of sexual violence"
   * ✅ GOOD: "Google Books review cites 'explicit content warnings' - contains themes of sexual content"
   * ✅ GOOD (Dark Romance): "Book description indicates CNC/power play dynamics (consensual roleplay) - contains consensual non-consent scenarios"

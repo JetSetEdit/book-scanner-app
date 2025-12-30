@@ -9,6 +9,7 @@ export interface UserPreferences {
   theme?: 'light' | 'dark' | 'system'
   showCameraScanner?: boolean
   useMultiModel?: boolean
+  tropeMode?: 'tropes' | 'triggers' | 'both' // For dark romance readers: show tropes they seek, triggers they avoid, or both
 }
 
 const PREFERENCES_KEY = 'book-scanner-preferences'
@@ -20,6 +21,7 @@ const defaultPreferences: UserPreferences = {
   theme: 'system',
   showCameraScanner: false, // Default to manual entry, camera is opt-in
   useMultiModel: true, // Default to multi-model for better coverage
+  tropeMode: 'both', // Default to showing both tropes and triggers
 }
 
 /**
