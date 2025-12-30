@@ -29,34 +29,96 @@ export function getWarningContext(
 ): WarningContext {
   const descLower = description.toLowerCase()
   const subcatLower = subcategoryId?.toLowerCase() || ''
+  const catLower = categoryId?.toLowerCase() || ''
 
-  // Sexual Content Context
-  if (categoryId === 'sexual_content') {
-    if (subcatLower === 'cnc' || descLower.includes('cnc') || descLower.includes('consensual non-consent') || descLower.includes('consensual roleplay')) {
+  // Sexual Content Context - Check subcategory FIRST (most reliable)
+  if (catLower === 'sexual_content') {
+    // Direct subcategory matching (most reliable)
+    if (subcatLower === 'cnc') {
       return 'cnc-fantasy'
     }
-    if (subcatLower === 'consent_ambiguity' || descLower.includes('dubious consent') || descLower.includes('dub-con')) {
-      // Check if it's described as a trope vs actual assault
+    if (subcatLower === 'consent_ambiguity' || subcatLower === 'dub_con') {
+      // For dub-con, check description to see if it's trope or trigger
+      // If description mentions "trope", "power play", "fantasy", "within relationship" → trope
+      // If description mentions "actual", "traumatic", "not consensual roleplay" → trigger
+      if (descLower.includes('trope') || descLower.includes('power play') || descLower.includes('fantasy') || descLower.includes('within relationship') || descLower.includes('dark romance')) {
+        return 'dub-con-trope'
+      }
+      // Default dub-con to trope (most dark romance dub-con is trope territory)
+      // Only mark as actual-assault if explicitly stated
+      if (descLower.includes('actual') || descLower.includes('traumatic') || descLower.includes('not consensual roleplay') || descLower.includes('real assault')) {
+        return 'actual-assault'
+      }
+      // Default: assume dub-con is trope (dark romance context)
+      return 'dub-con-trope'
+    }
+    // CRITICAL: sexual_violence subcategory = actual assault (trigger), not trope
+    if (subcatLower === 'non_consensual_sexual_acts' || subcatLower === 'sexual_violence') {
+      // Check if description clarifies it's CNC/roleplay vs actual assault
+      if (descLower.includes('cnc') || descLower.includes('consensual roleplay') || descLower.includes('power play') || descLower.includes('fantasy') || descLower.includes('within relationship')) {
+        return 'cnc-fantasy' // Misclassified - should be cnc but marked as non_consensual
+      }
+      if (descLower.includes('actual') || descLower.includes('traumatic') || descLower.includes('not consensual roleplay') || descLower.includes('real assault')) {
+        return 'actual-assault'
+      }
+      // If subcategory is non_consensual_sexual_acts or sexual_violence but description doesn't clarify,
+      // default to actual-assault (safer assumption - these are triggers, not tropes)
+      return 'actual-assault'
+    }
+    
+    // Fallback: Check description keywords if subcategory doesn't match
+    if (descLower.includes('cnc') || descLower.includes('consensual non-consent') || descLower.includes('consensual roleplay') || descLower.includes('power play dynamics')) {
+      return 'cnc-fantasy'
+    }
+    if (descLower.includes('dubious consent') || descLower.includes('dub-con')) {
       if (descLower.includes('trope') || descLower.includes('power play') || descLower.includes('fantasy') || descLower.includes('within relationship')) {
         return 'dub-con-trope'
       }
+      // Default dub-con to trope
+      return 'dub-con-trope'
     }
-    if (subcatLower === 'non_consensual_sexual_acts' || descLower.includes('actual sexual assault') || descLower.includes('not consensual roleplay') || descLower.includes('traumatic assault')) {
+    if (descLower.includes('actual sexual assault') || descLower.includes('not consensual roleplay') || descLower.includes('traumatic assault') || descLower.includes('real non-consent')) {
+      return 'actual-assault'
+    }
+    
+    // Generic "sexual violence" or "sexual coercion" in description - need to infer
+    // If it's in sexual_content category but no specific subcategory, check description
+    // IMPORTANT: "sexual violence" in description usually means actual assault (trigger), not trope
+    if (descLower.includes('sexual violence') || descLower.includes('sexual coercion') || descLower.includes('sexual assault') || descLower.includes('rape')) {
+      // Only classify as trope if description explicitly mentions it's CNC/roleplay/power play
+      if (descLower.includes('cnc') || descLower.includes('consensual roleplay') || descLower.includes('power play') || descLower.includes('fantasy') || descLower.includes('within relationship') || descLower.includes('dark romance trope')) {
+        return 'dub-con-trope'
+      }
+      // Otherwise, assume it's actual assault (safer - "sexual violence" is typically a trigger)
       return 'actual-assault'
     }
   }
 
-  // Stalking Context
-  if (categoryId === 'emotional_abuse_or_toxic_relationships' && subcatLower === 'stalking') {
-    if (descLower.includes('protective') || descLower.includes('obsessive') || descLower.includes('not threatening') || descLower.includes('dark romance trope')) {
+  // Stalking Context - Check subcategory FIRST
+  if (catLower === 'emotional_abuse_or_toxic_relationships' && subcatLower === 'stalking') {
+    // Check description for context
+    if (descLower.includes('protective') || descLower.includes('obsessive') || descLower.includes('not threatening') || descLower.includes('dark romance trope') || descLower.includes('romantic')) {
       return 'protective-stalking'
     }
-    if (descLower.includes('threatening') || descLower.includes('dangerous') || descLower.includes('creates fear')) {
+    if (descLower.includes('threatening') || descLower.includes('dangerous') || descLower.includes('creates fear') || descLower.includes('predatory')) {
       return 'predatory-stalking'
     }
-    if (descLower.includes('surveillance') || descLower.includes('within relationship') || descLower.includes('established relationship')) {
+    if (descLower.includes('surveillance') || descLower.includes('within relationship') || descLower.includes('established relationship') || descLower.includes('monitoring')) {
       return 'relationship-surveillance'
     }
+    // Default: If it's stalking subcategory but no context, assume protective (dark romance context)
+    // This is safer for dark romance readers who seek protective stalking
+    return 'protective-stalking'
+  }
+
+  // Violence category with sexual_violence subcategory
+  if (catLower === 'violence' && (subcatLower === 'sexual_violence' || descLower.includes('sexual violence'))) {
+    // Check if it's described as CNC/roleplay
+    if (descLower.includes('cnc') || descLower.includes('consensual roleplay') || descLower.includes('power play') || descLower.includes('fantasy')) {
+      return 'cnc-fantasy'
+    }
+    // Otherwise assume actual assault
+    return 'actual-assault'
   }
 
   return 'other'
@@ -129,6 +191,12 @@ export function shouldShowWarning(
   if (tropeMode === 'both') return true
   
   const contextInfo = getContextInfo(context)
+  
+  // If context is 'other', show it in both modes (can't determine if trope or trigger)
+  // This ensures we don't hide warnings we can't classify
+  if (context === 'other') {
+    return true // Show 'other' warnings in all modes to avoid hiding important content
+  }
   
   if (tropeMode === 'tropes') {
     return contextInfo.isTrope

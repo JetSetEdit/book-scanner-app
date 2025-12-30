@@ -1,0 +1,112 @@
+
+> my-v0-project@1.02 build
+> next build
+
+   ▲ Next.js 16.0.7 (Turbopack)
+   - Environments: .env.production.local, .env.local
+
+ ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 1479.6ms
+   Skipping validation of types
+   Collecting page data using 13 workers ...
+ ⚠ Using edge runtime on a page currently disables static generation for that page
+   Generating static pages using 13 workers (0/38) ...
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /_not-found. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /_not-found. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+   Generating static pages using 13 workers (9/38) 
+   Generating static pages using 13 workers (18/38) 
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /collection. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /collection. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /dev/agent-comparison. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /dev/agent-comparison. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /rlhf/analysis. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /rlhf/analysis. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /rlhf/examples. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /rlhf/examples. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /rlhf/categories. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /rlhf/categories. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /rlhf. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /rlhf. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /dev/check-covers. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /dev/check-covers. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+   Generating static pages using 13 workers (28/38) 
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /scan. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /scan. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata themeColor is configured in metadata export in /transparency. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ⚠ Unsupported metadata viewport is configured in metadata export in /transparency. Please move it to viewport export instead.
+Read more: https://nextjs.org/docs/app/api-reference/functions/generate-viewport
+ ✓ Generating static pages using 13 workers (38/38) in 350.9ms
+   Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/add-columns
+├ ƒ /api/add-reasoning-column
+├ ƒ /api/admin/ai-debug
+├ ƒ /api/admin/delete-book
+├ ƒ /api/admin/edit-book
+├ ƒ /api/analyze-strict
+├ ƒ /api/audio/batch
+├ ƒ /api/audio/generate
+├ ƒ /api/audit-logs
+├ ƒ /api/book-cover
+├ ƒ /api/db-stats
+├ ƒ /api/debug/env-check
+├ ƒ /api/dev/check-covers
+├ ƒ /api/dev/scan-with-agent
+├ ƒ /api/dev/update-cover
+├ ƒ /api/generate-content-warnings
+├ ƒ /api/rlhf/analysis
+├ ƒ /api/rlhf/categories
+├ ƒ /api/rlhf/compare
+├ ƒ /api/rlhf/examples
+├ ƒ /api/run-migration
+├ ƒ /api/scan
+├ ƒ /api/scan-isbn
+├ ƒ /api/scan-multi-model
+├ ƒ /api/search
+├ ƒ /api/validate-warning
+├ ƒ /book/[isbn]
+├ ƒ /collection
+├ ○ /dev/agent-comparison
+├ ○ /dev/check-covers
+├ ○ /manifest
+├ ○ /rlhf
+├ ○ /rlhf/analysis
+├ ○ /rlhf/categories
+├ ○ /rlhf/examples
+├ ○ /scan
+├ ƒ /sw.js
+└ ○ /transparency
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
