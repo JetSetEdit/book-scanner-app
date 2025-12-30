@@ -1111,7 +1111,7 @@ I need you to find information about a book with ISBN: ${isbn}
     } else if (isQuotaError) {
       reasoning = `Error during AI search: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.`;
     } else if (isRateLimitError) {
-      reasoning = `Error: ${errorMessage} (Note: Deep web search could not confirm this safety rating due to lack of online results. Manual review recommended.)`;
+      reasoning = `Rate limit error: ${errorMessage}. The OpenAI API rate limit was exceeded. Please wait a moment and try again, or check your API usage limits.`;
     }
     
     return {
