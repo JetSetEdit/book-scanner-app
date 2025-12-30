@@ -33,18 +33,10 @@ export default function ScanTestPage() {
   // Show scanner based on user preference
   const [showScanner, setShowScanner] = useState(preferences.showCameraScanner ?? false)
   
-  // Multi-model toggle (default to true for better coverage)
-  const [useMultiModel, setUseMultiModel] = useState(preferences.useMultiModel ?? true)
-  
   // Update showScanner when preference changes
   useEffect(() => {
     setShowScanner(preferences.showCameraScanner ?? false)
   }, [preferences.showCameraScanner])
-
-  // Update useMultiModel when preference changes
-  useEffect(() => {
-    setUseMultiModel(preferences.useMultiModel ?? true)
-  }, [preferences.useMultiModel])
   
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -82,8 +74,7 @@ export default function ScanTestPage() {
     try {
       markStage('api-request-sent')
       
-      // Use multi-model endpoint if enabled
-      if (useMultiModel) {
+      // Always use multi-model endpoint for better coverage
         setStatusUpdates(prev => [...prev, "Using multi-model analysis (GPT-4o + Gemini)..."])
         
         const response = await fetch("/api/scan-multi-model", {
@@ -148,73 +139,6 @@ export default function ScanTestPage() {
         
         setLoading(false)
         return
-      }
-      
-      // Standard single-model scan (existing code)
-      const body: any = { isbn: isbnToScan, stream: true }
-      if (selectedCandidate) {
-        body.selectedCandidate = selectedCandidate
-      }
-
-      const response = await fetch("/api/scan-isbn", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      })
-
-      const responseReceivedTime = performance.now()
-      markStage('api-response-received')
-
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to scan ISBN")
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader()
-      const decoder = new TextDecoder()
-
-      if (!reader) {
-        throw new Error("Response body is not readable")
-      }
-
-      markStage('stream-started')
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) {
-          markStage('stream-completed')
-          break
-        }
-
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split("\n\n")
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-                const data = JSON.parse(line.slice(6))
-                
-                if (data.status) {
-                  setStatusUpdates(prev => [...prev, data.status])
-                } else if (data.statusUpdate) {
-                  // Handle detailed status update
-                  setDetailedStatusUpdates(prev => [...prev, data.statusUpdate])
-                  // Also add a simple string version for backward compatibility
-                  setStatusUpdates(prev => [...prev, data.statusUpdate.action])
-                } else if (data.result) {
-                  markStage('result-received')
-                  
-                  if (data.result.status === 'ambiguous') {
-                    setCandidates(data.result.candidates)
-                    setStatusUpdates(prev => [...prev, "Ambiguous results found. Waiting for selection..."])
-                  } else {
-                    setResult(data.result)
-                    setCandidates(null)
-                    
-                    markStage('result-processed')
                     
                     // Save to scan history
                     if (data.result.book) {
@@ -340,31 +264,6 @@ export default function ScanTestPage() {
             <p className="text-xs text-muted-foreground ml-6">
               When enabled, the camera scanner will be shown when you visit this page. You can always toggle it on/off.
             </p>
-            
-            {/* Multi-Model Toggle */}
-            <div className="pt-4 border-t">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="use-multi-model"
-                  checked={useMultiModel}
-                  onCheckedChange={(checked) => {
-                    const newValue = checked === true
-                    setUseMultiModel(newValue)
-                    updatePreference('useMultiModel', newValue)
-                  }}
-                  disabled={loading}
-                />
-                <Label
-                  htmlFor="use-multi-model"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Use multi-model analysis (GPT-4o + Gemini)
-                </Label>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2 ml-6">
-                When enabled, both GPT-4o and Gemini will analyze the book and their results will be combined for more comprehensive content warnings. Enabled by default for better coverage.
-              </p>
-            </div>
           </div>
 
           {/* Scan History */}
