@@ -150,7 +150,20 @@ export async function POST(request: NextRequest) {
             user_id: null,
             reasoning: warning.reasoning || null,
             is_author_verified: warning.is_author_verified || false,
-            source_url: warning.source_url || null
+            source_url: (() => {
+              // Filter out cover/image URLs - only allow actual content source URLs
+              const url = warning.source_url;
+              if (!url) return null;
+              
+              // Check if it's a cover/image URL
+              const isCoverUrl = /mzstatic\.com|artworkUrl|covers\.openlibrary|books\.google.*\/books\/content|\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+              if (isCoverUrl) {
+                console.warn(`[Multi-Model API] Filtered out cover URL from source_url: ${url}`);
+                return null; // Don't use cover URLs as sources
+              }
+              
+              return url;
+            })()
           }
         })
 

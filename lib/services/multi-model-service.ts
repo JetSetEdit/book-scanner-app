@@ -95,13 +95,27 @@ ${bookCategories ? `- Categories: ${bookCategories.join(', ')}` : ''}
    - If description is missing: "Description not provided - unable to verify specific content warnings"
    - DO NOT say: "Given the high likelihood..." or "Author is known for..." or "Genre typically contains..."
    - DO NOT generalize based on author reputation
+   - **FOR DARK ROMANCE TROPES**: MUST clarify if it's a trope (what readers seek) vs actual trigger (what readers avoid)
+     * ✅ GOOD: "CNC/power play dynamics (consensual roleplay) - contains consensual non-consent scenarios"
+     * ✅ GOOD: "Protective/obsessive stalking behavior (dark romance trope) - possessive surveillance, not threatening"
+     * ❌ BAD: "Dubious consent common in Dark Romance genre" (doesn't clarify trope vs trigger)
+     * ❌ BAD: "Stalking behavior frequent in Enemies to Lovers" (doesn't clarify protective vs threatening)
 
 3. **When Description is Missing**:
    - Set confidence to 'low'
    - Only generate warnings if categories/genre tags provide specific evidence
    - In reasoning, explicitly state: "Limited information available - analysis based only on provided metadata"
 
-4. **False Positive Checks**: Death ≠ Grief, Action ≠ Violence, Non-Fiction = Clinical
+4. **Dark Romance / Kink Detection (CRITICAL - TROPE vs TRIGGER DISTINCTION)**:
+   - **CNC (Consensual Non-Consent)**: Use \`sexual_content\` → \`cnc\` when it's negotiated, consensual roleplay, power dynamics that are part of the fantasy. Reasoning MUST clarify: "CNC/power play dynamics (consensual roleplay)" or "Negotiated non-consent scenarios (dark romance trope)"
+   - **Dub-Con (Dubious Consent)**: Use \`sexual_content\` → \`consent_ambiguity\` when consent is unclear but still within dark romance trope territory. Reasoning MUST clarify: "Dubious consent dynamics (dark romance trope)" or "Ambiguous consent within power play context"
+   - **Actual Sexual Assault**: Use \`sexual_content\` → \`non_consensual_sexual_acts\` when it's actual non-consensual acts that are NOT part of a consensual dynamic. Reasoning MUST clarify: "Contains depictions of actual sexual assault" or "Non-consensual sexual acts (not consensual roleplay)"
+   - **Stalking**: Use \`emotional_abuse_or_toxic_relationships\` → \`stalking\`. Reasoning MUST clarify:
+     * "Protective/obsessive stalking behavior (dark romance trope) - possessive surveillance, not threatening" for trope
+     * "Threatening stalking behavior" or "Dangerous surveillance that creates fear" for actual trigger
+   - **KEY RULE**: When in doubt between trope and trigger, check if it's part of a consensual dynamic/fantasy (use trope subcategory) vs actual violation/threat (use trigger subcategory)
+
+5. **False Positive Checks**: Death ≠ Grief, Action ≠ Violence, Non-Fiction = Clinical
 
 ## Output Format (JSON):
 {

@@ -503,7 +503,20 @@ export async function processIsbnScan(
               user_id: null, // AI-generated warnings don't have a user_id
               reasoning: warning.reasoning || null,
               is_author_verified: warning.is_author_verified || false,
-              source_url: warning.source_url || null
+              source_url: (() => {
+                // Filter out cover/image URLs - only allow actual content source URLs
+                const url = warning.source_url;
+                if (!url) return null;
+                
+                // Check if it's a cover/image URL
+                const isCoverUrl = /mzstatic\.com|artworkUrl|covers\.openlibrary|books\.google.*\/books\/content|\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+                if (isCoverUrl) {
+                  console.warn(`[Scan Service] Filtered out cover URL from source_url: ${url}`);
+                  return null; // Don't use cover URLs as sources
+                }
+                
+                return url;
+              })()
             }))
 
             const { error: insertError } = await supabaseAdmin

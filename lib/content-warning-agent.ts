@@ -13,6 +13,65 @@ import {
 } from "./config/taxonomy-v2";
 import { classifySeverity, type ClassificationContext } from "./services/severity-classification-agent";
 
+// Helper function to filter out cover/image URLs from source URLs
+function isValidSourceUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  
+  // Cover/image URL patterns to exclude
+  const coverUrlPatterns = [
+    /mzstatic\.com/i, // Apple Books artwork
+    /covers\.openlibrary\.org/i, // Open Library covers
+    /books\.google\.com.*\/books\/content/i, // Google Books cover images
+    /books\.googleapis\.com.*\/books\/content/i, // Google Books API cover images
+    /artworkUrl/i, // Apple Books artwork URLs
+    /imageLinks/i, // Google Books image links
+    /\.jpg$/i, // Image file extensions
+    /\.jpeg$/i,
+    /\.png$/i,
+    /\.gif$/i,
+    /\.webp$/i,
+    /\/cover/i, // URLs containing "cover"
+    /\/image/i, // URLs containing "image" (but allow some exceptions)
+    /\/artwork/i, // URLs containing "artwork"
+  ];
+  
+  // Check if URL matches any cover pattern
+  for (const pattern of coverUrlPatterns) {
+    if (pattern.test(url)) {
+      return false; // This is a cover/image URL, not a valid source
+    }
+  }
+  
+  // Allow these patterns (actual content pages)
+  const validPatterns = [
+    /^https?:\/\/[^\/]+\/(books|library|content|warnings|notes|guidance)/i, // Author sites with content pages
+    /goodreads\.com/i, // Goodreads (reviews/content)
+    /storygraph\.com/i, // StoryGraph (reviews/content)
+    /amazon\.com.*\/dp\//i, // Amazon product pages (not images)
+    /google\.com\/books/i, // Google Books volume pages (not cover images)
+  ];
+  
+  // Check if URL matches any valid pattern
+  for (const pattern of validPatterns) {
+    if (pattern.test(url)) {
+      return true; // This is a valid content source
+    }
+  }
+  
+  // If it doesn't match cover patterns and doesn't match valid patterns, 
+  // check if it looks like a content page (has path beyond domain)
+  const urlObj = new URL(url);
+  const path = urlObj.pathname;
+  
+  // If path is just "/" or very short, likely not a content page
+  if (path.length < 3) {
+    return false;
+  }
+  
+  // If it doesn't match cover patterns, allow it (but log for review)
+  return true;
+}
+
 // Helper function to ensure API key is set at runtime
 // In Next.js serverless functions, env vars are available at runtime, not module load
 function ensureOpenAIKey(): string | null {
@@ -468,10 +527,43 @@ const getHybridInstructions = () => `
 - Use category: \`phobias\` with appropriate subcategory (snakes, spiders, needles, heights, water, enclosed_spaces, darkness, blood, vomiting, trypophobia, dental_trauma)
 - **Note:** Animal death is now in \`death_or_grief\` category, not phobias
 
-**2. Dark Romance / Kink Detection (CRITICAL):**
-- **CNC (Consensual Non-Consent)**: Look for negotiated non-consent, CNC play, or consensual non-consent scenarios. This is distinct from actual non-consent and is very popular in dark romance. Use \`sexual_content\` → \`cnc\`
-- **Dub-Con (Dubious Consent)**: Same as "Ambiguous Consent" but use the term "Dub-Con" in reasoning if it's the industry term. Use \`sexual_content\` → \`consent_ambiguity\`
-- **Somnophilia**: Sexual acts while one partner is sleeping/unconscious. Very common in dark college romances. Use \`sexual_content\` → \`somnophilia\`
+**2. Dark Romance / Kink Detection (CRITICAL - TROPE vs TRIGGER DISTINCTION):**
+
+**CRITICAL: Distinguish Between Tropes (What Readers Seek) vs Actual Triggers (What Readers Avoid)**
+
+**Consent Spectrum - MUST Distinguish:**
+- **CNC (Consensual Non-Consent)** - Use \`sexual_content\` → \`cnc\` when:
+  * Negotiated beforehand, consensual roleplay, power dynamics that are part of the fantasy
+  * Characters discuss boundaries, use safewords, or establish consent framework
+  * Part of dark romance trope where both characters are participating in the dynamic
+  * **Reasoning MUST clarify**: "CNC/power play dynamics (consensual roleplay)" or "Negotiated non-consent scenarios (dark romance trope)"
+  
+- **Dub-Con (Dubious Consent)** - Use \`sexual_content\` → \`consent_ambiguity\` when:
+  * Consent is unclear, compromised (intoxication), or influenced by power dynamics
+  * But still within dark romance trope territory (not actual assault)
+  * **Reasoning MUST clarify**: "Dubious consent dynamics (dark romance trope)" or "Ambiguous consent within power play context"
+  
+- **Actual Sexual Assault** - Use \`sexual_content\` → \`non_consensual_sexual_acts\` when:
+  * Actual non-consensual sexual acts that are NOT part of a consensual dynamic
+  * No negotiation, no consent framework, actual violation
+  * **Reasoning MUST clarify**: "Contains depictions of actual sexual assault" or "Non-consensual sexual acts (not consensual roleplay)"
+  
+- **Somnophilia**: Sexual acts while one partner is sleeping/unconscious. Use \`sexual_content\` → \`somnophilia\`
+  * **Reasoning MUST clarify**: If it's part of consensual dynamic ("Consensual sleep play") vs actual violation ("Non-consensual acts while unconscious")
+
+**Stalking - MUST Distinguish:**
+- **Protective/Obsessive Stalking (Dark Romance Trope)** - Use \`emotional_abuse_or_toxic_relationships\` → \`stalking\` when:
+  * "Watching over you" protective behavior, possessive but not threatening
+  * Part of dark romance "touch her and you die" or "I'm always watching" tropes
+  * Character is protective/obsessive but not dangerous to the love interest
+  * **Reasoning MUST clarify**: "Protective/obsessive stalking behavior (dark romance trope)" or "Possessive surveillance dynamics (not threatening)"
+  
+- **Threatening/Dangerous Stalking (Actual Trigger)** - Use \`emotional_abuse_or_toxic_relationships\` → \`stalking\` when:
+  * Actual threatening behavior, fear-inducing surveillance
+  * Character feels unsafe, stalker is dangerous
+  * **Reasoning MUST clarify**: "Threatening stalking behavior" or "Dangerous surveillance that creates fear"
+
+**Other Dark Romance Tropes:**
 - **Breeding Kink**: Sexual focus on impregnation as kink (distinct from actual pregnancy). Use \`sexual_content\` → \`breeding_kink\`
 - **Knife Play / Blood Play**: Sexualized use of knives or blood in sexual contexts. Use \`sexual_content\` → \`knife_play\`
 - **Primal Play**: Hunting/chasing dynamics, "touch her and you die" tropes. Use \`sexual_content\` → \`primal_play\`
@@ -479,6 +571,10 @@ const getHybridInstructions = () => `
 - **Human Trafficking**: Distinct from general kidnapping, often in dark mafia romance. Use \`violence\` → \`human_trafficking\`
 - **Cannibalism**: Eating human flesh, cannibalistic themes (horror romance niche). Use \`violence\` → \`cannibalism\`
 - **Incest / Pseudo-Incest**: Step-siblings, blood relations, or pseudo-incest. Use \`family_dynamics\` → \`incest_taboo\`
+
+**KEY RULE**: When in doubt between trope and trigger, check if it's:
+- Part of a consensual dynamic/fantasy → Use trope subcategory (cnc, consent_ambiguity) and clarify in reasoning
+- Actual violation/threat → Use trigger subcategory (non_consensual_sexual_acts) and clarify in reasoning
 
 **3. LGBTQ+ Specific Discrimination:**
 - **Acephobia**: Look for invalidation of asexuality, pressure to be sexual, "just hasn't met the right person", questioning asexual identity
@@ -743,7 +839,7 @@ const ContentWarningSchema = z.object({
     "information not known from the back cover or book description."
   ),
   is_author_verified: z.boolean().optional().default(false).describe("MUST be set to true if the warnings come from an official author/publisher site."),
-  source_url: z.string().optional().nullable(),
+  source_url: z.string().optional().nullable().describe("URL of the source that provided the content warning information (e.g., author website, review site). DO NOT use cover image URLs or artwork URLs - only use URLs to actual content pages (reviews, descriptions, author sites)."),
 }).refine(
   (data) => {
     // If subcategory_id is provided, validate it belongs to the parent
@@ -1099,19 +1195,36 @@ Search for "[${workflow.book_title}] ${workflow.book_author} plot summary" and "
 Please analyze ${instructionMode === 'old' ? 'this book' : 'THIS SPECIFIC BOOK'} and generate appropriate content warnings using Australian Classification Board standards. 
 ${isThinDescription ? (instructionMode === 'old' ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : instructionMode === 'new' ? 'Since the description is brief, you MUST use web search to find verified information about THIS SPECIFIC BOOK first. Do NOT assume content based on author reputation or genre.' : 'Since the description is brief, you MUST use web search to find verified information first. If verified information is insufficient, you may apply genre-aware inference but must clearly mark inferred warnings.') : (instructionMode === 'old' ? '' : instructionMode === 'new' ? 'Base your analysis ONLY on the book description provided above. Do NOT make assumptions based on author reputation or genre conventions.' : 'Start with evidence-based analysis from the description. If information is insufficient, you may apply genre-aware inference but must clearly distinguish verified vs inferred warnings.')}
 
-**CRITICAL: Categorical Reasoning Enforcement + Source Citation**
+**CRITICAL: Categorical Reasoning Enforcement + Source Citation + Trope Context**
 - For each warning's \`reasoning\` field:
   1. **MUST cite the source**: Reference where the evidence came from (e.g., "Book description states...", "Google Books review mentions...", "Author's website indicates...")
   2. Use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
   3. DO NOT include specific plot points, character names, story events, or narrative details
   4. DO NOT generalize based on author reputation (e.g., "Author is known for..." is NOT allowed)
+  5. **FOR DARK ROMANCE TROPES**: MUST clarify if it's a trope (what readers seek) vs actual trigger (what readers avoid)
 - Examples:
   * ✅ GOOD: "Book description mentions 'graphic violence and sexual assault' - contains themes of sexual violence"
   * ✅ GOOD: "Google Books review cites 'explicit content warnings' - contains themes of sexual content"
+  * ✅ GOOD (Dark Romance): "Book description indicates CNC/power play dynamics (consensual roleplay) - contains consensual non-consent scenarios"
+  * ✅ GOOD (Dark Romance): "Protective/obsessive stalking behavior (dark romance trope) - possessive surveillance dynamics, not threatening"
   * ❌ BAD: "Given the high likelihood of graphic violence..." (no source cited)
   * ❌ BAD: "Author's storytelling typically features..." (generalizing from reputation)
-- The reasoning should describe the TYPE of content with source citation, not specific plot occurrences
+  * ❌ BAD (Dark Romance): "Dubious consent common in Dark Romance genre" (doesn't clarify if it's trope or trigger)
+  * ❌ BAD (Dark Romance): "Stalking behavior frequent in Enemies to Lovers" (doesn't clarify protective vs threatening)
+- The reasoning should describe the TYPE of content with source citation AND trope context, not specific plot occurrences
 - High severity scores indicate impact/frequency, NOT permission to include more plot details
+- **Dark Romance readers need to know**: Is this the trope I'm seeking, or an actual trigger I need to avoid?
+
+**CRITICAL: source_url Field Rules**
+- **DO NOT use cover image URLs** as source_url (e.g., mzstatic.com, covers.openlibrary.org, books.google.com cover images)
+- **DO NOT use artwork URLs** as source_url (e.g., artworkUrl100, image URLs ending in .jpg/.png/.gif)
+- **ONLY use actual content page URLs** as source_url:
+  * ✅ Author's official website page (e.g., hdcarlton.com/library)
+  * ✅ Review sites (e.g., Goodreads, StoryGraph)
+  * ✅ Book description pages (e.g., Google Books volume page, not cover image)
+  * ✅ Publisher pages with content information
+- If you only have a cover image URL from web search, set source_url to null - do NOT use the cover URL
+- Cover images are NOT valid sources for content warnings - they provide no information about book content
 
 CALL THE submit_warnings TOOL WITH THE RESULT.
 `;
