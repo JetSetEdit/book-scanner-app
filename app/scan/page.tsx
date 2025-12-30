@@ -139,43 +139,6 @@ export default function ScanTestPage() {
         
         setLoading(false)
         return
-                    
-                    // Save to scan history
-                    if (data.result.book) {
-                      addScan({
-                        isbn: data.result.book.isbn,
-                        title: data.result.book.title || "Unknown",
-                        author: data.result.book.author || undefined,
-                        bookId: data.result.book.id,
-                      })
-                    }
-                    
-                    // Save last ISBN
-                    setLastIsbn(isbnToScan)
-                    
-                    // End timing and log
-                    markStage('ui-updated')
-                    const timingResult = endTiming()
-                    if (timingResult) {
-                      // Log to console
-                      console.log('📊 Scan Timing Results:')
-                      console.log(`  Total Duration: ${timingResult.duration.toFixed(0)}ms`)
-                      Object.entries(timingResult.stages).forEach(([stage, duration]) => {
-                        console.log(`  ${stage}: ${duration.toFixed(0)}ms`)
-                      })
-                      // Store timing in result for display
-                      (data.result as any).timing = timingResult
-                    }
-                  }
-                } else if (data.error) {
-                  throw new Error(data.error)
-                }
-            } catch (parseError) {
-                console.error("Error parsing SSE data:", parseError)
-            }
-          }
-        }
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An unknown error occurred")
       // Reset selection state on error
