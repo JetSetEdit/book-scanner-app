@@ -180,30 +180,43 @@ function combineWarnings(
         model_agreement: 'none'
       })
     } else {
-      // Both models found this category - average the scores
+      // Both models found this category - use MAX score for safety
+      // Safety-first: If one model found severe content, we must warn about it
       const scores = warnings.map(w => w.score || 0).filter(s => s > 0)
-      const avgScore = scores.length > 0
-        ? scores.reduce((a, b) => a + b, 0) / scores.length
+      const maxScore = scores.length > 0
+        ? Math.max(...scores)
         : 0
 
-      // Use the more detailed description
+      // Use the more detailed description (prefer the one with higher score)
       const descriptions = warnings.map(w => w.description || '').filter(d => d)
       const bestDescription = descriptions.reduce((a, b) => 
         a.length > b.length ? a : b
       , '')
 
-      // Combine reasoning
+      // Use the most severe presence and detail_level
+      const presenceLevels = { 'on_page': 4, 'flashback': 3, 'off_page': 2, 'referenced': 1, 'implied': 0 }
+      const detailLevels = { 'graphic': 3, 'moderate': 2, 'vague': 1, 'clinical': 0 }
+      const maxPresence = warnings.reduce((a, b) => 
+        (presenceLevels[a.presence as keyof typeof presenceLevels] || 0) > 
+        (presenceLevels[b.presence as keyof typeof presenceLevels] || 0) ? a : b
+      ).presence || 'on_page'
+      const maxDetailLevel = warnings.reduce((a, b) => 
+        (detailLevels[a.detail_level as keyof typeof detailLevels] || 0) > 
+        (detailLevels[b.detail_level as keyof typeof detailLevels] || 0) ? a : b
+      ).detail_level || null
+
+      // Combine reasoning (include both for transparency)
       const reasoning = warnings.map(w => w.reasoning || '').filter(r => r).join(' | ')
 
       combined.push({
         category_id: categoryId,
         subcategory_id: warnings[0].subcategory_id || null,
         description: bestDescription || warnings[0].description,
-        score: avgScore,
-        severity: getSeverityFromScore(avgScore),
-        reasoning: reasoning || `Combined analysis from ${warnings.length} models`,
-        presence: warnings[0].presence || 'on_page',
-        detail_level: warnings[0].detail_level || null,
+        score: maxScore, // SAFETY: Use MAX, not average
+        severity: getSeverityFromScore(maxScore),
+        reasoning: reasoning || `Combined analysis from ${warnings.length} models (using maximum severity for safety)`,
+        presence: maxPresence,
+        detail_level: maxDetailLevel,
         is_spoiler: warnings.some(w => w.is_spoiler) || false,
         source: 'combined',
         model_agreement: scores.length === 2 && Math.abs(scores[0] - scores[1]) < 0.2 ? 'high' : 'low',
@@ -291,7 +304,7 @@ function analyzeDifferences(
   }
 
   if (severityDifferences.length > 0) {
-    insights.push(`Severity differences in ${severityDifferences.length} categories - averaging scores.`)
+    insights.push(`Severity differences in ${severityDifferences.length} categories - using maximum severity for safety.`)
   }
 
   return {
@@ -416,13 +429,35 @@ export async function runMultiModelAnalysis(
     ? ratings[Math.max(gpt4oIndex, geminiIndex)] // More restrictive
     : gpt4oResult.classification_rating || geminiResult.classification_rating
 
-  // Combined confidence (use lower of the two)
+  // Combined confidence: Use confidence of model that found warnings
+  // If both found warnings, use the higher confidence
+  // If only one found warnings, use that model's confidence
   const confidenceLevels = ['low', 'medium', 'high']
-  const gpt4oConfIndex = confidenceLevels.indexOf(gpt4oResult.confidence)
-  const geminiConfIndex = confidenceLevels.indexOf(geminiResult.confidence)
-  const combinedConfidence = gpt4oConfIndex <= geminiConfIndex
-    ? gpt4oResult.confidence
-    : geminiResult.confidence
+  const gpt4oHasWarnings = gpt4oResult.content_warnings.length > 0
+  const geminiHasWarnings = geminiResult.content_warnings.length > 0
+  
+  let combinedConfidence: 'low' | 'medium' | 'high'
+  if (gpt4oHasWarnings && geminiHasWarnings) {
+    // Both found warnings - use higher confidence
+    const gpt4oConfIndex = confidenceLevels.indexOf(gpt4oResult.confidence)
+    const geminiConfIndex = confidenceLevels.indexOf(geminiResult.confidence)
+    combinedConfidence = gpt4oConfIndex >= geminiConfIndex
+      ? gpt4oResult.confidence
+      : geminiResult.confidence
+  } else if (gpt4oHasWarnings) {
+    // Only GPT-4o found warnings - trust its confidence
+    combinedConfidence = gpt4oResult.confidence
+  } else if (geminiHasWarnings) {
+    // Only Gemini found warnings - trust its confidence
+    combinedConfidence = geminiResult.confidence
+  } else {
+    // Neither found warnings - use lower (conservative)
+    const gpt4oConfIndex = confidenceLevels.indexOf(gpt4oResult.confidence)
+    const geminiConfIndex = confidenceLevels.indexOf(geminiResult.confidence)
+    combinedConfidence = gpt4oConfIndex <= geminiConfIndex
+      ? gpt4oResult.confidence
+      : geminiResult.confidence
+  }
 
   return {
     combined_warnings: combinedWarnings,
