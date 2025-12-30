@@ -33,13 +33,18 @@ export default function ScanTestPage() {
   // Show scanner based on user preference
   const [showScanner, setShowScanner] = useState(preferences.showCameraScanner ?? false)
   
-  // Multi-model toggle
-  const [useMultiModel, setUseMultiModel] = useState(false)
+  // Multi-model toggle (default to true for better coverage)
+  const [useMultiModel, setUseMultiModel] = useState(preferences.useMultiModel ?? true)
   
   // Update showScanner when preference changes
   useEffect(() => {
     setShowScanner(preferences.showCameraScanner ?? false)
   }, [preferences.showCameraScanner])
+
+  // Update useMultiModel when preference changes
+  useEffect(() => {
+    setUseMultiModel(preferences.useMultiModel ?? true)
+  }, [preferences.useMultiModel])
   
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
@@ -343,7 +348,9 @@ export default function ScanTestPage() {
                   id="use-multi-model"
                   checked={useMultiModel}
                   onCheckedChange={(checked) => {
-                    setUseMultiModel(checked === true)
+                    const newValue = checked === true
+                    setUseMultiModel(newValue)
+                    updatePreference('useMultiModel', newValue)
                   }}
                   disabled={loading}
                 />
@@ -355,7 +362,7 @@ export default function ScanTestPage() {
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground mt-2 ml-6">
-                When enabled, both GPT-4o and Gemini will analyze the book and their results will be combined for more comprehensive content warnings. This takes longer but provides better coverage.
+                When enabled, both GPT-4o and Gemini will analyze the book and their results will be combined for more comprehensive content warnings. Enabled by default for better coverage.
               </p>
             </div>
           </div>

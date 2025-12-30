@@ -8,6 +8,7 @@ export interface UserPreferences {
   autoSelectSingleCandidate?: boolean
   theme?: 'light' | 'dark' | 'system'
   showCameraScanner?: boolean
+  useMultiModel?: boolean
 }
 
 const PREFERENCES_KEY = 'book-scanner-preferences'
@@ -18,6 +19,7 @@ const defaultPreferences: UserPreferences = {
   autoSelectSingleCandidate: true,
   theme: 'system',
   showCameraScanner: false, // Default to manual entry, camera is opt-in
+  useMultiModel: true, // Default to multi-model for better coverage
 }
 
 /**
