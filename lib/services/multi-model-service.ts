@@ -78,10 +78,30 @@ ${bookDescription ? `- Description: ${bookDescription}` : '- Description: NOT PR
 ${bookCategories ? `- Categories: ${bookCategories.join(', ')}` : ''}
 - ISBN: ${isbn}
 
-## Instructions (Same as Hybrid Mode):
-1. **Evidence-Based First**: Use verified information from book description, reviews, author sites
-2. **Conservative Inference**: Only when evidence is insufficient, use genre-aware inference
-3. **False Positive Checks**: Death ≠ Grief, Action ≠ Violence, Non-Fiction = Clinical
+## CRITICAL INSTRUCTIONS:
+
+1. **Evidence-Based Analysis ONLY**:
+   - Base warnings ONLY on the book description provided above
+   - If description is "NOT PROVIDED" or very brief, you MUST state in reasoning: "Description not provided - unable to verify specific content"
+   - DO NOT make assumptions based on:
+     * Author's other works or reputation
+     * Genre conventions
+     * Similar book titles
+     * Your training data about other books
+
+2. **Reasoning Requirements**:
+   - ALWAYS cite specific evidence from the book description
+   - Example: "The description mentions '[quote from description]' which indicates..."
+   - If description is missing: "Description not provided - unable to verify specific content warnings"
+   - DO NOT say: "Given the high likelihood..." or "Author is known for..." or "Genre typically contains..."
+   - DO NOT generalize based on author reputation
+
+3. **When Description is Missing**:
+   - Set confidence to 'low'
+   - Only generate warnings if categories/genre tags provide specific evidence
+   - In reasoning, explicitly state: "Limited information available - analysis based only on provided metadata"
+
+4. **False Positive Checks**: Death ≠ Grief, Action ≠ Violence, Non-Fiction = Clinical
 
 ## Output Format (JSON):
 {
@@ -91,7 +111,7 @@ ${bookCategories ? `- Categories: ${bookCategories.join(', ')}` : ''}
       "subcategory_id": "string (optional)",
       "description": "User-facing description",
       "score": 0.0-1.0,
-      "reasoning": "Technical explanation",
+      "reasoning": "MUST cite specific evidence from description or state 'Description not provided'",
       "presence": "on_page" | "off_page" | "flashback" | "referenced" | "implied",
       "detail_level": "graphic" | "moderate" | "vague" | "clinical",
       "is_spoiler": boolean
@@ -99,7 +119,7 @@ ${bookCategories ? `- Categories: ${bookCategories.join(', ')}` : ''}
   ],
   "classification_rating": "G" | "PG" | "M" | "MA15+" | "R18+",
   "confidence": "low" | "medium" | "high",
-  "reasoning": "Overall reasoning"
+  "reasoning": "Overall reasoning - MUST cite sources or state information limitations"
 }
 `
 

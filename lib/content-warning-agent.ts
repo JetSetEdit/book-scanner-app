@@ -1099,12 +1099,18 @@ Search for "[${workflow.book_title}] ${workflow.book_author} plot summary" and "
 Please analyze ${instructionMode === 'old' ? 'this book' : 'THIS SPECIFIC BOOK'} and generate appropriate content warnings using Australian Classification Board standards. 
 ${isThinDescription ? (instructionMode === 'old' ? 'Since the description is brief, you MUST use web search to find the full plot summary first.' : instructionMode === 'new' ? 'Since the description is brief, you MUST use web search to find verified information about THIS SPECIFIC BOOK first. Do NOT assume content based on author reputation or genre.' : 'Since the description is brief, you MUST use web search to find verified information first. If verified information is insufficient, you may apply genre-aware inference but must clearly mark inferred warnings.') : (instructionMode === 'old' ? '' : instructionMode === 'new' ? 'Base your analysis ONLY on the book description provided above. Do NOT make assumptions based on author reputation or genre conventions.' : 'Start with evidence-based analysis from the description. If information is insufficient, you may apply genre-aware inference but must clearly distinguish verified vs inferred warnings.')}
 
-**CRITICAL: Categorical Reasoning Enforcement**
-- For each warning's \`reasoning\` field, use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
-- DO NOT include specific plot points, character names, story events, or narrative details
-- Example: "Contains pervasive themes of sexual violence and exploitation" NOT "Character is sold as a prostitute"
-- Example: "Contains themes of character loss and accidental death" NOT "Character A dies in a fire at the end"
-- The reasoning should describe the TYPE of content, not specific plot occurrences
+**CRITICAL: Categorical Reasoning Enforcement + Source Citation**
+- For each warning's \`reasoning\` field:
+  1. **MUST cite the source**: Reference where the evidence came from (e.g., "Book description states...", "Google Books review mentions...", "Author's website indicates...")
+  2. Use ONLY categorical taxonomy language (e.g., "Contains themes of X", "Depictions of Y")
+  3. DO NOT include specific plot points, character names, story events, or narrative details
+  4. DO NOT generalize based on author reputation (e.g., "Author is known for..." is NOT allowed)
+- Examples:
+  * ✅ GOOD: "Book description mentions 'graphic violence and sexual assault' - contains themes of sexual violence"
+  * ✅ GOOD: "Google Books review cites 'explicit content warnings' - contains themes of sexual content"
+  * ❌ BAD: "Given the high likelihood of graphic violence..." (no source cited)
+  * ❌ BAD: "Author's storytelling typically features..." (generalizing from reputation)
+- The reasoning should describe the TYPE of content with source citation, not specific plot occurrences
 - High severity scores indicate impact/frequency, NOT permission to include more plot details
 
 CALL THE submit_warnings TOOL WITH THE RESULT.
