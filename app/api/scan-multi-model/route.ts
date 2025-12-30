@@ -163,14 +163,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Record scan
-    await supabaseAdmin
-      .from('scans')
-      .insert({
-        isbn: cleanIsbn,
-        book_id: bookId
-      })
-      .catch(err => console.warn('Failed to record scan:', err))
+    // Record scan (non-blocking, ignore errors)
+    try {
+      await supabaseAdmin
+        .from('scans')
+        .insert({
+          isbn: cleanIsbn,
+          book_id: bookId
+        })
+    } catch (err) {
+      console.warn('Failed to record scan:', err)
+    }
 
     return NextResponse.json({
       success: true,
