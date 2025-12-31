@@ -36,3 +36,5 @@ next-env.d.ts
 antigravity-wip/
 cursor-wip/
 node_modules
+*.md
+backups/
