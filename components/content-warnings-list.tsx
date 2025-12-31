@@ -299,7 +299,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pl-9">
+          <div className="flex flex-col gap-1 pl-9">
             <span className={cn(
               "text-[10px] font-bold uppercase tracking-widest",
               warning.severity === "severe" && "text-red-600 dark:text-red-500",
@@ -309,9 +309,22 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               {warning.severity} Intensity
             </span>
             {isSpoiler && (
-              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
-                Spoiler
-              </Badge>
+              <button
+                onClick={() => setIsRevealed(!isRevealed)}
+                className="text-[10px] text-muted-foreground/60 hover:text-foreground font-medium flex items-center gap-1 transition-colors cursor-pointer w-fit"
+              >
+                {isRevealed ? (
+                  <>
+                    <EyeOff className="h-3 w-3" />
+                    <span>Hide spoiler</span>
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-3 w-3" />
+                    <span>Reveal spoiler</span>
+                  </>
+                )}
+              </button>
             )}
           </div>
         </div>
@@ -342,25 +355,11 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             <p 
               className={cn(
                 "text-muted-foreground text-base leading-relaxed font-serif transition-all duration-300",
-                isSpoiler && !isRevealed && "blur-sm select-none cursor-pointer opacity-75 hover:opacity-85"
+                isSpoiler && !isRevealed && "blur-sm select-none opacity-75"
               )}
-              onClick={() => isSpoiler && !isRevealed && setIsRevealed(true)}
             >
               {warning.description}
             </p>
-            {isSpoiler && isRevealed && (
-              <div className="mt-2 flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsRevealed(false)}
-                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 h-6 px-2"
-                >
-                  <EyeOff className="h-3 w-3" />
-                  <span>Hide spoiler</span>
-                </Button>
-              </div>
-            )}
           </div>
 
           <div className="flex items-center gap-4 opacity-40 group-hover:opacity-100 transition-opacity">
