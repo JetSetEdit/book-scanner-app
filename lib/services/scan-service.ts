@@ -192,8 +192,8 @@ export async function processIsbnScan(
   })
   let existingBook = null
 
-  // Only check DB if we aren't forcing a candidate
-  if (!usedSelectedCandidate) {
+  // Only check DB if we aren't forcing a candidate or forcing a refresh
+  if (!usedSelectedCandidate && !forceRefresh) {
     const dbLookupStart = performance.now()
     const { data, error: fetchError } = await supabaseAdmin
       .from('books')
@@ -430,8 +430,15 @@ export async function processIsbnScan(
       }
     }
     
-    // Lower threshold to 50 characters for analysis (some books have shorter but valid descriptions)
-    if (bookForAnalysis && bookForAnalysis.description && bookForAnalysis.description.length > 50) {
+    // Try analysis if we have at least title and author (description is helpful but not strictly required)
+    if (bookForAnalysis && bookForAnalysis.title) {
+      // If we have a description, use it. Otherwise, use a minimal description based on metadata
+      const descriptionForAnalysis = bookForAnalysis.description && bookForAnalysis.description.length > 50
+        ? bookForAnalysis.description
+        : bookForAnalysis.description && bookForAnalysis.description.length > 0
+        ? bookForAnalysis.description
+        : `A book by ${bookForAnalysis.author || 'Unknown Author'}. ${bookForAnalysis.categories ? `Categories: ${bookForAnalysis.categories.slice(0, 3).join(', ')}.` : ''}`
+      
       onProgress?.('Analyzing book content with AI models...')
       
       const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
@@ -440,7 +447,7 @@ export async function processIsbnScan(
         {
           title: bookForAnalysis.title || 'Unknown',
           author: bookForAnalysis.author || 'Unknown',
-          description: bookForAnalysis.description,
+          description: descriptionForAnalysis,
           isbn: cleanIsbn
         },
         onProgress

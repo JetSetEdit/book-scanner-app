@@ -82,7 +82,7 @@ export default function ScanTestPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ isbn: isbnToScan }),
+          body: JSON.stringify({ isbn: isbnToScan, forceRefresh: true }),
         })
 
         if (!response.ok) {

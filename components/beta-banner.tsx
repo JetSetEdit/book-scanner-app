@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { APP_VERSION_LABEL } from "@/lib/config/version"
 
 export function BetaBanner() {
   const [isVisible, setIsVisible] = useState(true)
@@ -16,7 +17,7 @@ export function BetaBanner() {
       <div className="container mx-auto flex items-center justify-center gap-3 text-sm">
         <Sparkles className="h-4 w-4 text-primary flex-shrink-0" />
         <div className="flex items-center gap-2 flex-wrap justify-center">
-          <span className="font-semibold text-primary">Public Beta</span>
+          <span className="font-semibold text-primary">{APP_VERSION_LABEL}</span>
           <span className="hidden sm:inline text-muted-foreground">—</span>
           <span className="text-muted-foreground text-center">
             AI analysis is actively being improved. Results may vary.
@@ -35,6 +36,7 @@ export function BetaBanner() {
     </div>
   )
 }
+
 
 
 

@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { isbn } = body;
+        const { isbn, forceRefresh } = body;
 
         if (!isbn) {
             return NextResponse.json({ error: 'ISBN is required' }, { status: 400 });
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
                     await writer.write(encoder.encode(`data: ${JSON.stringify({ status: statusMessage })}\n\n`))
                 }
 
-                const result = await processIsbnScan(isbn, onProgress)
+                const result = await processIsbnScan(isbn, onProgress, undefined, forceRefresh === true)
 
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
             } catch (error) {
