@@ -231,11 +231,9 @@ async function testSupabase() {
 // Check if key files exist
 console.log('📁 Key Files:');
 const keyFiles = [
-  'lib/content-warning-agent.ts',
   'lib/config/taxonomy-v2.ts',
-  'lib/services/multi-model-service.ts',
   'components/content-warnings-list.tsx',
-  'app/api/scan-multi-model/route.ts',
+  'lib/services/scan-service.ts',
 ];
 
 keyFiles.forEach(file => {
