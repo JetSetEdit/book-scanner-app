@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
 import { fetchBookByISBN } from "@/lib/book-api"
-import { generateContentWarnings } from "@/lib/content-warning-agent"
 import { isStale, refreshBookMetadata } from "@/lib/book-cache"
 
 export async function ensureBookExists(isbn: string) {
@@ -74,41 +73,7 @@ export async function ensureBookExists(isbn: string) {
             return { error: "Failed to save book data. Please try again." }
         }
 
-        // 5. Generate and insert content warnings
-        // We do this asynchronously but await it here to ensure the user sees them immediately
-        // In a production app, this might be better as a background job
-        const { content_warnings: warnings } = await generateContentWarnings({
-            book_title: newBook.title,
-            book_author: newBook.author || "Unknown",
-            book_description: newBook.description || undefined,
-            book_categories: newBook.categories || undefined,
-            book_isbn: newBook.isbn
-        })
-
-        if (warnings && warnings.length > 0) {
-            const validCategories = ['violence', 'sexual_content', 'substance_abuse', 'mental_health', 'death', 'abuse', 'discrimination', 'other'];
-
-            const warningsToInsert = warnings.map(w => ({
-                book_id: newBook.id,
-                category: validCategories.includes(w.category) ? w.category : 'other',
-                description: w.category === 'relationships' || w.category === 'language' ? `[${w.category.toUpperCase()}] ${w.description}` : w.description,
-                severity: w.severity,
-                helpful_count: 0,
-                not_helpful_count: 0,
-                reasoning: w.reasoning || null,
-                is_author_verified: w.is_author_verified || false,
-                source_url: w.source_url || null
-            })) as any[]
-
-            const { error: warningError } = await supabase
-                .from("content_warnings")
-                .insert(warningsToInsert)
-
-            if (warningError) {
-                console.error("[Book Service] Error inserting warnings:", warningError)
-                // We don't fail the whole request if warnings fail, just log it
-            }
-        }
+        // Content warning generation removed - agents no longer used
 
         return { success: true, book: newBook }
     } catch (error) {
