@@ -46,33 +46,59 @@ export function SeverityScoreBadge({ warnings, bookTitle }: SeverityScoreBadgePr
     mild: warnings.filter(w => w.severity === 'mild').length,
   }
 
-  // Calculate breakdown
-  let primaryScore = 0
-  if (summary.severe > 0) {
-    primaryScore = 100
-  } else if (summary.moderate > 0) {
-    primaryScore = 50
-  } else if (summary.mild > 0) {
-    primaryScore = 10
+  // Calculate breakdown using improved algorithm
+  // Get numeric scores for all warnings
+  const getWarningScore = (w: ContentWarning): number => {
+    if (w.confidence_score != null && w.confidence_score >= 0 && w.confidence_score <= 1) {
+      return w.confidence_score
+    }
+    // Estimate from severity
+    const severityScores = { mild: 0.45, moderate: 0.68, severe: 0.90 }
+    let baseScore = severityScores[w.severity]
+    // Adjust for detail level
+    if (w.detail_level === 'graphic') baseScore = Math.min(baseScore + 0.15, 1.0)
+    else if (w.detail_level === 'moderate') baseScore = Math.min(baseScore + 0.05, 1.0)
+    else if (w.detail_level === 'vague') baseScore = Math.max(baseScore - 0.1, 0.0)
+    else if (w.detail_level === 'clinical') baseScore = Math.max(baseScore - 0.05, 0.0)
+    // Adjust for presence
+    if (w.presence === 'on_page') baseScore = Math.min(baseScore + 0.1, 1.0)
+    else if (w.presence === 'off_page') baseScore = Math.max(baseScore - 0.1, 0.0)
+    else if (w.presence === 'flashback') baseScore = Math.min(baseScore + 0.05, 1.0)
+    else if (w.presence === 'referenced') baseScore = Math.max(baseScore - 0.15, 0.0)
+    else if (w.presence === 'implied') baseScore = Math.max(baseScore - 0.1, 0.0)
+    return Math.max(0.0, Math.min(1.0, baseScore))
   }
 
+  const warningScores = warnings.map(w => ({
+    warning: w,
+    score: getWarningScore(w),
+    category: w.category_id || w.category || 'other'
+  }))
+
+  // Primary score: Linear mapping of highest score
+  const maxScore = Math.max(...warningScores.map(ws => ws.score))
+  const scores = warningScores.map(ws => ws.score).sort((a, b) => b - a)
+  const isOutlier = scores.length > 1 && scores[0] - scores[1] > 0.3
+  const effectiveMaxScore = isOutlier ? (scores[0] * 0.7 + scores[1] * 0.3) : maxScore
+  const primaryScore = effectiveMaxScore * 100
+
+  // Weighted sum with logarithmic normalization
   let weightedSum = 0
-  const breakdown = warnings.map(warning => {
-    const basePoints = SEVERITY_POINTS_EXPORT[warning.severity as keyof typeof SEVERITY_POINTS_EXPORT] || 1
-    const categoryWeight = warning.category_id 
-      ? (CATEGORY_WEIGHTS_EXPORT[warning.category_id] || 1.0)
-      : (warning.category ? (CATEGORY_WEIGHTS_EXPORT[warning.category] || 1.0) : 1.0)
-    const contribution = basePoints * categoryWeight
+  const breakdown = warningScores.map(({ warning, score: warningScore, category }) => {
+    const categoryWeight = CATEGORY_WEIGHTS_EXPORT[category] || 1.0
+    const contribution = warningScore * categoryWeight
     weightedSum += contribution
     return {
       warning,
-      basePoints,
+      score: warningScore,
       categoryWeight,
       contribution,
     }
   })
 
-  const normalizedWeightedSum = Math.min(weightedSum * 2, 50)
+  const maxPossibleSum = 10 * 1.5
+  const logNormalized = Math.log(1 + weightedSum) / Math.log(1 + maxPossibleSum) * 50
+  const normalizedWeightedSum = Math.min(logNormalized, 50)
   const finalScore = primaryScore + normalizedWeightedSum
 
   const getScoreColor = () => {
@@ -121,8 +147,11 @@ export function SeverityScoreBadge({ warnings, bookTitle }: SeverityScoreBadgePr
             
             <div className="space-y-2 text-xs">
               <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="font-medium">Primary Score (Highest Severity):</span>
-                <span className="font-mono font-bold">{primaryScore}</span>
+                <span className="font-medium">Primary Score (Linear Mapping):</span>
+                <span className="font-mono font-bold">{primaryScore.toFixed(1)}</span>
+                {isOutlier && (
+                  <span className="text-xs text-muted-foreground ml-2">(outlier adjusted)</span>
+                )}
               </div>
               
               <div className="space-y-1">
@@ -136,7 +165,7 @@ export function SeverityScoreBadge({ warnings, bookTitle }: SeverityScoreBadgePr
                       </div>
                     </div>
                     <div className="text-right font-mono">
-                      <div>{item.basePoints} × {item.categoryWeight.toFixed(1)} = {item.contribution.toFixed(1)}</div>
+                      <div>{item.score.toFixed(2)} × {item.categoryWeight.toFixed(1)} = {item.contribution.toFixed(2)}</div>
                     </div>
                   </div>
                 ))}
@@ -148,7 +177,7 @@ export function SeverityScoreBadge({ warnings, bookTitle }: SeverityScoreBadgePr
               </div>
               
               <div className="flex justify-between items-center p-2 bg-slate-50 rounded">
-                <span className="font-medium">Normalized (×2, max 50):</span>
+                <span className="font-medium">Normalized (Logarithmic):</span>
                 <span className="font-mono">{normalizedWeightedSum.toFixed(1)}</span>
               </div>
               

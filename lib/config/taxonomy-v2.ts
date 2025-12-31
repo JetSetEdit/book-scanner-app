@@ -15,7 +15,7 @@
  * - Mediation Flag: Whether content requires parental/educational mediation
  */
 
-export const TAXONOMY_VERSION = "2.3.0";
+export const TAXONOMY_VERSION = "2.4.0";
 export const MODEL_VERSION = "gpt-4o-2024-11-20";
 
 export interface WarningSubcategory {
@@ -48,6 +48,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'moderate'
       },
       {
+        id: 'weight_loss_dieting',
+        userLabel: 'Weight Loss / Dieting Focus',
+        shortDescription: 'Chronic diet talk, weight loss focus, "makeover" plots, or dieting narratives. Distinct from disordered eating but may be triggering for ED-sensitive readers.',
+        defaultSeverityHint: 'mild'
+      },
+      {
         id: 'anxiety',
         userLabel: 'Anxiety',
         shortDescription: 'Anxiety, panic attacks, stress, anxiety disorders.',
@@ -76,6 +82,18 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         userLabel: 'Suicidal Ideation',
         shortDescription: 'Suicidal thoughts, attempts, detailed descriptions of suicide.',
         defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'suicide_minor',
+        userLabel: 'Suicide of a Minor',
+        shortDescription: 'Suicide or suicidal ideation involving a child or minor character.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'casual_suicidal_ideation',
+        userLabel: 'Casual Suicidal Ideation / Jokes',
+        shortDescription: 'Non-graphic but repeated "jokes" or casual references to suicide, self-harm, or death wishes. Less severe than acute suicidal content but may still be triggering.',
+        defaultSeverityHint: 'mild'
       },
       {
         id: 'other_mental_health',
@@ -114,6 +132,18 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         userLabel: 'Sexual Themes',
         shortDescription: 'Sexual themes, discussions, references (non-explicit).',
         defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'infidelity_cheating',
+        userLabel: 'Infidelity / Cheating',
+        shortDescription: 'Infidelity, cheating in relationships, or sexual/romantic betrayal. Also see Emotional Abuse category for relationship dynamics.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'pornography_sex_work',
+        userLabel: 'Pornography / Sex Work',
+        shortDescription: 'Explicit pornography, sex work representation, or sexual content industry themes.',
+        defaultSeverityHint: 'moderate'
       },
       // Sexual Dynamics & Framing
       {
@@ -403,8 +433,14 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       {
         id: 'violence_against_children',
         userLabel: 'Violence Against Children',
-        shortDescription: 'Violence directed at children, child abuse, harm to minors.',
+        shortDescription: 'Violence directed at children, child abuse, harm to minors. May include suicide of a minor.',
         defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'crime_non_violent',
+        userLabel: 'Non-Violent Crime / Prison',
+        shortDescription: 'General crime content: robbery, non-violent crime, prison/jail settings, interrogations, or criminal justice system themes. May be tagged even when violence is mild.',
+        defaultSeverityHint: 'mild'
       },
       {
         id: 'animal_cruelty',
@@ -641,6 +677,18 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'moderate'
       },
       {
+        id: 'economic_collapse',
+        userLabel: 'Economic Collapse / Eviction / Job Loss',
+        shortDescription: 'Economic collapse, eviction, foreclosure, job loss, or sudden economic hardship. Distinct from chronic poverty.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'queer_joy_identity',
+        userLabel: 'Queer Joy / Identity Focus',
+        shortDescription: 'Non-triggering identity flags: coming out arcs, transition journeys, or positive LGBTQ+ identity exploration. Not discrimination, but identity-focused content that some readers seek or avoid.',
+        defaultSeverityHint: 'mild'
+      },
+      {
         id: 'other_discrimination',
         userLabel: 'Other Discrimination',
         shortDescription: 'Other forms of discrimination not covered by specific subcategories.',
@@ -767,9 +815,33 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'moderate'
       },
       {
+        id: 'medical_detail_procedural',
+        userLabel: 'Medical Detail / Procedural',
+        shortDescription: 'Non-graphic surgery or medical procedures without trauma focus. Clinical or procedural medical content.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'plastic_surgery_cosmetic',
+        userLabel: 'Plastic Surgery / Cosmetic Procedures',
+        shortDescription: 'Plastic surgery, cosmetic procedures, or elective body modification. Distinct from body horror and general medical trauma.',
+        defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'pandemics_contagion',
+        userLabel: 'Pandemics / Contagion',
+        shortDescription: 'Pandemics, plague, outbreaks, contagion narratives, or infectious disease themes. Common post-2020 trigger.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
         id: 'infertility',
-        userLabel: 'Infertility / Pregnancy Loss',
-        shortDescription: 'Infertility, miscarriage, stillbirth, or pregnancy loss.',
+        userLabel: 'Infertility',
+        shortDescription: 'Infertility, long-term lack of conception, or inability to conceive. Distinct from pregnancy loss.',
+        defaultSeverityHint: 'severe'
+      },
+      {
+        id: 'pregnancy_loss',
+        userLabel: 'Pregnancy Loss',
+        shortDescription: 'Miscarriage, stillbirth, or pregnancy loss. Distinct from infertility (long-term conception issues).',
         defaultSeverityHint: 'severe'
       },
       {

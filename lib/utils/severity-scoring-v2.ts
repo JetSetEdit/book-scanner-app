@@ -1,14 +1,13 @@
 /**
- * Severity Scoring System (IMPROVED VERSION)
+ * Improved Severity Scoring System v2
  * 
- * Addresses mathematical issues identified:
+ * Addresses mathematical issues:
  * 1. Linear mapping instead of hard buckets (fixes "Cliff Problem")
  * 2. Volume consideration for outlier detection (fixes "One Bad Apple")
  * 3. Logarithmic normalization (fixes "Ceiling Effect")
  * 4. Optional user-adjustable category weights (fixes "Bias")
  * 
- * This version replaces the previous hard-bucket system with a smooth,
- * mathematically continuous scoring algorithm.
+ * This is a proposed replacement for severity-scoring.ts
  */
 
 export interface WarningSummary {
@@ -32,7 +31,7 @@ export interface ContentWarning {
  * Category sensitivity weights (can be made user-adjustable)
  * Default weights - can be overridden by user preferences
  */
-export const CATEGORY_WEIGHTS: Record<string, number> = {
+export const DEFAULT_CATEGORY_WEIGHTS: Record<string, number> = {
   // High sensitivity categories
   'sexual_content': 1.5,
   'self_harm_or_suicidal_ideation': 1.5,
@@ -51,16 +50,6 @@ export const CATEGORY_WEIGHTS: Record<string, number> = {
   // Lower sensitivity
   'language': 0.8,
   'other': 0.8,
-}
-
-/**
- * Base severity point values (kept for backward compatibility)
- * Note: New algorithm uses actual scores instead of these discrete points
- */
-export const SEVERITY_POINTS = {
-  severe: 3,
-  moderate: 2,
-  mild: 1,
 }
 
 /**
@@ -145,12 +134,12 @@ function getWarningScore(warning: ContentWarning): number {
  *    Prevents single severe warning from dominating
  * 
  * @param warnings Array of content warnings
- * @param categoryWeights Optional custom weights (defaults to CATEGORY_WEIGHTS)
+ * @param categoryWeights Optional custom weights (defaults to DEFAULT_CATEGORY_WEIGHTS)
  * @returns Overall severity score (0-150 range, but typically 0-120)
  */
-export function calculateSeverityScore(
+export function calculateSeverityScoreV2(
   warnings: ContentWarning[],
-  categoryWeights: Record<string, number> = CATEGORY_WEIGHTS
+  categoryWeights: Record<string, number> = DEFAULT_CATEGORY_WEIGHTS
 ): number {
   if (!warnings || warnings.length === 0) {
     return 0
@@ -166,19 +155,19 @@ export function calculateSeverityScore(
   // FIX 1: LINEAR MAPPING instead of hard buckets
   // Find highest score and map linearly: 0.0-1.0 → 0-100
   const maxScore = Math.max(...warningScores.map(ws => ws.score))
-  
+  const primaryScore = maxScore * 100 // Smooth linear mapping
+
   // FIX 2: OUTLIER DETECTION
   // If one warning is significantly higher than others, it might be an outlier
   const scores = warningScores.map(ws => ws.score).sort((a, b) => b - a)
   const isOutlier = scores.length > 1 && scores[0] - scores[1] > 0.3 // 30% gap
   
   // If outlier detected, use average of top 2 instead of just max
-  // This prevents a single isolated severe warning from dominating
   const effectiveMaxScore = isOutlier 
     ? (scores[0] * 0.7 + scores[1] * 0.3) // Weighted average favoring top
     : maxScore
   
-  const primaryScore = effectiveMaxScore * 100 // Smooth linear mapping
+  const adjustedPrimaryScore = effectiveMaxScore * 100
 
   // FIX 3: LOGARITHMIC NORMALIZATION for weighted sum
   // Calculate weighted sum of all warnings
@@ -192,20 +181,22 @@ export function calculateSeverityScore(
 
   // Logarithmic curve: log(1 + x) / log(max) to create soft cap
   // This allows growth but with diminishing returns
-  // Distinguishes between "heavy" (10 warnings) and "unbearably heavy" (50 warnings)
   const maxPossibleSum = 10 * 1.5 // 10 severe warnings at 1.5x weight = 15
   const logNormalized = Math.log(1 + weightedSum) / Math.log(1 + maxPossibleSum) * 50
+  
+  // Alternative: Use square root for softer curve
+  // const sqrtNormalized = Math.sqrt(weightedSum / maxPossibleSum) * 50
   
   const normalizedWeightedSum = Math.min(logNormalized, 50)
 
   // Final score: Primary (0-100) + Weighted Sum (0-50) = 0-150 range
-  return primaryScore + normalizedWeightedSum
+  return adjustedPrimaryScore + normalizedWeightedSum
 }
 
 /**
  * Get severity level from score (same thresholds, but smoother distribution)
  */
-export function getSeverityLevelFromScore(score: number): 'none' | 'mild' | 'moderate' | 'severe' {
+export function getSeverityLevelFromScoreV2(score: number): 'none' | 'mild' | 'moderate' | 'severe' {
   if (score === 0) return 'none'
   if (score < 30) return 'mild'
   if (score < 80) return 'moderate'
@@ -216,12 +207,45 @@ export function getSeverityLevelFromScore(score: number): 'none' | 'mild' | 'mod
  * Compare two books by severity (for sorting)
  * Uses improved scoring algorithm
  */
-export function compareBySeverity(
+export function compareBySeverityV2(
   a: { warnings: ContentWarning[] },
   b: { warnings: ContentWarning[] },
   categoryWeights?: Record<string, number>
 ): number {
-  const scoreA = calculateSeverityScore(a.warnings || [], categoryWeights)
-  const scoreB = calculateSeverityScore(b.warnings || [], categoryWeights)
+  const scoreA = calculateSeverityScoreV2(a.warnings || [], categoryWeights)
+  const scoreB = calculateSeverityScoreV2(b.warnings || [], categoryWeights)
   return scoreB - scoreA // Higher score = more severe = comes first
 }
+
+/**
+ * Get user-customizable category weights
+ * In a real implementation, this would load from user preferences
+ */
+export function getUserCategoryWeights(userId?: string): Record<string, number> {
+  // TODO: Load from user preferences in database
+  // For now, return defaults
+  return DEFAULT_CATEGORY_WEIGHTS
+}
+
+/**
+ * Example usage and comparison:
+ * 
+ * OLD SYSTEM:
+ * - Warning at 0.80 → "moderate" → 50 points
+ * - Warning at 0.81 → "severe" → 100 points
+ * - Difference: 50 points for 0.01 difference
+ * 
+ * NEW SYSTEM:
+ * - Warning at 0.80 → 80 points
+ * - Warning at 0.81 → 81 points  
+ * - Difference: 1 point for 0.01 difference (smooth!)
+ * 
+ * OLD SYSTEM:
+ * - 1 severe warning → 100 points (always severe)
+ * - 20 severe warnings → 100 points (same!)
+ * 
+ * NEW SYSTEM:
+ * - 1 severe warning → ~90 points (may be moderate if outlier)
+ * - 20 severe warnings → ~120 points (clearly severe, logarithmic growth)
+ */
+
