@@ -15,7 +15,7 @@
  * - Mediation Flag: Whether content requires parental/educational mediation
  */
 
-export const TAXONOMY_VERSION = "2.4.0";
+export const TAXONOMY_VERSION = "2.5.0";
 export const MODEL_VERSION = "gpt-4o-2024-11-20";
 
 export interface WarningSubcategory {
@@ -50,7 +50,7 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       {
         id: 'weight_loss_dieting',
         userLabel: 'Weight Loss / Dieting Focus',
-        shortDescription: 'Chronic diet talk, weight loss focus, "makeover" plots, or dieting narratives. Distinct from disordered eating but may be triggering for ED-sensitive readers.',
+        shortDescription: 'Chronic diet talk, weight loss focus, "makeover" plots, or dieting narratives. Distinct from disordered eating but may be triggering for ED-sensitive readers. Keywords: makeover, diet culture, clean eating.',
         defaultSeverityHint: 'mild'
       },
       {
@@ -94,6 +94,18 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         userLabel: 'Casual Suicidal Ideation / Jokes',
         shortDescription: 'Non-graphic but repeated "jokes" or casual references to suicide, self-harm, or death wishes. Less severe than acute suicidal content but may still be triggering.',
         defaultSeverityHint: 'mild'
+      },
+      {
+        id: 'workplace_burnout',
+        userLabel: 'Workplace Burnout / Toxic Workplace',
+        shortDescription: 'Workplace burnout, toxic work environments, overwork, or professional stress. May include exploitation, harassment, or unsafe working conditions.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'academic_pressure',
+        userLabel: 'Academic Pressure / Exam Stress',
+        shortDescription: 'Academic pressure, exam stress, academic competition, or intense educational pressure. May include academic failure, grade anxiety, or competitive academic environments.',
+        defaultSeverityHint: 'moderate'
       },
       {
         id: 'other_mental_health',
@@ -433,13 +445,13 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       {
         id: 'violence_against_children',
         userLabel: 'Violence Against Children',
-        shortDescription: 'Violence directed at children, child abuse, harm to minors. May include suicide of a minor.',
+        shortDescription: 'Violence directed at children, child abuse, harm to minors. Implicitly covers suicidal content involving minors (see also: suicide_minor for explicit tagging).',
         defaultSeverityHint: 'severe'
       },
       {
         id: 'crime_non_violent',
         userLabel: 'Non-Violent Crime / Prison',
-        shortDescription: 'General crime content: robbery, non-violent crime, prison/jail settings, interrogations, or criminal justice system themes. May be tagged even when violence is mild.',
+        shortDescription: 'General crime content: robbery, non-violent crime, prison/jail settings, interrogations, or criminal justice system themes. May be tagged even when violence is mild. Keywords: heist, robbery, prison setting, courtroom drama.',
         defaultSeverityHint: 'mild'
       },
       {
@@ -553,12 +565,6 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         userLabel: 'Animal Death',
         shortDescription: 'Animal death, pet death, or harm to animals.',
         defaultSeverityHint: 'severe'
-      },
-      {
-        id: 'divorce',
-        userLabel: 'Divorce / Separation',
-        shortDescription: 'Divorce, separation, or relationship breakdown.',
-        defaultSeverityHint: 'moderate'
       },
       {
         id: 'grief_processing',
@@ -679,13 +685,13 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       {
         id: 'economic_collapse',
         userLabel: 'Economic Collapse / Eviction / Job Loss',
-        shortDescription: 'Economic collapse, eviction, foreclosure, job loss, or sudden economic hardship. Distinct from chronic poverty.',
+        shortDescription: 'Economic collapse, eviction, foreclosure, job loss, or sudden economic hardship. Distinct from chronic poverty. Keywords: recession, foreclosure, redundancy, layoffs.',
         defaultSeverityHint: 'moderate'
       },
       {
         id: 'queer_joy_identity',
         userLabel: 'Queer Joy / Identity Focus',
-        shortDescription: 'Non-triggering identity flags: coming out arcs, transition journeys, or positive LGBTQ+ identity exploration. Not discrimination, but identity-focused content that some readers seek or avoid.',
+        shortDescription: 'Non-triggering identity flags: coming out arcs, transition journeys, or positive LGBTQ+ identity exploration. Not discrimination, but identity-focused content that some readers seek or avoid. Keywords: coming out arc, transition journey, found family (queer).',
         defaultSeverityHint: 'mild'
       },
       {
@@ -829,7 +835,7 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       {
         id: 'pandemics_contagion',
         userLabel: 'Pandemics / Contagion',
-        shortDescription: 'Pandemics, plague, outbreaks, contagion narratives, or infectious disease themes. Common post-2020 trigger.',
+        shortDescription: 'Pandemics, plague, outbreaks, contagion narratives, or infectious disease themes. Common post-2020 trigger. Keywords: plague, outbreak, virus, lockdown.',
         defaultSeverityHint: 'moderate'
       },
       {
@@ -930,6 +936,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'foster_care_adoption',
         userLabel: 'Foster Care / Adoption Trauma',
         shortDescription: 'Foster care trauma, adoption breakdown, or displacement of children.',
+        defaultSeverityHint: 'moderate'
+      },
+      {
+        id: 'divorce',
+        userLabel: 'Divorce / Separation',
+        shortDescription: 'Divorce, separation, or relationship breakdown. Moved from Death / Grief to better reflect family dynamics context.',
         defaultSeverityHint: 'moderate'
       },
       {

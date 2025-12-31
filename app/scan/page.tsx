@@ -74,10 +74,10 @@ export default function ScanTestPage() {
     try {
       markStage('api-request-sent')
       
-      // Always use multi-model endpoint for better coverage
-        setStatusUpdates(prev => [...prev, "Using multi-model analysis (GPT-4o + Gemini)..."])
+      // Use the scan endpoint with multi-model analysis
+        setStatusUpdates(prev => [...prev, "Starting scan with multi-model analysis (GPT-4o + Gemini)..."])
         
-        const response = await fetch("/api/scan-multi-model", {
+        const response = await fetch("/api/scan", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -86,33 +86,96 @@ export default function ScanTestPage() {
         })
 
         if (!response.ok) {
-          const data = await response.json()
-          throw new Error(data.error || "Failed to scan ISBN")
+          const errorText = await response.text()
+          let errorData
+          try {
+            errorData = JSON.parse(errorText)
+          } catch {
+            errorData = { error: errorText || "Failed to scan ISBN" }
+          }
+          throw new Error(errorData.error || "Failed to scan ISBN")
         }
 
-        const data = await response.json()
+        // Handle streaming response
+        const reader = response.body?.getReader()
+        const decoder = new TextDecoder()
+        let result: any = null
+        let buffer = ''
+
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) {
+              // Check buffer one last time
+              if (buffer.trim()) {
+                const lines = buffer.split('\n')
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const data = JSON.parse(line.slice(6))
+                      if (data.result) {
+                        result = data.result
+                      }
+                    } catch (e) {
+                      // Ignore parse errors
+                    }
+                  }
+                }
+              }
+              break
+            }
+
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split('\n')
+            buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                try {
+                  const data = JSON.parse(line.slice(6))
+                  
+                  if (data.status) {
+                    // Progress update
+                    setStatusUpdates(prev => [...prev, data.status])
+                    setDetailedStatusUpdates(prev => [...prev, {
+                      action: data.status,
+                      timestamp: Date.now()
+                    }])
+                  } else if (data.result) {
+                    // Final result
+                    result = data.result
+                  } else if (data.error) {
+                    throw new Error(data.error)
+                  }
+                } catch (e) {
+                  console.warn('Failed to parse stream data:', e, line)
+                }
+              }
+            }
+            
+            if (result) break
+          }
+        } else {
+          // Fallback for non-streaming response
+          const data = await response.json()
+          result = data.result || data
+        }
+
+        if (!result) {
+          throw new Error("No result received from scan - the scan may have completed but no result was returned")
+        }
+
         markStage('result-received')
         
-        // Transform multi-model result to match expected format
+        // Transform result to match expected format
         const transformedResult = {
-          success: data.success,
-          book: data.book,
-          isNewBook: data.isNewBook || false,
-          contentWarningsGenerated: data.combined_warnings?.length > 0 || false,
+          success: result.success,
+          book: result.book,
+          isNewBook: result.isNewBook || false,
+          contentWarningsGenerated: result.contentWarningsGenerated || false,
           authorContextInvestigated: false,
-          multiModelAnalysis: {
-            combined_warnings: data.combined_warnings || [],
-            classification_rating: data.classification_rating,
-            confidence: data.confidence,
-            model_results: data.model_results || [],
-            analysis: data.analysis || {
-              agreement_score: 0,
-              unique_to_gpt4o: [],
-              unique_to_gemini: [],
-              severity_differences: [],
-              reasoning_insights: 'Analysis unavailable'
-            }
-          }
+          timings: result.timings,
+          flags: result.flags
         }
         
         setResult(transformedResult)
@@ -121,12 +184,12 @@ export default function ScanTestPage() {
         markStage('result-processed')
         
         // Save to scan history
-        if (data.book) {
+        if (result.book) {
           addScan({
             isbn: isbnToScan,
-            title: data.book.title || "Unknown",
-            author: data.book.author || undefined,
-            bookId: data.book.id || `multi-${isbnToScan}`,
+            title: result.book.title || "Unknown",
+            author: result.book.author || undefined,
+            bookId: result.book.id || `scan-${isbnToScan}`,
           })
         }
         

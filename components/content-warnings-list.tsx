@@ -24,7 +24,9 @@ import {
   HeartCrack,
   Users,
   Activity,
-  Hash
+  Hash,
+  Eye,
+  EyeOff
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
@@ -51,6 +53,7 @@ interface ContentWarning {
   reasoning?: string | null
   is_author_verified?: boolean
   source_url?: string | null
+  is_spoiler?: boolean
 }
 
 interface ContentWarningsListProps {
@@ -237,6 +240,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
 }
 
 function WarningItem({ warning, isAi = false, isVerified = false }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean }) {
+  const [isRevealed, setIsRevealed] = useState(false)
+  const isSpoiler = warning.is_spoiler === true
+
   // Safely get category label with fallbacks
   let categoryLabel: string;
   try {
@@ -302,6 +308,11 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             )}>
               {warning.severity} Intensity
             </span>
+            {isSpoiler && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30">
+                Spoiler
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -327,9 +338,30 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             return null
           })()}
           
-          <p className="text-muted-foreground text-base leading-relaxed font-serif mb-3">
-            {warning.description}
-          </p>
+          <div className="mb-3">
+            <p 
+              className={cn(
+                "text-muted-foreground text-base leading-relaxed font-serif transition-all duration-300",
+                isSpoiler && !isRevealed && "blur-sm select-none cursor-pointer opacity-75 hover:opacity-85"
+              )}
+              onClick={() => isSpoiler && !isRevealed && setIsRevealed(true)}
+            >
+              {warning.description}
+            </p>
+            {isSpoiler && isRevealed && (
+              <div className="mt-2 flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsRevealed(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 h-6 px-2"
+                >
+                  <EyeOff className="h-3 w-3" />
+                  <span>Hide spoiler</span>
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-4 opacity-40 group-hover:opacity-100 transition-opacity">
             <ThumbsButtons

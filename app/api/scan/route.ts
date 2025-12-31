@@ -23,20 +23,21 @@ export async function POST(req: NextRequest) {
         // Start the scan in the background
         (async () => {
             try {
-                const onProgress = async (message: string) => {
-                    await writer.write(encoder.encode(`data: ${JSON.stringify({ status: message })}\n\n`));
-                };
+                const onProgress = async (message: string | { action: string; timestamp?: number }) => {
+                    const statusMessage = typeof message === 'string' ? message : message.action
+                    await writer.write(encoder.encode(`data: ${JSON.stringify({ status: statusMessage })}\n\n`))
+                }
 
-                const result = await processIsbnScan(isbn, onProgress);
+                const result = await processIsbnScan(isbn, onProgress)
 
-                await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`));
+                await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
             } catch (error) {
-                console.error('Scan failed:', error);
-                await writer.write(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`));
+                console.error('Scan failed:', error)
+                await writer.write(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`))
             } finally {
-                await writer.close();
+                await writer.close()
             }
-        })();
+        })()
 
         return new NextResponse(stream.readable, {
             headers: {

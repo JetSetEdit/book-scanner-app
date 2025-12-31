@@ -176,10 +176,10 @@ export async function processIsbnScan(
   let usedWebSearch = false
   let isThinMetadata = false
   let pipelinePath = 'unknown'
+  let authorContextInvestigated = false
 
   // Clean ISBN (remove hyphens, spaces)
   const cleanIsbn = normalizeISBN(isbn)
-  let contentWarningsGenerated = false
   let usedSelectedCandidate = !!selectedCandidate
 
   // Removed: cachedWebSearchResult - agents no longer used
@@ -383,8 +383,130 @@ export async function processIsbnScan(
   }
 
   // At this point, we have a bookId and currentBook (unless something went wrong)
-  // Content warning generation and author context investigation removed - agents are no longer used
-  // Books are saved with metadata only, no AI analysis is performed
+  // Now generate content warnings using multi-model analysis
+  onProgress?.('Fetching book description for analysis...')
+  
+  let contentWarningsGenerated = false
+  const analysisStartTime = performance.now()
+  
+  try {
+    // Get book metadata for analysis
+    let bookForAnalysis = currentBook || existingBook
+    
+    // If description is missing or too short, try to fetch it
+    if (bookForAnalysis && (!bookForAnalysis.description || bookForAnalysis.description.length <= 100)) {
+      onProgress?.('Description missing or too short, fetching from external APIs...')
+      const { fetchBookByISBN } = await import('@/lib/book-api')
+      const freshData = await fetchBookByISBN(cleanIsbn)
+      
+      if (freshData && freshData.description && freshData.description.length > 100) {
+        // Update the book in database with fresh description
+        const { error: updateError } = await supabaseAdmin
+          .from('books')
+          .update({ 
+            description: freshData.description,
+            last_synced_at: new Date().toISOString()
+          })
+          .eq('id', bookId)
+        
+        if (!updateError) {
+          bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
+          onProgress?.('✅ Fetched fresh description from external APIs')
+        }
+      } else if (freshData && freshData.description && freshData.description.length > 50) {
+        // Even if it's shorter than 100, update it if it's better than what we have
+        const { error: updateError } = await supabaseAdmin
+          .from('books')
+          .update({ 
+            description: freshData.description,
+            last_synced_at: new Date().toISOString()
+          })
+          .eq('id', bookId)
+        
+        if (!updateError) {
+          bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
+          onProgress?.('✅ Updated description from external APIs')
+        }
+      }
+    }
+    
+    // Lower threshold to 50 characters for analysis (some books have shorter but valid descriptions)
+    if (bookForAnalysis && bookForAnalysis.description && bookForAnalysis.description.length > 50) {
+      onProgress?.('Analyzing book content with AI models...')
+      
+      const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
+      
+      const analysisResult = await analyzeBookWithMultiModel(
+        {
+          title: bookForAnalysis.title || 'Unknown',
+          author: bookForAnalysis.author || 'Unknown',
+          description: bookForAnalysis.description,
+          isbn: cleanIsbn
+        },
+        onProgress
+      )
+      
+      timings.aiContentWarningGeneration = performance.now() - analysisStartTime
+      
+      if (analysisResult.warnings.length > 0) {
+        onProgress?.(`Saving ${analysisResult.warnings.length} content warnings...`)
+        
+        // Save warnings to database
+        const { getCategoryById } = await import('@/lib/config/taxonomy-v2')
+        
+        const warningsToInsert = analysisResult.warnings.map(w => {
+          const [categoryId, subcategoryId] = w.subcategory_id.split('.')
+          
+          // Map to legacy category for database constraint compatibility
+          const category = getCategoryById(categoryId)
+          const legacyCategory = category?.legacyCategory || 'other'
+          
+          return {
+            book_id: bookId,
+            category: legacyCategory, // Legacy field - must match DB constraint
+            category_id: categoryId,
+            subcategory_id: subcategoryId,
+            description: w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`,
+            severity: w.severity,
+            confidence_score: w.evidence[0]?.confidence || 0.8,
+            context_modifiers: w.modifiers,
+            evidence: w.evidence,
+            severity_signals: w.severity_signals,
+            taxonomy_version: w.taxonomy_version,
+            presence: w.evidence[0]?.location ? 'on_page' : undefined,
+            detail_level: w.severity_signals?.explicitness ? 
+              (w.severity_signals.explicitness > 0.8 ? 'graphic' : 
+               w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
+            is_spoiler: w.is_spoiler === true,
+            source: 'ai_generated'
+          }
+        })
+        
+        const { data: insertedWarnings, error: warningsError } = await supabaseAdmin
+          .from('content_warnings')
+          .insert(warningsToInsert)
+          .select()
+        
+        if (warningsError) {
+          console.error('Failed to save warnings:', warningsError)
+          console.error('Warnings that failed to insert:', JSON.stringify(warningsToInsert, null, 2))
+          onProgress?.(`⚠️ Warning: Failed to save content warnings: ${warningsError.message}`)
+        } else {
+          contentWarningsGenerated = true
+          const savedCount = insertedWarnings?.length || warningsToInsert.length
+          onProgress?.(`✅ Saved ${savedCount} content warnings`)
+        }
+      } else {
+        onProgress?.('No content warnings identified')
+      }
+    } else {
+      onProgress?.('⚠️ Skipping analysis: Book description too short or missing')
+    }
+  } catch (error) {
+    console.error('Content warning analysis failed:', error)
+    onProgress?.('⚠️ Warning: Content analysis failed, but book metadata was saved')
+    timings.aiContentWarningGeneration = performance.now() - analysisStartTime
+  }
 
   // Record the scan
   let scan = null;
