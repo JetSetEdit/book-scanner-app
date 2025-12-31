@@ -4,10 +4,11 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect, useMemo } from "react"
 import { useTheme } from "next-themes"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun, Image as ImageIcon } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun, Image as ImageIcon, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { BookSpineLogo } from "@/components/book-spine-logo"
+import { APP_VERSION, APP_VERSION_LABEL, APP_BUILD_DATE } from "@/lib/config/version"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -330,6 +331,16 @@ export function Navbar() {
                         </div>
                       </div>
                     </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="flex items-center gap-2 cursor-default">
+                    <Info className="h-4 w-4" />
+                    <div className="flex-1">
+                      <div className="font-medium">{APP_VERSION_LABEL}</div>
+                      <div className="text-xs text-muted-foreground">
+                        Version {APP_VERSION} • Built {APP_BUILD_DATE}
+                      </div>
+                    </div>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

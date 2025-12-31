@@ -14,7 +14,7 @@ export function Footer() {
               Learn how we work
             </Link>
             <div className="text-xs text-muted-foreground/60">
-              {APP_VERSION_LABEL} (v{APP_VERSION})
+              {APP_VERSION_LABEL} (v{APP_VERSION}) • Updated {APP_BUILD_DATE}
             </div>
           </div>
         </div>
