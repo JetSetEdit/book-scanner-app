@@ -8,7 +8,6 @@
 export const APP_VERSION = "1.01.0"
 export const APP_VERSION_LABEL = "Public Beta 1.01"
 export const APP_BUILD_DATE = "2025-12-31" // YYYY-MM-DD - Update on each deployment
-export const APP_BUILD_TIMESTAMP = new Date().toISOString() // Full timestamp for this build
 
 // Version history
 export const VERSION_HISTORY = [

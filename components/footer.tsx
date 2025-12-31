@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { APP_VERSION_LABEL, APP_VERSION } from "@/lib/config/version"
+import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE } from "@/lib/config/version"
 
 export function Footer() {
   return (
