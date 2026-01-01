@@ -318,6 +318,225 @@ function processWarnings(
   })
 }
 
+interface VerificationResult {
+  subcategory_id: string
+  action: 'keep' | 'drop' | 'adjust'
+  adjusted_severity?: 'mild' | 'moderate' | 'severe'
+  adjusted_subcategory_id?: string
+  reason?: string
+}
+
+interface VerificationMetrics {
+  unique_before: number
+  kept: number
+  dropped: number
+  adjusted: number
+  latency_ms: number
+  failed: boolean
+}
+
+async function verifyUniqueWarnings(
+  uniqueWarnings: EnhancedContentWarning[],
+  metadata: BookMetadata,
+  verifierModel: 'openai' | 'gemini',
+  onProgress?: ProgressCallback
+): Promise<{
+  verified: EnhancedContentWarning[]
+  metrics: VerificationMetrics
+}> {
+  const startTime = Date.now()
+  const metrics: VerificationMetrics = {
+    unique_before: uniqueWarnings.length,
+    kept: 0,
+    dropped: 0,
+    adjusted: 0,
+    latency_ms: 0,
+    failed: false
+  }
+
+  // If no unique warnings, return early
+  if (uniqueWarnings.length === 0) {
+    return { verified: [], metrics }
+  }
+
+  onProgress?.(`🔍 Verifying ${uniqueWarnings.length} unique warning(s) with ${verifierModel === 'openai' ? 'OpenAI' : 'Gemini'}...`)
+
+  try {
+    const taxonomyContext = buildTaxonomyContext()
+    
+    // Build the verification prompt
+    const warningsList = uniqueWarnings.map((w, idx) => {
+      const evidenceText = w.evidence[0]?.excerpt || 'No evidence excerpt provided'
+      return `${idx + 1}. subcategory_id: ${w.subcategory_id}
+   description: ${w.description || 'N/A'}
+   severity: ${w.severity}
+   evidence: "${evidenceText.substring(0, 200)}${evidenceText.length > 200 ? '...' : ''}"
+   confidence: ${w.evidence[0]?.confidence || 0.5}`
+    }).join('\n\n')
+
+    const prompt = `You are verifying content warnings that were identified by only ONE AI model. Your job is to validate whether these warnings are accurate and should be included.
+
+Book Information:
+- Title: ${metadata.title}
+- Author: ${metadata.author}
+- ISBN: ${metadata.isbn}
+
+Description:
+${metadata.description}
+
+Available Categories and Subcategories:
+${taxonomyContext}
+
+Unique Warnings to Verify:
+${warningsList}
+
+Instructions:
+For each warning, determine:
+1. Does the evidence support this warning? (Check if the evidence excerpt actually supports the claimed subcategory)
+2. Is the subcategory_id correct? (Verify it matches the taxonomy and the evidence)
+3. Is the severity appropriate? (mild/moderate/severe based on detail_level, presence, etc.)
+4. Should this warning be included? (include if valid, drop if false positive or unsupported)
+
+Return JSON with this structure:
+{
+  "verifications": [
+    {
+      "subcategory_id": "category.subcategory",
+      "action": "keep" | "drop" | "adjust",
+      "adjusted_severity": "mild" | "moderate" | "severe" (only if action is "adjust"),
+      "adjusted_subcategory_id": "category.subcategory" (only if subcategory is wrong),
+      "reason": "Brief explanation (1-2 sentences)"
+    }
+  ]
+}
+
+Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust severity/subcategory if close but not quite right.`
+
+    let verificationResults: VerificationResult[] = []
+
+    // Add timeout wrapper (10 seconds max for verification)
+    const verificationPromise = (async () => {
+      if (verifierModel === 'openai') {
+        const response = await openai.chat.completions.create({
+          model: MODEL_VERSION,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a content warning verifier. Be strict and evidence-based. Only keep warnings with clear support from the evidence.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.2, // Lower temperature for verification (more conservative)
+          max_tokens: 2000
+        })
+
+        const content = response.choices[0].message.content
+        if (!content) {
+          throw new Error('No response from OpenAI verifier')
+        }
+
+        const parsed = JSON.parse(content)
+        return parsed.verifications || []
+      } else {
+        // Use Gemini for verification
+        try {
+          const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+          const result = await model.generateContent(prompt)
+          const response = result.response
+          const text = response.text()
+          
+          // Extract JSON from response (may have markdown code blocks)
+          const jsonMatch = text.match(/\{[\s\S]*\}/)
+          if (!jsonMatch) {
+            throw new Error('No JSON found in Gemini response')
+          }
+          
+          const parsed = JSON.parse(jsonMatch[0])
+          return parsed.verifications || []
+        } catch (geminiError) {
+          // Fallback to gemini-1.5-flash
+          console.warn('gemini-pro failed, trying gemini-1.5-flash:', geminiError)
+          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+          const result = await model.generateContent(prompt)
+          const response = result.response
+          const text = response.text()
+          
+          const jsonMatch = text.match(/\{[\s\S]*\}/)
+          if (!jsonMatch) {
+            throw new Error('No JSON found in Gemini response')
+          }
+          
+          const parsed = JSON.parse(jsonMatch[0])
+          return parsed.verifications || []
+        }
+      }
+    })()
+
+    // Add timeout (10 seconds)
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Verification timeout after 10s')), 10000)
+    })
+
+    try {
+      verificationResults = await Promise.race([verificationPromise, timeoutPromise])
+    } catch (timeoutError) {
+      throw timeoutError // Re-throw to be caught by outer try-catch
+    }
+
+    // Apply verification results
+    const verified: EnhancedContentWarning[] = []
+    const verificationMap = new Map(verificationResults.map(v => [v.subcategory_id, v]))
+
+    for (const warning of uniqueWarnings) {
+      const verification = verificationMap.get(warning.subcategory_id)
+      
+      if (!verification) {
+        // No verification result for this warning - keep it (fallback)
+        verified.push(warning)
+        metrics.kept++
+        continue
+      }
+
+      if (verification.action === 'drop') {
+        metrics.dropped++
+        continue // Skip this warning
+      }
+
+      if (verification.action === 'adjust') {
+        metrics.adjusted++
+        // Create adjusted warning
+        const adjusted: EnhancedContentWarning = {
+          ...warning,
+          severity: verification.adjusted_severity || warning.severity,
+          subcategory_id: verification.adjusted_subcategory_id || warning.subcategory_id
+        }
+        verified.push(adjusted)
+      } else {
+        // action === 'keep'
+        metrics.kept++
+        verified.push(warning)
+      }
+    }
+
+    metrics.latency_ms = Date.now() - startTime
+    onProgress?.(`✅ Verification complete: ${metrics.kept} kept, ${metrics.dropped} dropped, ${metrics.adjusted} adjusted (${metrics.latency_ms}ms)`)
+
+    return { verified, metrics }
+  } catch (error) {
+    console.error('Verification failed:', error)
+    metrics.failed = true
+    metrics.latency_ms = Date.now() - startTime
+    onProgress?.('⚠️ Verification failed, using original unique warnings')
+    
+    // Fallback: return original warnings
+    return { verified: uniqueWarnings, metrics }
+  }
+}
+
 function combineResults(
   openaiWarnings: EnhancedContentWarning[],
   geminiWarnings: EnhancedContentWarning[]
@@ -409,6 +628,7 @@ export async function analyzeBookWithMultiModel(
       openai_severity: string
       gemini_severity: string
     }>
+    verification_metrics?: VerificationMetrics
   }
   model_results: {
     openai: EnhancedContentWarning[]
@@ -435,11 +655,50 @@ export async function analyzeBookWithMultiModel(
   
   const { combined, analysis } = combineResults(openaiWarnings, geminiWarnings)
   
-  onProgress?.(`Analysis complete: ${combined.length} warnings found`)
+  // POC: Verify unique warnings only
+  const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
+  let finalWarnings = combined
+  let verificationMetrics: VerificationMetrics | undefined = undefined
+
+  if (allUniqueWarnings.length > 0) {
+    // Use the opposite model for verification (if OpenAI found it, verify with Gemini, and vice versa)
+    // For simplicity, verify all unique warnings together using OpenAI (more reliable)
+    const { verified, metrics } = await verifyUniqueWarnings(
+      allUniqueWarnings,
+      metadata,
+      'openai', // Use OpenAI for verification (more reliable)
+      onProgress
+    )
+
+    verificationMetrics = metrics
+
+    // Replace unique warnings in combined list with verified ones
+    // Remove original unique warnings
+    const uniqueSubcategoryIds = new Set(allUniqueWarnings.map(w => w.subcategory_id))
+    finalWarnings = combined.filter(w => !uniqueSubcategoryIds.has(w.subcategory_id))
+    
+    // Add verified warnings
+    finalWarnings.push(...verified)
+
+    // Log metrics
+    console.log('[Verification Metrics]', {
+      unique_before: metrics.unique_before,
+      kept: metrics.kept,
+      dropped: metrics.dropped,
+      adjusted: metrics.adjusted,
+      latency_ms: metrics.latency_ms,
+      failed: metrics.failed
+    })
+  }
+  
+  onProgress?.(`Analysis complete: ${finalWarnings.length} warnings found${verificationMetrics ? ` (${verificationMetrics.dropped} unique warnings dropped)` : ''}`)
   
   return {
-    warnings: combined,
-    analysis,
+    warnings: finalWarnings,
+    analysis: {
+      ...analysis,
+      verification_metrics: verificationMetrics
+    },
     model_results: {
       openai: openaiWarnings,
       gemini: geminiWarnings
