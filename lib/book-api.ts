@@ -25,7 +25,6 @@ interface BookData {
   published_date?: string
   page_count?: number
   categories?: string[]
-  classification_rating?: string
   source?: 'openlibrary' | 'googlebooks' // Track data source for TOS compliance
 }
 

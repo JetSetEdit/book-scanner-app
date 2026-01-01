@@ -448,9 +448,20 @@ export async function processIsbnScan(
           } else {
             onProgress?.('✅ Updated description from external APIs (shorter but valid)')
           }
+        } else {
+          console.error('Failed to update book description:', updateError)
+          onProgress?.(`⚠️ Warning: Failed to save description: ${updateError.message}`)
         }
       } else if (forceRefresh) {
-        onProgress?.('⚠️ Could not fetch fresh description, using existing or minimal description')
+        if (!freshData) {
+          onProgress?.('⚠️ Could not fetch book data from external APIs')
+        } else if (!freshData.description) {
+          onProgress?.('⚠️ Book found but no description available in external APIs')
+        } else if (freshData.description.length <= 50) {
+          onProgress?.('⚠️ Description too short (< 50 chars), skipping save')
+        } else {
+          onProgress?.('⚠️ Could not fetch fresh description, using existing or minimal description')
+        }
       }
     }
     
