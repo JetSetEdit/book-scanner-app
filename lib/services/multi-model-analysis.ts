@@ -232,8 +232,15 @@ Instructions:
 }`
 
   try {
-    // Use gemini-1.5-flash for v1beta API (gemini-1.5-pro not available in v1beta)
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    // Try gemini-pro first (stable model), fallback to gemini-1.5-flash if needed
+    // Note: gemini-1.5-pro is not available in v1beta API
+    let model
+    try {
+      model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+    } catch (e) {
+      // Fallback to flash if pro fails
+      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+    }
     
     const result = await model.generateContent(prompt)
     const response = await result.response
