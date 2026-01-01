@@ -301,37 +301,26 @@ export async function processIsbnScan(
     isThinMetadata = !!(bookData && (!bookData.description || bookData.description.length < 150 || !bookData.cover_url));
 
     if (!bookData) {
-      // No book data found - create minimal record
-      console.log('Book not found in external APIs, creating minimal record...')
-      onProgress?.('Book not found in standard libraries. Creating minimal record...');
+      // No book data found - don't create a record, return error instead
+      console.log('Book not found in external APIs')
+      onProgress?.('❌ Book not found in any external library (Open Library, Google Books)')
       
-      const insertData: any = {
-        isbn: cleanIsbn,
-        title: `Unknown Book (ISBN: ${cleanIsbn})`,
-        author: 'Unknown Author',
-        cover_url: null,
-        description: null,
-        publisher: null,
-        published_date: null,
-        page_count: null,
-        categories: null,
-        last_synced_at: new Date().toISOString(),
+      timings.total = performance.now() - overallStartTime
+      return {
+        success: false,
+        status: 'error',
+        message: `Book with ISBN ${cleanIsbn} not found in any external library. Please check the ISBN and try again.`,
+        scan: { id: 'temp-error', isbn: cleanIsbn },
+        isNewBook: false,
+        contentWarningsGenerated: false,
+        authorContextInvestigated: false,
+        timings,
+        flags: {
+          usedWebSearch: false,
+          isThinMetadata: false,
+          pipelinePath: 'not_found'
+        }
       }
-      
-      const { data: newBook, error: insertError } = await supabaseAdmin
-        .from('books')
-        .insert(insertData)
-        .select()
-        .single()
-
-      if (insertError) {
-        console.error('Error creating minimal book record:', JSON.stringify(insertError, null, 2))
-        throw insertError
-      }
-
-      console.log('Minimal book record created with ID:', newBook.id)
-      currentBook = newBook
-      bookId = newBook.id
     } else {
       // Hybrid cache strategy: Store all metadata with last_synced_at timestamp
       // Data is treated as a temporary cache that expires after 30 days
