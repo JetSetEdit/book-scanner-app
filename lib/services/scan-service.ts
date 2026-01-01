@@ -556,73 +556,78 @@ export async function processIsbnScan(
           onProgress?.(`⏱️ Analysis took ${Math.round(timings.aiContentWarningGeneration)}ms`)
           
           if (analysisResult.warnings.length > 0) {
-          onProgress?.(`💾 Saving ${analysisResult.warnings.length} content warnings to database...`)
-        
-        // If forceRefresh is true, delete existing AI-generated warnings first
-        if (forceRefresh && bookId) {
-          onProgress?.('Deleting existing AI-generated warnings for fresh scan...')
-          const { error: deleteError } = await supabaseAdmin
-            .from('content_warnings')
-            .delete()
-            .eq('book_id', bookId)
-            .eq('source', 'ai_generated')
+            onProgress?.(`💾 Saving ${analysisResult.warnings.length} content warnings to database...`)
           
-          if (deleteError) {
-            console.error('Failed to delete existing warnings:', deleteError)
-            onProgress?.(`⚠️ Warning: Failed to delete existing warnings: ${deleteError.message}`)
+            // If forceRefresh is true, delete existing AI-generated warnings first
+            if (forceRefresh && bookId) {
+              onProgress?.('Deleting existing AI-generated warnings for fresh scan...')
+              const { error: deleteError } = await supabaseAdmin
+                .from('content_warnings')
+                .delete()
+                .eq('book_id', bookId)
+                .eq('source', 'ai_generated')
+              
+              if (deleteError) {
+                console.error('Failed to delete existing warnings:', deleteError)
+                onProgress?.(`⚠️ Warning: Failed to delete existing warnings: ${deleteError.message}`)
+              } else {
+                onProgress?.('✅ Deleted existing AI-generated warnings')
+              }
+            }
+            
+            // Save warnings to database
+            const { getCategoryById } = await import('@/lib/config/taxonomy-v2')
+            
+            const warningsToInsert = analysisResult.warnings.map(w => {
+              const [categoryId, subcategoryId] = w.subcategory_id.split('.')
+              
+              // Map to legacy category for database constraint compatibility
+              const category = getCategoryById(categoryId)
+              const legacyCategory = category?.legacyCategory || 'other'
+              
+              return {
+                book_id: bookId,
+                category: legacyCategory, // Legacy field - must match DB constraint
+                category_id: categoryId,
+                subcategory_id: subcategoryId,
+                description: w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`,
+                severity: w.severity,
+                confidence_score: w.evidence[0]?.confidence || 0.8,
+                context_modifiers: w.modifiers,
+                evidence: w.evidence,
+                severity_signals: w.severity_signals,
+                taxonomy_version: w.taxonomy_version,
+                presence: w.evidence[0]?.location ? 'on_page' : undefined,
+                detail_level: w.severity_signals?.explicitness ? 
+                  (w.severity_signals.explicitness > 0.8 ? 'graphic' : 
+                   w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
+                is_spoiler: w.is_spoiler === true,
+                source: 'ai_generated'
+              }
+            })
+            
+            const { data: insertedWarnings, error: warningsError } = await supabaseAdmin
+              .from('content_warnings')
+              .insert(warningsToInsert)
+              .select()
+            
+            if (warningsError) {
+              console.error('Failed to save warnings:', warningsError)
+              console.error('Warnings that failed to insert:', JSON.stringify(warningsToInsert, null, 2))
+              onProgress?.(`⚠️ Warning: Failed to save content warnings: ${warningsError.message}`)
+            } else {
+              contentWarningsGenerated = true
+              const savedCount = insertedWarnings?.length || warningsToInsert.length
+              onProgress?.(`✅ Saved ${savedCount} content warnings`)
+            }
           } else {
-            onProgress?.('✅ Deleted existing AI-generated warnings')
+            onProgress?.('ℹ️ No content warnings identified by AI analysis')
+            console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
           }
-        }
-        
-        // Save warnings to database
-        const { getCategoryById } = await import('@/lib/config/taxonomy-v2')
-        
-        const warningsToInsert = analysisResult.warnings.map(w => {
-          const [categoryId, subcategoryId] = w.subcategory_id.split('.')
-          
-          // Map to legacy category for database constraint compatibility
-          const category = getCategoryById(categoryId)
-          const legacyCategory = category?.legacyCategory || 'other'
-          
-          return {
-            book_id: bookId,
-            category: legacyCategory, // Legacy field - must match DB constraint
-            category_id: categoryId,
-            subcategory_id: subcategoryId,
-            description: w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`,
-            severity: w.severity,
-            confidence_score: w.evidence[0]?.confidence || 0.8,
-            context_modifiers: w.modifiers,
-            evidence: w.evidence,
-            severity_signals: w.severity_signals,
-            taxonomy_version: w.taxonomy_version,
-            presence: w.evidence[0]?.location ? 'on_page' : undefined,
-            detail_level: w.severity_signals?.explicitness ? 
-              (w.severity_signals.explicitness > 0.8 ? 'graphic' : 
-               w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
-            is_spoiler: w.is_spoiler === true,
-            source: 'ai_generated'
-          }
-        })
-        
-        const { data: insertedWarnings, error: warningsError } = await supabaseAdmin
-          .from('content_warnings')
-          .insert(warningsToInsert)
-          .select()
-        
-        if (warningsError) {
-          console.error('Failed to save warnings:', warningsError)
-          console.error('Warnings that failed to insert:', JSON.stringify(warningsToInsert, null, 2))
-          onProgress?.(`⚠️ Warning: Failed to save content warnings: ${warningsError.message}`)
-        } else {
-          contentWarningsGenerated = true
-          const savedCount = insertedWarnings?.length || warningsToInsert.length
-          onProgress?.(`✅ Saved ${savedCount} content warnings`)
-        }
-        } else {
-          onProgress?.('No content warnings identified by AI analysis')
-          console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
+        } catch (analysisError) {
+          console.error('Error in analyzeBookWithMultiModel:', analysisError)
+          onProgress?.(`❌ AI analysis error: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`)
+          throw analysisError // Re-throw to be caught by outer catch
         }
       }
     } else {
