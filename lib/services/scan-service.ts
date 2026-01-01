@@ -192,8 +192,8 @@ export async function processIsbnScan(
   })
   let existingBook = null
 
-  // Only check DB if we aren't forcing a candidate or forcing a refresh
-  if (!usedSelectedCandidate && !forceRefresh) {
+  // Always check DB to see if book exists (needed even for forceRefresh to get bookId)
+  if (!usedSelectedCandidate) {
     const dbLookupStart = performance.now()
     const { data, error: fetchError } = await supabaseAdmin
       .from('books')
@@ -216,8 +216,8 @@ export async function processIsbnScan(
     })
     
     // --- COMPLIANCE CHECK: Staleness Check ---
-    // If data is stale (>30 days), refresh in background
-    if (existingBook && isStale(existingBook.last_synced_at)) {
+    // If data is stale (>30 days), refresh in background (unless forceRefresh is true)
+    if (existingBook && !forceRefresh && isStale(existingBook.last_synced_at)) {
       console.log(`[Cache] Book ${cleanIsbn} is stale (>30 days). Refreshing in background...`);
       // Fire-and-forget refresh (don't block the user)
       refreshBookMetadata(cleanIsbn, async (isbn, data) => {
@@ -393,14 +393,18 @@ export async function processIsbnScan(
     // Get book metadata for analysis
     let bookForAnalysis = currentBook || existingBook
     
-    // If description is missing or too short, try to fetch it
-    if (bookForAnalysis && (!bookForAnalysis.description || bookForAnalysis.description.length <= 100)) {
-      onProgress?.('Description missing or too short, fetching from external APIs...')
+    // If description is missing or too short, or if forceRefresh is true, try to fetch it
+    if (bookForAnalysis && (forceRefresh || !bookForAnalysis.description || bookForAnalysis.description.length <= 100)) {
+      if (forceRefresh) {
+        onProgress?.('Force refresh: fetching fresh description from external APIs...')
+      } else {
+        onProgress?.('Description missing or too short, fetching from external APIs...')
+      }
       const { fetchBookByISBN } = await import('@/lib/book-api')
       const freshData = await fetchBookByISBN(cleanIsbn)
       
-      if (freshData && freshData.description && freshData.description.length > 100) {
-        // Update the book in database with fresh description
+      if (freshData && freshData.description && freshData.description.length > 50) {
+        // Update the book in database with fresh description (accept descriptions > 50 chars)
         const { error: updateError } = await supabaseAdmin
           .from('books')
           .update({ 
@@ -411,26 +415,19 @@ export async function processIsbnScan(
         
         if (!updateError) {
           bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
-          onProgress?.('✅ Fetched fresh description from external APIs')
+          if (freshData.description.length > 100) {
+            onProgress?.('✅ Fetched fresh description from external APIs')
+          } else {
+            onProgress?.('✅ Updated description from external APIs (shorter but valid)')
+          }
         }
-      } else if (freshData && freshData.description && freshData.description.length > 50) {
-        // Even if it's shorter than 100, update it if it's better than what we have
-        const { error: updateError } = await supabaseAdmin
-          .from('books')
-          .update({ 
-            description: freshData.description,
-            last_synced_at: new Date().toISOString()
-          })
-          .eq('id', bookId)
-        
-        if (!updateError) {
-          bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
-          onProgress?.('✅ Updated description from external APIs')
-        }
+      } else if (forceRefresh) {
+        onProgress?.('⚠️ Could not fetch fresh description, using existing or minimal description')
       }
     }
     
-    // Try analysis if we have at least title and author (description is helpful but not strictly required)
+    // Try analysis if we have at least title (description is helpful but not strictly required)
+    // Always run analysis if forceRefresh is true, even with minimal metadata
     if (bookForAnalysis && bookForAnalysis.title) {
       // If we have a description, use it. Otherwise, use a minimal description based on metadata
       const descriptionForAnalysis = bookForAnalysis.description && bookForAnalysis.description.length > 50
@@ -457,6 +454,23 @@ export async function processIsbnScan(
       
       if (analysisResult.warnings.length > 0) {
         onProgress?.(`Saving ${analysisResult.warnings.length} content warnings...`)
+        
+        // If forceRefresh is true, delete existing AI-generated warnings first
+        if (forceRefresh && bookId) {
+          onProgress?.('Deleting existing AI-generated warnings for fresh scan...')
+          const { error: deleteError } = await supabaseAdmin
+            .from('content_warnings')
+            .delete()
+            .eq('book_id', bookId)
+            .eq('source', 'ai_generated')
+          
+          if (deleteError) {
+            console.error('Failed to delete existing warnings:', deleteError)
+            onProgress?.(`⚠️ Warning: Failed to delete existing warnings: ${deleteError.message}`)
+          } else {
+            onProgress?.('✅ Deleted existing AI-generated warnings')
+          }
+        }
         
         // Save warnings to database
         const { getCategoryById } = await import('@/lib/config/taxonomy-v2')
@@ -504,14 +518,20 @@ export async function processIsbnScan(
           onProgress?.(`✅ Saved ${savedCount} content warnings`)
         }
       } else {
-        onProgress?.('No content warnings identified')
+        onProgress?.('No content warnings identified by AI analysis')
+        console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
       }
     } else {
-      onProgress?.('⚠️ Skipping analysis: Book description too short or missing')
+      onProgress?.('⚠️ Skipping analysis: Book title missing')
+      console.error('Cannot run analysis: bookForAnalysis is null or missing title', { 
+        hasBook: !!bookForAnalysis, 
+        hasTitle: !!bookForAnalysis?.title 
+      })
     }
   } catch (error) {
     console.error('Content warning analysis failed:', error)
-    onProgress?.('⚠️ Warning: Content analysis failed, but book metadata was saved')
+    console.error('Error details:', error instanceof Error ? error.stack : error)
+    onProgress?.(`⚠️ Warning: Content analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     timings.aiContentWarningGeneration = performance.now() - analysisStartTime
   }
 
