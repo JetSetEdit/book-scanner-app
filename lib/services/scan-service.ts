@@ -412,7 +412,7 @@ export async function processIsbnScan(
 
   // At this point, we have a bookId and currentBook (unless something went wrong)
   // Now generate content warnings using multi-model analysis
-  onProgress?.('Fetching book description for analysis...')
+  onProgress?.('📖 Step 6: Fetching book description for analysis...')
   
   let contentWarningsGenerated = false
   const analysisStartTime = performance.now()
@@ -421,59 +421,84 @@ export async function processIsbnScan(
     // Get book metadata for analysis
     let bookForAnalysis = currentBook || existingBook
     
+    if (!bookForAnalysis) {
+      onProgress?.('❌ Error: No book data available for analysis')
+      throw new Error('No book data available for analysis')
+    }
+    
+    onProgress?.(`📚 Book for analysis: "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown'}`)
+    onProgress?.(`📝 Current description length: ${bookForAnalysis.description?.length || 0} characters`)
+    
     // If description is missing or too short, or if forceRefresh is true, try to fetch it
     if (bookForAnalysis && (forceRefresh || !bookForAnalysis.description || bookForAnalysis.description.length <= 100)) {
       if (forceRefresh) {
-        onProgress?.('Force refresh: fetching fresh description from external APIs...')
+        onProgress?.('🔄 Force refresh: fetching fresh description from external APIs...')
       } else {
-        onProgress?.('Description missing or too short, fetching from external APIs...')
+        onProgress?.('📥 Description missing or too short, fetching from external APIs...')
       }
-      const { fetchBookByISBN } = await import('@/lib/book-api')
-      const freshData = await fetchBookByISBN(cleanIsbn)
       
-      if (freshData && freshData.description && freshData.description.length > 50) {
-        // Update the book in database with fresh description (accept descriptions > 50 chars)
-        const { error: updateError } = await supabaseAdmin
-          .from('books')
-          .update({ 
-            description: freshData.description,
-            last_synced_at: new Date().toISOString()
-          })
-          .eq('id', bookId)
-        
-        if (!updateError) {
-          bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
-          if (freshData.description.length > 100) {
-            onProgress?.('✅ Fetched fresh description from external APIs')
+      try {
+        const { fetchBookByISBN } = await import('@/lib/book-api')
+        onProgress?.('🌐 Calling fetchBookByISBN...')
+        const freshData = await fetchBookByISBN(cleanIsbn)
+        onProgress?.(freshData ? `✅ Fetched data from ${freshData.source || 'external API'}` : '❌ No data returned from external APIs')
+      
+        if (freshData && freshData.description && freshData.description.length > 50) {
+          onProgress?.(`💾 Saving description (${freshData.description.length} chars) to database...`)
+          // Update the book in database with fresh description (accept descriptions > 50 chars)
+          const { error: updateError } = await supabaseAdmin
+            .from('books')
+            .update({ 
+              description: freshData.description,
+              last_synced_at: new Date().toISOString()
+            })
+            .eq('id', bookId)
+          
+          if (!updateError) {
+            bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
+            if (freshData.description.length > 100) {
+              onProgress?.('✅ Fetched and saved fresh description from external APIs')
+            } else {
+              onProgress?.('✅ Updated description from external APIs (shorter but valid)')
+            }
           } else {
-            onProgress?.('✅ Updated description from external APIs (shorter but valid)')
+            console.error('Failed to update book description:', updateError)
+            onProgress?.(`❌ Error: Failed to save description: ${updateError.message}`)
+            // Continue anyway with the fresh data in memory
+            bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
           }
-        } else {
-          console.error('Failed to update book description:', updateError)
-          onProgress?.(`⚠️ Warning: Failed to save description: ${updateError.message}`)
+        } else if (forceRefresh) {
+          if (!freshData) {
+            onProgress?.('❌ Could not fetch book data from external APIs')
+          } else if (!freshData.description) {
+            onProgress?.('⚠️ Book found but no description available in external APIs')
+            onProgress?.('💡 This book may need manual description entry')
+          } else if (freshData.description.length <= 50) {
+            onProgress?.(`⚠️ Description too short (${freshData.description.length} chars < 50), skipping save`)
+          } else {
+            onProgress?.('⚠️ Could not fetch fresh description, using existing or minimal description')
+          }
         }
-      } else if (forceRefresh) {
-        if (!freshData) {
-          onProgress?.('⚠️ Could not fetch book data from external APIs')
-        } else if (!freshData.description) {
-          onProgress?.('⚠️ Book found but no description available in external APIs')
-        } else if (freshData.description.length <= 50) {
-          onProgress?.('⚠️ Description too short (< 50 chars), skipping save')
-        } else {
-          onProgress?.('⚠️ Could not fetch fresh description, using existing or minimal description')
-        }
+      } catch (fetchError) {
+        console.error('Error fetching fresh description:', fetchError)
+        onProgress?.(`❌ Error fetching description: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
+        // Continue with existing description if available
       }
     }
     
     // Try analysis if we have at least title (description is helpful but not strictly required)
     // Always run analysis if forceRefresh is true, even with minimal metadata
     if (bookForAnalysis && bookForAnalysis.title) {
+      onProgress?.('🔍 Checking if description is sufficient for analysis...')
+      
       // If we have a description, use it. Otherwise, use a minimal description based on metadata
       const descriptionForAnalysis = bookForAnalysis.description && bookForAnalysis.description.length > 50
         ? bookForAnalysis.description
         : bookForAnalysis.description && bookForAnalysis.description.length > 0
         ? bookForAnalysis.description
         : `A book by ${bookForAnalysis.author || 'Unknown Author'}. ${bookForAnalysis.categories ? `Categories: ${bookForAnalysis.categories.slice(0, 3).join(', ')}.` : ''}`
+      
+      onProgress?.(`📄 Description for analysis: ${descriptionForAnalysis.length} characters`)
       
       // Check if description is too minimal (just title/author/categories)
       const isMinimalDescription = !bookForAnalysis.description || 
@@ -484,6 +509,7 @@ export async function processIsbnScan(
       if (isMinimalDescription) {
         onProgress?.('⚠️ Description too minimal - skipping analysis to avoid genre-based assumptions')
         onProgress?.('💡 Tip: Try fetching a description from external APIs or provide book details manually')
+        onProgress?.('📋 This scan has been logged for manual handling')
         console.log('Skipping analysis: Description is too minimal, would lead to genre-based assumptions')
         
         // Log for manual handling
@@ -506,24 +532,31 @@ export async function processIsbnScan(
           console.error('Failed to log manual handling scan:', logError)
         }
       } else {
-        onProgress?.('Analyzing book content with AI models...')
+        onProgress?.('🤖 Starting AI content analysis with multi-model (GPT-4o + Gemini)...')
+        onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
+        onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
         
-        const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
-        
-        const analysisResult = await analyzeBookWithMultiModel(
-          {
-            title: bookForAnalysis.title || 'Unknown',
-            author: bookForAnalysis.author || 'Unknown',
-            description: descriptionForAnalysis,
-            isbn: cleanIsbn
-          },
-          onProgress
-        )
-        
-        timings.aiContentWarningGeneration = performance.now() - analysisStartTime
-        
-        if (analysisResult.warnings.length > 0) {
-        onProgress?.(`Saving ${analysisResult.warnings.length} content warnings...`)
+        try {
+          const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
+          onProgress?.('⏳ Calling analyzeBookWithMultiModel...')
+          
+          const analysisResult = await analyzeBookWithMultiModel(
+            {
+              title: bookForAnalysis.title || 'Unknown',
+              author: bookForAnalysis.author || 'Unknown',
+              description: descriptionForAnalysis,
+              isbn: cleanIsbn
+            },
+            onProgress
+          )
+          
+          onProgress?.(`✅ AI analysis complete: ${analysisResult.warnings.length} warnings generated`)
+          
+          timings.aiContentWarningGeneration = performance.now() - analysisStartTime
+          onProgress?.(`⏱️ Analysis took ${Math.round(timings.aiContentWarningGeneration)}ms`)
+          
+          if (analysisResult.warnings.length > 0) {
+          onProgress?.(`💾 Saving ${analysisResult.warnings.length} content warnings to database...`)
         
         // If forceRefresh is true, delete existing AI-generated warnings first
         if (forceRefresh && bookId) {
