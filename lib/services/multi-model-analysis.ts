@@ -324,6 +324,7 @@ interface VerificationResult {
   adjusted_severity?: 'mild' | 'moderate' | 'severe'
   adjusted_subcategory_id?: string
   reason?: string
+  drop_reason?: 'no_evidence' | 'misclassified' | 'duplicate' | 'other'
 }
 
 interface VerificationMetrics {
@@ -333,6 +334,12 @@ interface VerificationMetrics {
   adjusted: number
   latency_ms: number
   failed: boolean
+  dropped_reasons: {
+    no_evidence: number
+    misclassified: number
+    duplicate: number
+    other: number
+  }
 }
 
 async function verifyUniqueWarnings(
@@ -405,10 +412,17 @@ Return JSON with this structure:
       "action": "keep" | "drop" | "adjust",
       "adjusted_severity": "mild" | "moderate" | "severe" (only if action is "adjust"),
       "adjusted_subcategory_id": "category.subcategory" (only if subcategory is wrong),
-      "reason": "Brief explanation (1-2 sentences)"
+      "reason": "Brief explanation (1-2 sentences)",
+      "drop_reason": "no_evidence" | "misclassified" | "duplicate" | "other" (REQUIRED if action is "drop")
     }
   ]
 }
+
+For drop_reason:
+- "no_evidence": Evidence doesn't support the warning
+- "misclassified": Wrong subcategory (but content exists)
+- "duplicate": Duplicate of another warning
+- "other": Any other reason
 
 Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust severity/subcategory if close but not quite right.`
 
@@ -487,6 +501,56 @@ Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust 
       throw timeoutError // Re-throw to be caught by outer try-catch
     }
 
+    // Helper function to normalize other_note for other_* subcategories
+    const normalizeOtherNote = (warning: EnhancedContentWarning): string | undefined => {
+      const subcategoryId = warning.subcategory_id.split('.')[1] || warning.subcategory_id
+      if (!subcategoryId.startsWith('other_')) {
+        return warning.other_note
+      }
+
+      // Priority: AI-provided other_note > extracted from description > evidence excerpt > generated note
+      if (warning.other_note && warning.other_note.trim().length >= 10) {
+        return warning.other_note.trim()
+      }
+
+      // Extract meaningful context from description/evidence
+      const evidenceText = warning.evidence[0]?.excerpt || ''
+      const descriptionText = warning.description || ''
+      
+      const extractKeyPhrase = (text: string, maxLength: number = 150): string => {
+        if (!text || text.length <= maxLength) return text.trim()
+        
+        // Try to find a sentence or phrase that captures the essence
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || []
+        if (sentences.length > 0) {
+          const firstSentence = sentences[0].trim()
+          if (firstSentence.length >= 10 && firstSentence.length <= maxLength) {
+            return firstSentence
+          }
+          if (firstSentence.length > maxLength) {
+            const truncated = firstSentence.substring(0, maxLength)
+            const lastSpace = truncated.lastIndexOf(' ')
+            return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...'
+          }
+        }
+        
+        // Fallback: truncate at word boundary
+        const truncated = text.substring(0, maxLength)
+        const lastSpace = truncated.lastIndexOf(' ')
+        return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...'
+      }
+      
+      // Prefer evidence excerpt (more specific) over description
+      const sourceText = evidenceText || descriptionText
+      if (sourceText && sourceText.trim().length >= 10) {
+        return extractKeyPhrase(sourceText, 150)
+      }
+      
+      // Last resort: create a descriptive note based on subcategory
+      const categoryName = subcategoryId.replace('other_', '').replace(/_/g, ' ')
+      return `Content related to ${categoryName} as described in the book.`
+    }
+
     // Apply verification results
     const verified: EnhancedContentWarning[] = []
     const verificationMap = new Map(verificationResults.map(v => [v.subcategory_id, v]))
@@ -496,13 +560,26 @@ Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust 
       
       if (!verification) {
         // No verification result for this warning - keep it (fallback)
-        verified.push(warning)
+        const keptWarning = { ...warning }
+        // Ensure other_note is normalized if needed
+        const subcategoryId = keptWarning.subcategory_id.split('.')[1] || keptWarning.subcategory_id
+        if (subcategoryId.startsWith('other_')) {
+          keptWarning.other_note = normalizeOtherNote(keptWarning)
+        }
+        verified.push(keptWarning)
         metrics.kept++
         continue
       }
 
       if (verification.action === 'drop') {
         metrics.dropped++
+        // Categorize drop reason
+        const dropReason = verification.drop_reason || 'other'
+        if (dropReason === 'no_evidence' || dropReason === 'misclassified' || dropReason === 'duplicate') {
+          metrics.dropped_reasons[dropReason]++
+        } else {
+          metrics.dropped_reasons.other++
+        }
         continue // Skip this warning
       }
 
@@ -514,16 +591,41 @@ Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust 
           severity: verification.adjusted_severity || warning.severity,
           subcategory_id: verification.adjusted_subcategory_id || warning.subcategory_id
         }
+        
+        // Safety check: If adjusted to other_* subcategory, ensure other_note is normalized
+        const newSubcategoryId = adjusted.subcategory_id.split('.')[1] || adjusted.subcategory_id
+        if (newSubcategoryId.startsWith('other_')) {
+          adjusted.other_note = normalizeOtherNote(adjusted)
+          // If we can't generate a valid other_note, filter out the warning
+          if (!adjusted.other_note || adjusted.other_note.trim().length < 10) {
+            console.warn(`[Verification] Adjusted warning to ${adjusted.subcategory_id} but cannot generate valid other_note, dropping`)
+            metrics.dropped++
+            metrics.dropped_reasons.other++
+            continue
+          }
+        }
+        
         verified.push(adjusted)
       } else {
         // action === 'keep'
+        const keptWarning = { ...warning }
+        // Ensure other_note is normalized if needed
+        const subcategoryId = keptWarning.subcategory_id.split('.')[1] || keptWarning.subcategory_id
+        if (subcategoryId.startsWith('other_')) {
+          keptWarning.other_note = normalizeOtherNote(keptWarning)
+        }
         metrics.kept++
-        verified.push(warning)
+        verified.push(keptWarning)
       }
     }
 
     metrics.latency_ms = Date.now() - startTime
-    onProgress?.(`✅ Verification complete: ${metrics.kept} kept, ${metrics.dropped} dropped, ${metrics.adjusted} adjusted (${metrics.latency_ms}ms)`)
+    const dropReasonSummary = Object.entries(metrics.dropped_reasons)
+      .filter(([_, count]) => count > 0)
+      .map(([reason, count]) => `${reason}:${count}`)
+      .join(', ')
+    const dropSummary = dropReasonSummary ? ` (${dropReasonSummary})` : ''
+    onProgress?.(`✅ Verification complete: ${metrics.kept} kept, ${metrics.dropped} dropped${dropSummary}, ${metrics.adjusted} adjusted (${metrics.latency_ms}ms)`)
 
     return { verified, metrics }
   } catch (error) {
@@ -685,6 +787,7 @@ export async function analyzeBookWithMultiModel(
       unique_before: metrics.unique_before,
       kept: metrics.kept,
       dropped: metrics.dropped,
+      dropped_reasons: metrics.dropped_reasons,
       adjusted: metrics.adjusted,
       latency_ms: metrics.latency_ms,
       failed: metrics.failed
