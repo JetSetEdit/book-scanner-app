@@ -593,33 +593,57 @@ export async function processIsbnScan(
                 // Generate other_note for other_* subcategories (required by DB constraint)
                 let otherNote: string | undefined = undefined
                 if (requiresOtherNote) {
-                  // Priority: AI-provided other_note > description > evidence excerpt > generated note
-                  const candidateNote = w.other_note || w.description || w.evidence[0]?.excerpt
-                  
-                  if (candidateNote && candidateNote.trim().length >= 10) {
-                    otherNote = candidateNote.trim()
-                    // Log when using AI-provided or existing note
-                    if (!w.other_note) {
-                      console.log(`[other_note] ${subcategoryId}: Using description/evidence (${otherNote.substring(0, 100)}...)`)
-                    }
+                  // Priority: AI-provided other_note > extracted from description > evidence excerpt > generated note
+                  if (w.other_note && w.other_note.trim().length >= 10) {
+                    // Use AI-provided other_note (best case - AI extracted meaningful context)
+                    otherNote = w.other_note.trim()
+                    console.log(`[other_note] ${subcategoryId}: Using AI-provided note (${otherNote.substring(0, 100)}...)`)
                   } else {
-                    // Generate a meaningful note from available data
+                    // Extract meaningful context from description/evidence instead of copying verbatim
                     const evidenceText = w.evidence[0]?.excerpt || ''
                     const descriptionText = w.description || ''
-                    const combined = `${evidenceText} ${descriptionText}`.trim()
                     
-                    if (combined.length >= 10) {
-                      otherNote = combined.substring(0, 200) // Cap at 200 chars
-                      console.log(`[other_note] ${subcategoryId}: Generated from combined text (${otherNote.substring(0, 100)}...)`)
+                    // Try to extract key phrases rather than copying entire text
+                    const extractKeyPhrase = (text: string, maxLength: number = 150): string => {
+                      if (!text || text.length <= maxLength) return text.trim()
+                      
+                      // Try to find a sentence or phrase that captures the essence
+                      const sentences = text.match(/[^.!?]+[.!?]+/g) || []
+                      if (sentences.length > 0) {
+                        // Use first meaningful sentence, truncate if needed
+                        const firstSentence = sentences[0].trim()
+                        if (firstSentence.length >= 10 && firstSentence.length <= maxLength) {
+                          return firstSentence
+                        }
+                        // If too long, truncate intelligently at word boundary
+                        if (firstSentence.length > maxLength) {
+                          const truncated = firstSentence.substring(0, maxLength)
+                          const lastSpace = truncated.lastIndexOf(' ')
+                          return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...'
+                        }
+                      }
+                      
+                      // Fallback: truncate at word boundary
+                      const truncated = text.substring(0, maxLength)
+                      const lastSpace = truncated.lastIndexOf(' ')
+                      return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...'
+                    }
+                    
+                    // Prefer evidence excerpt (more specific) over description
+                    const sourceText = evidenceText || descriptionText
+                    if (sourceText && sourceText.trim().length >= 10) {
+                      otherNote = extractKeyPhrase(sourceText, 150)
+                      console.log(`[other_note] ${subcategoryId}: Extracted from ${evidenceText ? 'evidence' : 'description'} (${otherNote.substring(0, 100)}...)`)
                     } else {
-                      // Last resort: create a descriptive note
-                      otherNote = `Content related to ${subcategoryId.replace('other_', '').replace(/_/g, ' ')} as described in the book.`
+                      // Last resort: create a descriptive note based on subcategory
+                      const categoryName = subcategoryId.replace('other_', '').replace(/_/g, ' ')
+                      otherNote = `Content related to ${categoryName} as described in the book.`
                       console.log(`[other_note] ${subcategoryId}: Generated fallback note (${otherNote})`)
                     }
                   }
                   
                   // Ensure it meets minimum length requirement
-                  if (otherNote.trim().length < 10) {
+                  if (!otherNote || otherNote.trim().length < 10) {
                     console.warn(`Warning: Generated other_note for ${subcategoryId} is too short, will filter out`)
                     return null // Filter this warning out
                   }

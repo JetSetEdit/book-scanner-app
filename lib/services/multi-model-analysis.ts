@@ -87,6 +87,7 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with at least one evidence span containing: source: "text", excerpt: short quote, confidence: 0-1)
+   - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
 
 2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
    - DO NOT make assumptions based on genre, categories, or book title alone
@@ -196,6 +197,7 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with evidence spans)
+   - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
 
 2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
    - DO NOT make assumptions based on genre, categories, or book title alone
@@ -226,7 +228,8 @@ Instructions:
       "frequency_hint": "theme",
       "centrality_hint": "central",
       "is_spoiler": false,
-      "evidence": [{"source": "text", "excerpt": "...", "confidence": 0.8}]
+      "evidence": [{"source": "text", "excerpt": "...", "confidence": 0.8}],
+      "other_note": "Only include if subcategory_id starts with 'other_'. Provide a concise explanation of the specific content."
     }
   ]
 }`
