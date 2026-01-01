@@ -14,6 +14,7 @@ interface OpenLibraryBook {
 }
 
 import { isPlaceholderTitle, filterPlaceholderCandidates } from './utils/placeholder-detection'
+import { normalizeISBN } from './isbn-validation'
 
 interface BookData {
   isbn: string
@@ -70,9 +71,30 @@ export async function fetchCandidatesByISBN(isbn: string): Promise<BookCandidate
   return uniqueCandidates
 }
 
+/**
+ * Extract and normalize ISBNs from Google Books industryIdentifiers
+ */
+function extractISBNsFromGoogleBooks(industryIdentifiers: any[] | undefined): string[] {
+  if (!industryIdentifiers) return []
+  
+  return industryIdentifiers
+    .filter((id: any) => id.type === 'ISBN_10' || id.type === 'ISBN_13')
+    .map((id: any) => normalizeISBN(id.identifier))
+    .filter(Boolean)
+}
+
+/**
+ * Check if any of the returned ISBNs match the scanned ISBN
+ */
+function isbnMatches(scannedIsbn: string, returnedISBNs: string[]): boolean {
+  const normalizedScanned = normalizeISBN(scannedIsbn)
+  return returnedISBNs.some(isbn => normalizeISBN(isbn) === normalizedScanned)
+}
+
 async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandidate[]> {
   try {
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`, {
+    const cleanScannedIsbn = normalizeISBN(isbn)
+    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`, {
       next: { revalidate: 86400 },
       headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
     })
@@ -82,27 +104,37 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
     const data = await response.json()
     if (!data.items || data.items.length === 0) return []
 
-    // Map top 3 results and filter out placeholder titles
-    const candidates = data.items.slice(0, 3).map((item: any) => {
-      const book = item.volumeInfo
-      return {
-        isbn,
-        title: book.title || 'Unknown Title',
-        author: book.authors?.[0],
-        cover_url: book.imageLinks?.large?.replace("http:", "https:") ||
-          book.imageLinks?.medium?.replace("http:", "https:") ||
-          book.imageLinks?.small?.replace("http:", "https:") ||
-          book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") ||
-          book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
-        description: book.description,
-        publisher: book.publisher,
-        published_date: book.publishedDate,
-        page_count: book.pageCount,
-        categories: book.categories?.slice(0, 5),
-        source: 'googlebooks',
-        source_id: item.id
-      }
-    })
+    // Map top 3 results, validate ISBN match, and filter out placeholder titles
+    const candidates = data.items.slice(0, 3)
+      .map((item: any) => {
+        const book = item.volumeInfo
+        const returnedISBNs = extractISBNsFromGoogleBooks(book.industryIdentifiers)
+        
+        // CRITICAL: Only include if ISBN matches the scanned ISBN
+        if (!isbnMatches(cleanScannedIsbn, returnedISBNs)) {
+          console.warn(`[Book API] Google Books returned book "${book.title}" with ISBNs ${returnedISBNs.join(', ')} which doesn't match scanned ISBN ${cleanScannedIsbn}. Skipping.`)
+          return null
+        }
+        
+        return {
+          isbn: cleanScannedIsbn, // Always use the scanned ISBN, not what Google Books returned
+          title: book.title || 'Unknown Title',
+          author: book.authors?.[0],
+          cover_url: book.imageLinks?.large?.replace("http:", "https:") ||
+            book.imageLinks?.medium?.replace("http:", "https:") ||
+            book.imageLinks?.small?.replace("http:", "https:") ||
+            book.imageLinks?.thumbnail?.replace("http:", "https:")?.replace("zoom=1", "zoom=2") ||
+            book.imageLinks?.smallThumbnail?.replace("http:", "https:")?.replace("zoom=5", "zoom=2"),
+          description: book.description,
+          publisher: book.publisher,
+          published_date: book.publishedDate,
+          page_count: book.pageCount,
+          categories: book.categories?.slice(0, 5),
+          source: 'googlebooks',
+          source_id: item.id
+        }
+      })
+      .filter((candidate): candidate is BookCandidate => candidate !== null)
     
     // Filter out placeholder titles (like "Untitled TBC 202325")
     return filterPlaceholderCandidates(candidates).filter((b: BookCandidate) => b.title !== 'Unknown Title')
@@ -217,7 +249,8 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
 
 async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
   try {
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`, {
+    const cleanScannedIsbn = normalizeISBN(isbn)
+    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`, {
       next: { revalidate: 86400 },
       headers: {
         'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
@@ -234,13 +267,19 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       return null
     }
 
-    // Find first non-placeholder book
+    // Find first non-placeholder book with matching ISBN
     let book = null
     for (const item of data.items) {
       const volumeInfo = item.volumeInfo
       if (volumeInfo.title && !isPlaceholderTitle(volumeInfo.title)) {
-        book = volumeInfo
-        break
+        // CRITICAL: Validate ISBN match before accepting the book
+        const returnedISBNs = extractISBNsFromGoogleBooks(volumeInfo.industryIdentifiers)
+        if (isbnMatches(cleanScannedIsbn, returnedISBNs)) {
+          book = volumeInfo
+          break
+        } else {
+          console.warn(`[Book API] Google Books returned book "${volumeInfo.title}" with ISBNs ${returnedISBNs.join(', ')} which doesn't match scanned ISBN ${cleanScannedIsbn}. Skipping.`)
+        }
       }
     }
 
@@ -289,7 +328,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
     }
 
     return {
-      isbn,
+      isbn: cleanScannedIsbn, // Always use the scanned ISBN, not what Google Books returned
       title: book.title,
       author: book.authors?.[0],
       cover_url: await getBestCover(book.imageLinks),

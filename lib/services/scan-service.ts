@@ -369,11 +369,13 @@ export async function processIsbnScan(
       // Validate cover URL before saving (reject placeholders)
       const validatedCoverUrl = await validateCoverUrl(bookData.cover_url);
       
+      // CRITICAL: Always use the scanned ISBN, not what the API returned
+      // This ensures we never save a book with a different ISBN than what was scanned
       const dbWriteStart = performance.now()
       const { data: newBook, error: insertError } = await supabaseAdmin
         .from('books')
         .insert({
-          isbn: bookData.isbn,
+          isbn: cleanIsbn, // Always use the scanned ISBN
           title: bookData.title,
           author: bookData.author || null,
           cover_url: validatedCoverUrl, // Use validated cover (null if placeholder)
