@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect, useMemo } from "react"
 import { useTheme } from "next-themes"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, Brain, ScanBarcode, Moon, Sun, Image as ImageIcon, Info } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, ScanBarcode, Moon, Sun, Image as ImageIcon, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { BookSpineLogo } from "@/components/book-spine-logo"
@@ -34,11 +34,6 @@ const navigation = [
     name: "Bookshelf",
     href: "/collection",
     icon: Library,
-  },
-  {
-    name: "Help Improve",
-    href: "/rlhf",
-    icon: Brain,
   },
 ]
 
@@ -79,15 +74,10 @@ export function Navbar() {
     }
   }, [])
 
-  // Filter navigation to hide "Help Improve" in production
+  // Navigation items (RLHF removed - backed up in backups/rlhf-backup-*)
   const visibleNavigation = useMemo(() => {
-    return navigation.filter(item => {
-      if (item.href === '/rlhf') {
-        return isDev
-      }
-      return true
-    })
-  }, [isDev])
+    return navigation
+  }, [])
 
   const toggleAuditTrail = () => {
     const newValue = !showAuditTrail
