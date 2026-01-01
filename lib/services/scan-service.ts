@@ -578,45 +578,69 @@ export async function processIsbnScan(
             // Save warnings to database
             const { getCategoryById } = await import('@/lib/config/taxonomy-v2')
             
-            const warningsToInsert = analysisResult.warnings.map(w => {
-              const [categoryId, subcategoryId] = w.subcategory_id.split('.')
-              
-              // Map to legacy category for database constraint compatibility
-              const category = getCategoryById(categoryId)
-              const legacyCategory = category?.legacyCategory || 'other'
-              
-              // Check if subcategory requires other_note
-              const requiresOtherNote = subcategoryId.startsWith('other_')
-              const otherNote = requiresOtherNote 
-                ? (w.other_note || w.description || w.evidence[0]?.excerpt || `Additional details for ${subcategoryId}`)
-                : undefined
-              
-              // Validate other_note if required
-              if (requiresOtherNote && (!otherNote || otherNote.trim().length < 10)) {
-                console.warn(`Warning: subcategory ${subcategoryId} requires other_note (min 10 chars), using description as fallback`)
-              }
-              
-              return {
-                book_id: bookId,
-                category: legacyCategory, // Legacy field - must match DB constraint
-                category_id: categoryId,
-                subcategory_id: subcategoryId,
-                description: w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`,
-                severity: w.severity,
-                confidence_score: w.evidence[0]?.confidence || 0.8,
-                context_modifiers: w.modifiers,
-                evidence: w.evidence,
-                severity_signals: w.severity_signals,
-                taxonomy_version: w.taxonomy_version,
-                presence: w.evidence[0]?.location ? 'on_page' : undefined,
-                detail_level: w.severity_signals?.explicitness ? 
-                  (w.severity_signals.explicitness > 0.8 ? 'graphic' : 
-                   w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
-                is_spoiler: w.is_spoiler === true,
-                source: 'ai_generated',
-                other_note: requiresOtherNote ? otherNote : undefined
-              }
-            })
+            // Filter and map warnings, ensuring other_* subcategories have valid other_note
+            const warningsToInsert = analysisResult.warnings
+              .map(w => {
+                const [categoryId, subcategoryId] = w.subcategory_id.split('.')
+                
+                // Map to legacy category for database constraint compatibility
+                const category = getCategoryById(categoryId)
+                const legacyCategory = category?.legacyCategory || 'other'
+                
+                // Check if subcategory requires other_note
+                const requiresOtherNote = subcategoryId.startsWith('other_')
+                
+                // Generate other_note for other_* subcategories (required by DB constraint)
+                let otherNote: string | undefined = undefined
+                if (requiresOtherNote) {
+                  // Priority: AI-provided other_note > description > evidence excerpt > generated note
+                  const candidateNote = w.other_note || w.description || w.evidence[0]?.excerpt
+                  
+                  if (candidateNote && candidateNote.trim().length >= 10) {
+                    otherNote = candidateNote.trim()
+                  } else {
+                    // Generate a meaningful note from available data
+                    const evidenceText = w.evidence[0]?.excerpt || ''
+                    const descriptionText = w.description || ''
+                    const combined = `${evidenceText} ${descriptionText}`.trim()
+                    
+                    if (combined.length >= 10) {
+                      otherNote = combined.substring(0, 200) // Cap at 200 chars
+                    } else {
+                      // Last resort: create a descriptive note
+                      otherNote = `Content related to ${subcategoryId.replace('other_', '').replace(/_/g, ' ')} as described in the book.`
+                    }
+                  }
+                  
+                  // Ensure it meets minimum length requirement
+                  if (otherNote.trim().length < 10) {
+                    console.warn(`Warning: Generated other_note for ${subcategoryId} is too short, will filter out`)
+                    return null // Filter this warning out
+                  }
+                }
+                
+                return {
+                  book_id: bookId,
+                  category: legacyCategory, // Legacy field - must match DB constraint
+                  category_id: categoryId,
+                  subcategory_id: subcategoryId,
+                  description: w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`,
+                  severity: w.severity,
+                  confidence_score: w.evidence[0]?.confidence || 0.8,
+                  context_modifiers: w.modifiers,
+                  evidence: w.evidence,
+                  severity_signals: w.severity_signals,
+                  taxonomy_version: w.taxonomy_version,
+                  presence: w.evidence[0]?.location ? 'on_page' : undefined,
+                  detail_level: w.severity_signals?.explicitness ? 
+                    (w.severity_signals.explicitness > 0.8 ? 'graphic' : 
+                     w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
+                  is_spoiler: w.is_spoiler === true,
+                  source: 'ai_generated',
+                  other_note: otherNote // Will be undefined for non-other_* subcategories
+                }
+              })
+              .filter((w): w is NonNullable<typeof w> => w !== null) // Remove null entries
             
             const { data: insertedWarnings, error: warningsError } = await supabaseAdmin
               .from('content_warnings')
@@ -639,7 +663,7 @@ export async function processIsbnScan(
         } catch (analysisError) {
           console.error('Error in analyzeBookWithMultiModel:', analysisError)
           onProgress?.(`❌ AI analysis error: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`)
-          throw analysisError // Re-throw to be caught by outer catch
+          throw analysisError; // Re-throw to be caught by outer catch
         }
       }
     } else {
