@@ -257,7 +257,15 @@ Instructions:
     return processWarnings(analysis.warnings || [], 'gemini')
   } catch (error) {
     console.error('Gemini analysis error:', error)
-    throw error
+    // Check if it's a model availability error
+    if (error instanceof Error && (error.message.includes('not found') || error.message.includes('404'))) {
+      console.error('Gemini model not available - this may be a model name or API version issue')
+      onProgress?.('⚠️ Gemini model unavailable - using OpenAI only. Check GEMINI_API_KEY and model availability.')
+    } else {
+      onProgress?.('⚠️ Gemini analysis failed, continuing with OpenAI only...')
+    }
+    // Don't throw - let the caller handle gracefully
+    return []
   }
 }
 
