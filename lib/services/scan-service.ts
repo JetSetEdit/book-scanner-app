@@ -585,6 +585,17 @@ export async function processIsbnScan(
               const category = getCategoryById(categoryId)
               const legacyCategory = category?.legacyCategory || 'other'
               
+              // Check if subcategory requires other_note
+              const requiresOtherNote = subcategoryId.startsWith('other_')
+              const otherNote = requiresOtherNote 
+                ? (w.other_note || w.description || w.evidence[0]?.excerpt || `Additional details for ${subcategoryId}`)
+                : undefined
+              
+              // Validate other_note if required
+              if (requiresOtherNote && (!otherNote || otherNote.trim().length < 10)) {
+                console.warn(`Warning: subcategory ${subcategoryId} requires other_note (min 10 chars), using description as fallback`)
+              }
+              
               return {
                 book_id: bookId,
                 category: legacyCategory, // Legacy field - must match DB constraint
@@ -602,7 +613,8 @@ export async function processIsbnScan(
                   (w.severity_signals.explicitness > 0.8 ? 'graphic' : 
                    w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
                 is_spoiler: w.is_spoiler === true,
-                source: 'ai_generated'
+                source: 'ai_generated',
+                other_note: requiresOtherNote ? otherNote : undefined
               }
             })
             
