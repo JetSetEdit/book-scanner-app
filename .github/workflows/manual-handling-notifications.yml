@@ -1,0 +1,187 @@
+name: Manual Handling Notifications
+
+on:
+  schedule:
+    # Run every 6 hours to check for scans needing manual handling
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  check-manual-scans:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch pending manual handling scans
+        id: fetch-scans
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # Install jq if not available
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+          
+          response=$(curl -s -X GET \
+            "${SUPABASE_URL}/rest/v1/manual_handling_scans?status=eq.pending&order=created_at.desc&limit=10" \
+            -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation")
+          
+          echo "scans_json<<EOF" >> $GITHUB_OUTPUT
+          echo "$response" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Count pending scans
+          count=$(echo "$response" | jq '. | length' 2>/dev/null || echo "0")
+          echo "count=$count" >> $GITHUB_OUTPUT
+          
+          echo "Found $count pending manual handling scans"
+
+      - name: Create GitHub Issues for pending scans
+        if: steps.fetch-scans.outputs.count > 0
+        uses: actions/github-script@v7
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        with:
+          script: |
+            const scansJson = `${{ steps.fetch-scans.outputs.scans_json }}`;
+            const scans = JSON.parse(scansJson);
+            
+            for (const scan of scans) {
+              // Check if issue already exists for this ISBN
+              const existingIssues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: ['manual-handling'],
+                state: 'open'
+              });
+              
+              // Check if any open issue mentions this ISBN
+              const hasExistingIssue = existingIssues.data.some(issue => 
+                issue.body.includes(`ISBN ${scan.isbn}`) || issue.title.includes(scan.isbn)
+              );
+              
+              if (hasExistingIssue) {
+                console.log(`Issue already exists for ISBN ${scan.isbn}, skipping...`);
+                continue;
+              }
+              
+              // Build issue title and body
+              let title = '';
+              let body = '';
+              
+              switch (scan.reason) {
+                case 'not_found':
+                  title = `📚 Manual Handling: Book Not Found - ISBN ${scan.isbn}`;
+                  body = `## Book Not Found\n\n` +
+                    `**ISBN:** ${scan.isbn}\n\n` +
+                    `**Reason:** Book not found in any external library (Open Library, Google Books)\n\n` +
+                    `**Error:** ${scan.error_message || 'N/A'}\n\n` +
+                    `**Created:** ${new Date(scan.created_at).toLocaleString()}\n\n` +
+                    `**Action Required:**\n` +
+                    `- [ ] Verify the ISBN is correct\n` +
+                    `- [ ] Check if book exists in other sources\n` +
+                    `- [ ] Manually add book metadata if needed\n\n` +
+                    `---\n` +
+                    `_This issue was automatically created by GitHub Actions_`;
+                  break;
+                  
+                case 'ambiguous':
+                  title = `📚 Manual Handling: Ambiguous Scan - ISBN ${scan.isbn}`;
+                  const candidates = scan.candidates || [];
+                  body = `## Ambiguous Scan Results\n\n` +
+                    `**ISBN:** ${scan.isbn}\n\n` +
+                    `**Reason:** Multiple book candidates found (${candidates.length} results)\n\n` +
+                    `**Candidates:**\n\n`;
+                  
+                  candidates.forEach((c, i) => {
+                    body += `${i + 1}. **${c.title}** by ${c.author || 'Unknown'}\n`;
+                    body += `   - Source: ${c.source}\n`;
+                    if (c.cover_url) body += `   - Cover: ${c.cover_url}\n`;
+                    body += `\n`;
+                  });
+                  
+                  body += `**Action Required:**\n` +
+                    `- [ ] Review candidates and select the correct book\n` +
+                    `- [ ] Update scan with selected candidate\n\n` +
+                    `---\n` +
+                    `_This issue was automatically created by GitHub Actions_`;
+                  break;
+                  
+                case 'analysis_failed':
+                  title = `📚 Manual Handling: Analysis Failed - ISBN ${scan.isbn}`;
+                  body = `## Content Warning Analysis Failed\n\n` +
+                    `**ISBN:** ${scan.isbn}\n\n` +
+                    `**Reason:** AI analysis failed to generate content warnings\n\n` +
+                    `**Error:** ${scan.error_message || 'N/A'}\n\n` +
+                    `**Action Required:**\n` +
+                    `- [ ] Review book description\n` +
+                    `- [ ] Manually add content warnings if needed\n` +
+                    `- [ ] Check AI service status\n\n` +
+                    `---\n` +
+                    `_This issue was automatically created by GitHub Actions_`;
+                  break;
+                  
+                case 'description_too_minimal':
+                  title = `📚 Manual Handling: Minimal Description - ISBN ${scan.isbn}`;
+                  body = `## Description Too Minimal for Analysis\n\n` +
+                    `**ISBN:** ${scan.isbn}\n\n` +
+                    `**Reason:** Book description is too short/minimal to generate accurate content warnings\n\n` +
+                    `**Action Required:**\n` +
+                    `- [ ] Fetch better description from external sources\n` +
+                    `- [ ] Manually add content warnings based on book metadata\n\n` +
+                    `---\n` +
+                    `_This issue was automatically created by GitHub Actions_`;
+                  break;
+              }
+              
+              // Create GitHub issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['manual-handling', `reason-${scan.reason}`]
+              });
+              
+              console.log(`Created issue #${issue.data.number} for ISBN ${scan.isbn}`);
+              
+              // Update scan with issue number (using Supabase REST API)
+              const updateResponse = await fetch(`${process.env.SUPABASE_URL}/rest/v1/manual_handling_scans?id=eq.${scan.id}`, {
+                method: 'PATCH',
+                headers: {
+                  'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                  'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+                  'Content-Type': 'application/json',
+                  'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify({
+                  metadata: {
+                    ...(scan.metadata || {}),
+                    github_issue_number: issue.data.number,
+                    github_issue_url: issue.data.html_url
+                  }
+                })
+              });
+              
+              if (!updateResponse.ok) {
+                console.warn(`Failed to update scan ${scan.id} with issue number`);
+              }
+            }
+            
+            return `Created issues for ${scans.length} pending scans`;
+
+      - name: Summary
+        run: |
+          if [ "${{ steps.fetch-scans.outputs.count }}" -gt 0 ]; then
+            echo "✅ Processed ${{ steps.fetch-scans.outputs.count }} pending manual handling scans"
+          else
+            echo "✅ No pending scans requiring manual handling"
+          fi
+

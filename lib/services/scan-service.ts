@@ -273,6 +273,26 @@ export async function processIsbnScan(
           .select()
           .single()
 
+        // Log for manual handling
+        try {
+          await supabaseAdmin
+            .from('manual_handling_scans')
+            .insert({
+              isbn: cleanIsbn,
+              reason: 'ambiguous',
+              status: 'pending',
+              candidates: candidates as any,
+              metadata: {
+                candidate_count: candidates.length,
+                attempted_at: new Date().toISOString(),
+                source: 'scan_service'
+              }
+            })
+        } catch (logError) {
+          console.error('Failed to log manual handling scan:', logError)
+          // Don't throw - logging failure shouldn't break the scan
+        }
+
         timings.total = performance.now() - overallStartTime
         return {
           success: true,
@@ -304,6 +324,25 @@ export async function processIsbnScan(
       // No book data found - don't create a record, return error instead
       console.log('Book not found in external APIs')
       onProgress?.('❌ Book not found in any external library (Open Library, Google Books)')
+      
+      // Log for manual handling
+      try {
+        await supabaseAdmin
+          .from('manual_handling_scans')
+          .insert({
+            isbn: cleanIsbn,
+            reason: 'not_found',
+            status: 'pending',
+            error_message: `Book with ISBN ${cleanIsbn} not found in any external library`,
+            metadata: {
+              attempted_at: new Date().toISOString(),
+              source: 'scan_service'
+            }
+          })
+      } catch (logError) {
+        console.error('Failed to log manual handling scan:', logError)
+        // Don't throw - logging failure shouldn't break the scan
+      }
       
       timings.total = performance.now() - overallStartTime
       return {
@@ -435,6 +474,26 @@ export async function processIsbnScan(
         onProgress?.('⚠️ Description too minimal - skipping analysis to avoid genre-based assumptions')
         onProgress?.('💡 Tip: Try fetching a description from external APIs or provide book details manually')
         console.log('Skipping analysis: Description is too minimal, would lead to genre-based assumptions')
+        
+        // Log for manual handling
+        try {
+          await supabaseAdmin
+            .from('manual_handling_scans')
+            .insert({
+              isbn: cleanIsbn,
+              reason: 'description_too_minimal',
+              status: 'pending',
+              metadata: {
+                book_title: bookForAnalysis.title,
+                book_author: bookForAnalysis.author,
+                description_length: bookForAnalysis.description?.length || 0,
+                attempted_at: new Date().toISOString(),
+                source: 'scan_service'
+              }
+            })
+        } catch (logError) {
+          console.error('Failed to log manual handling scan:', logError)
+        }
       } else {
         onProgress?.('Analyzing book content with AI models...')
         
@@ -534,6 +593,27 @@ export async function processIsbnScan(
     console.error('Error details:', error instanceof Error ? error.stack : error)
     onProgress?.(`⚠️ Warning: Content analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     timings.aiContentWarningGeneration = performance.now() - analysisStartTime
+    
+    // Log for manual handling
+    try {
+      await supabaseAdmin
+        .from('manual_handling_scans')
+        .insert({
+          isbn: cleanIsbn,
+          reason: 'analysis_failed',
+          status: 'pending',
+          error_message: error instanceof Error ? error.message : 'Unknown error',
+          metadata: {
+            book_id: bookId,
+            book_title: currentBook?.title,
+            attempted_at: new Date().toISOString(),
+            source: 'scan_service',
+            error_type: error instanceof Error ? error.constructor.name : 'Unknown'
+          }
+        })
+    } catch (logError) {
+      console.error('Failed to log manual handling scan:', logError)
+    }
   }
 
   // Record the scan

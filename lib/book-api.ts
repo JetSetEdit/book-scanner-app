@@ -38,17 +38,23 @@ export async function fetchCandidatesByISBN(isbn: string): Promise<BookCandidate
   const cleanIsbn = isbn.replace(/[-\s]/g, "")
   console.log(`[Book API] Fetching candidates for ISBN: ${cleanIsbn}`)
 
+  // Fetch from both APIs in parallel for better performance
+  const [openLibResult, googleCandidates] = await Promise.allSettled([
+    fetchFromOpenLibrary(cleanIsbn),
+    fetchCandidatesFromGoogleBooks(cleanIsbn)
+  ])
+
   const candidates: BookCandidate[] = []
 
-  // 1. Open Library
-  const openLibResult = await fetchFromOpenLibrary(cleanIsbn)
-  if (openLibResult) {
-    candidates.push({ ...openLibResult, source: 'openlibrary' })
+  // Add Open Library result if successful
+  if (openLibResult.status === 'fulfilled' && openLibResult.value) {
+    candidates.push({ ...openLibResult.value, source: 'openlibrary' })
   }
 
-  // 2. Google Books (Always fetch to see if there are alternatives)
-  const googleCandidates = await fetchCandidatesFromGoogleBooks(cleanIsbn)
-  candidates.push(...googleCandidates)
+  // Add Google Books candidates if successful
+  if (googleCandidates.status === 'fulfilled') {
+    candidates.push(...googleCandidates.value)
+  }
 
   // Deduplicate by title and author (simple normalization)
   const uniqueCandidates: BookCandidate[] = []
@@ -113,22 +119,25 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
 
   console.log(`[Book API] Fetching book data for ISBN: ${cleanIsbn}`)
 
-  // 1. Try Open Library API first (primary source)
-  const openLibResult = await fetchFromOpenLibrary(cleanIsbn)
-  if (openLibResult) {
-    console.log(`[Book API] ✅ Found book via Open Library: ${openLibResult.title}`)
-    return openLibResult
+  // Fetch from both APIs in parallel for better performance
+  const [openLibResult, googleResult] = await Promise.allSettled([
+    fetchFromOpenLibrary(cleanIsbn),
+    fetchFromGoogleBooks(cleanIsbn)
+  ])
+
+  // Prefer Open Library if both succeed (primary source)
+  if (openLibResult.status === 'fulfilled' && openLibResult.value) {
+    console.log(`[Book API] ✅ Found book via Open Library: ${openLibResult.value.title}`)
+    return openLibResult.value
   }
 
-  // 2. Fallback to Google Books API
-  console.log(`[Book API] Open Library failed, trying Google Books...`)
-  const googleResult = await fetchFromGoogleBooks(cleanIsbn)
-  if (googleResult) {
-    console.log(`[Book API] ✅ Found book via Google Books: ${googleResult.title}`)
-    return googleResult
+  // Fallback to Google Books if Open Library failed
+  if (googleResult.status === 'fulfilled' && googleResult.value) {
+    console.log(`[Book API] ✅ Found book via Google Books: ${googleResult.value.title}`)
+    return googleResult.value
   }
 
-  // 3. Both APIs failed
+  // Both APIs failed
   console.log(`[Book API] ❌ Book not found in any API for ISBN: ${cleanIsbn}`)
   return null
 }
