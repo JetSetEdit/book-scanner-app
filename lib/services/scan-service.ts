@@ -436,23 +436,34 @@ export async function processIsbnScan(
         ? bookForAnalysis.description
         : `A book by ${bookForAnalysis.author || 'Unknown Author'}. ${bookForAnalysis.categories ? `Categories: ${bookForAnalysis.categories.slice(0, 3).join(', ')}.` : ''}`
       
-      onProgress?.('Analyzing book content with AI models...')
+      // Check if description is too minimal (just title/author/categories)
+      const isMinimalDescription = !bookForAnalysis.description || 
+        bookForAnalysis.description.length <= 50 ||
+        descriptionForAnalysis.startsWith('A book by') ||
+        descriptionForAnalysis === `A book by ${bookForAnalysis.author || 'Unknown Author'}.`
       
-      const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
-      
-      const analysisResult = await analyzeBookWithMultiModel(
-        {
-          title: bookForAnalysis.title || 'Unknown',
-          author: bookForAnalysis.author || 'Unknown',
-          description: descriptionForAnalysis,
-          isbn: cleanIsbn
-        },
-        onProgress
-      )
-      
-      timings.aiContentWarningGeneration = performance.now() - analysisStartTime
-      
-      if (analysisResult.warnings.length > 0) {
+      if (isMinimalDescription) {
+        onProgress?.('⚠️ Description too minimal - skipping analysis to avoid genre-based assumptions')
+        onProgress?.('💡 Tip: Try fetching a description from external APIs or provide book details manually')
+        console.log('Skipping analysis: Description is too minimal, would lead to genre-based assumptions')
+      } else {
+        onProgress?.('Analyzing book content with AI models...')
+        
+        const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
+        
+        const analysisResult = await analyzeBookWithMultiModel(
+          {
+            title: bookForAnalysis.title || 'Unknown',
+            author: bookForAnalysis.author || 'Unknown',
+            description: descriptionForAnalysis,
+            isbn: cleanIsbn
+          },
+          onProgress
+        )
+        
+        timings.aiContentWarningGeneration = performance.now() - analysisStartTime
+        
+        if (analysisResult.warnings.length > 0) {
         onProgress?.(`Saving ${analysisResult.warnings.length} content warnings...`)
         
         // If forceRefresh is true, delete existing AI-generated warnings first
@@ -517,9 +528,10 @@ export async function processIsbnScan(
           const savedCount = insertedWarnings?.length || warningsToInsert.length
           onProgress?.(`✅ Saved ${savedCount} content warnings`)
         }
-      } else {
-        onProgress?.('No content warnings identified by AI analysis')
-        console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
+        } else {
+          onProgress?.('No content warnings identified by AI analysis')
+          console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
+        }
       }
     } else {
       onProgress?.('⚠️ Skipping analysis: Book title missing')

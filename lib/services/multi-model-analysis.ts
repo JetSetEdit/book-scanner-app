@@ -88,7 +88,13 @@ Instructions:
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with at least one evidence span containing: source: "text", excerpt: short quote, confidence: 0-1)
 
-2. Be specific and evidence-based. Only include warnings you can identify from the description.
+2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
+   - DO NOT make assumptions based on genre, categories, or book title alone
+   - DO NOT use phrases like "often includes", "typically features", "usually contains"
+   - DO NOT infer warnings from genre labels (e.g., "dark romance", "thriller")
+   - ONLY include warnings if you can point to specific content mentioned in the description
+   - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
+   - If you cannot identify specific content warnings from the description, return [] (empty array)
 
 3. For sexual content, carefully distinguish:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
@@ -132,7 +138,7 @@ Instructions:
       messages: [
         {
           role: 'system',
-          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}. Always use the hierarchical category.subcategory format. Be precise, evidence-based, and avoid over-tagging.`
+          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}. Always use the hierarchical category.subcategory format. Be precise, evidence-based, and avoid over-tagging. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description. If the description is too minimal or generic, return an empty warnings array.`
         },
         {
           role: 'user',
@@ -191,7 +197,13 @@ Instructions:
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with evidence spans)
 
-2. Be specific and evidence-based. Only include warnings you can identify from the description.
+2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
+   - DO NOT make assumptions based on genre, categories, or book title alone
+   - DO NOT use phrases like "often includes", "typically features", "usually contains"
+   - DO NOT infer warnings from genre labels (e.g., "dark romance", "thriller")
+   - ONLY include warnings if you can point to specific content mentioned in the description
+   - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
+   - If you cannot identify specific content warnings from the description, return [] (empty array)
 
 3. For sexual content, carefully distinguish sexual_violence from consent_ambiguity/cnc.
 
