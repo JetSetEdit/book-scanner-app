@@ -24,18 +24,47 @@ export async function POST(req: NextRequest) {
         (async () => {
             try {
                 const onProgress = async (message: string | { action: string; timestamp?: number }) => {
-                    const statusMessage = typeof message === 'string' ? message : message.action
-                    await writer.write(encoder.encode(`data: ${JSON.stringify({ status: statusMessage })}\n\n`))
+                    try {
+                        const statusMessage = typeof message === 'string' ? message : message.action
+                        await writer.write(encoder.encode(`data: ${JSON.stringify({ status: statusMessage })}\n\n`))
+                    } catch (writeError) {
+                        console.error('Error writing progress:', writeError)
+                        // Don't throw - continue scan even if progress write fails
+                    }
                 }
+
+                console.log(`[Scan API] Starting scan for ISBN: ${isbn}, forceRefresh: ${forceRefresh}`)
+                await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '🚀 Starting scan process...' })}\n\n`))
 
                 const result = await processIsbnScan(isbn, onProgress, undefined, forceRefresh === true)
 
+                console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
+                await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '✅ Scan process completed' })}\n\n`))
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
             } catch (error) {
-                console.error('Scan failed:', error)
-                await writer.write(encoder.encode(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })}\n\n`))
+                console.error('[Scan API] Scan failed:', error)
+                console.error('[Scan API] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+                
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+                const errorDetails = {
+                    error: errorMessage,
+                    errorType: error instanceof Error ? error.constructor.name : typeof error,
+                    stack: error instanceof Error ? error.stack?.substring(0, 500) : undefined,
+                    isbn: isbn
+                }
+                
+                try {
+                    await writer.write(encoder.encode(`data: ${JSON.stringify({ status: `❌ Scan failed: ${errorMessage}` })}\n\n`))
+                    await writer.write(encoder.encode(`data: ${JSON.stringify({ error: errorDetails })}\n\n`))
+                } catch (writeError) {
+                    console.error('[Scan API] Failed to write error to stream:', writeError)
+                }
             } finally {
-                await writer.close()
+                try {
+                    await writer.close()
+                } catch (closeError) {
+                    console.error('[Scan API] Error closing stream:', closeError)
+                }
             }
         })()
 
