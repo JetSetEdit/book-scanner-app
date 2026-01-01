@@ -312,6 +312,8 @@ function processWarnings(
       severity_signals: signals,
       taxonomy_version: TAXONOMY_VERSION,
       is_spoiler: w.is_spoiler === true || w.is_spoiler === 'true',
+      other_note: w.other_note, // Preserve AI-provided other_note if available
+      description: w.description, // Preserve description for fallback logic
     }
   })
 }
