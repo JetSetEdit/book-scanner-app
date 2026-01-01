@@ -290,34 +290,12 @@ export function Navbar() {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href="/test-cover" className="flex items-center gap-2 cursor-pointer">
-                      <ScanBarcode className="h-4 w-4" />
-                      <div className="flex-1">
-                        <div className="font-medium">Cover Test Page</div>
-                        <div className="text-xs text-muted-foreground">
-                          Test ISBN scanning and cover display
-                        </div>
-                      </div>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
                     <Link href="/dev/check-covers" className="flex items-center gap-2 cursor-pointer">
                       <ImageIcon className="h-4 w-4" />
                       <div className="flex-1">
                         <div className="font-medium">Check Book Covers</div>
                         <div className="text-xs text-muted-foreground">
                           Validate covers for existing books
-                        </div>
-                      </div>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dev/agent-comparison" className="flex items-center gap-2 cursor-pointer">
-                      <Code className="h-4 w-4" />
-                      <div className="flex-1">
-                        <div className="font-medium">Agent Comparison Tool</div>
-                        <div className="text-xs text-muted-foreground">
-                          Compare old vs new agent instructions
                         </div>
                       </div>
                     </Link>
