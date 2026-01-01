@@ -124,16 +124,34 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
     fetchFromGoogleBooks(cleanIsbn)
   ])
 
-  // Prefer Open Library if both succeed (primary source)
-  if (openLibResult.status === 'fulfilled' && openLibResult.value) {
-    console.log(`[Book API] ✅ Found book via Open Library: ${openLibResult.value.title}`)
-    return openLibResult.value
+  const openLibBook = openLibResult.status === 'fulfilled' ? openLibResult.value : null
+  const googleBook = googleResult.status === 'fulfilled' ? googleResult.value : null
+
+  // Prefer the result that has a description (needed for content warning analysis)
+  if (openLibBook && googleBook) {
+    // Both succeeded - prefer the one with description
+    if (openLibBook.description && openLibBook.description.length > 50) {
+      console.log(`[Book API] ✅ Found book via Open Library (with description): ${openLibBook.title}`)
+      return openLibBook
+    }
+    if (googleBook.description && googleBook.description.length > 50) {
+      console.log(`[Book API] ✅ Found book via Google Books (with description): ${googleBook.title}`)
+      return googleBook
+    }
+    // Neither has good description, prefer Open Library as primary source
+    console.log(`[Book API] ✅ Found book via Open Library (no description): ${openLibBook.title}`)
+    return openLibBook
   }
 
-  // Fallback to Google Books if Open Library failed
-  if (googleResult.status === 'fulfilled' && googleResult.value) {
-    console.log(`[Book API] ✅ Found book via Google Books: ${googleResult.value.title}`)
-    return googleResult.value
+  // Only one succeeded
+  if (openLibBook) {
+    console.log(`[Book API] ✅ Found book via Open Library: ${openLibBook.title}`)
+    return openLibBook
+  }
+
+  if (googleBook) {
+    console.log(`[Book API] ✅ Found book via Google Books: ${googleBook.title}`)
+    return googleBook
   }
 
   // Both APIs failed
