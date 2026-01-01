@@ -598,6 +598,10 @@ export async function processIsbnScan(
                   
                   if (candidateNote && candidateNote.trim().length >= 10) {
                     otherNote = candidateNote.trim()
+                    // Log when using AI-provided or existing note
+                    if (!w.other_note) {
+                      console.log(`[other_note] ${subcategoryId}: Using description/evidence (${otherNote.substring(0, 100)}...)`)
+                    }
                   } else {
                     // Generate a meaningful note from available data
                     const evidenceText = w.evidence[0]?.excerpt || ''
@@ -606,9 +610,11 @@ export async function processIsbnScan(
                     
                     if (combined.length >= 10) {
                       otherNote = combined.substring(0, 200) // Cap at 200 chars
+                      console.log(`[other_note] ${subcategoryId}: Generated from combined text (${otherNote.substring(0, 100)}...)`)
                     } else {
                       // Last resort: create a descriptive note
                       otherNote = `Content related to ${subcategoryId.replace('other_', '').replace(/_/g, ' ')} as described in the book.`
+                      console.log(`[other_note] ${subcategoryId}: Generated fallback note (${otherNote})`)
                     }
                   }
                   
