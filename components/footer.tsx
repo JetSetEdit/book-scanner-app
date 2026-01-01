@@ -3,7 +3,7 @@ import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE } from "@/lib/config/ver
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card/30 mt-auto">
+    <footer className="border-t border-border bg-card/30 mt-auto pb-20 md:pb-8">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
