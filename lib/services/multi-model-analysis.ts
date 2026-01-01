@@ -79,7 +79,14 @@ ${modifiersList}
 Instructions:
 1. For each content warning found, provide:
    - subcategory_id (format: category.subcategory, e.g., "violence.graphic_violence")
-   - description (brief, clear description - avoid revealing major plot twists or character relationships not mentioned in the book description)
+   - description: Describe TYPES OF CONTENT, not specific plot events. Use trauma-aware, advisory language.
+     * GOOD: "Depictions of explicit gun violence resulting in death"
+     * GOOD: "Scenes involving sexual assault with graphic detail"
+     * GOOD: "Descriptions of self-harm behaviors"
+     * BAD: "Alicia shoots her husband five times"
+     * BAD: "Character X is raped by Character Y"
+     * BAD: "The protagonist cuts themselves in Chapter 12"
+     Focus on content categories and types rather than specific character actions or plot details. This reduces spoilers and improves trauma-aware tone.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any)
@@ -139,7 +146,9 @@ Instructions:
       messages: [
         {
           role: 'system',
-          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}. Always use the hierarchical category.subcategory format. Be precise, evidence-based, and avoid over-tagging. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description. If the description is too minimal or generic, return an empty warnings array.`
+          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}. Always use the hierarchical category.subcategory format. Be precise, evidence-based, and avoid over-tagging. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description. If the description is too minimal or generic, return an empty warnings array.
+
+CRITICAL: When writing descriptions, describe TYPES OF CONTENT (e.g., "Depictions of gun violence") rather than specific plot events (e.g., "Character X shoots Character Y"). Use trauma-aware, advisory language that focuses on content categories, not character actions or plot details. This reduces spoilers and improves the user experience.`
         },
         {
           role: 'user',
@@ -189,7 +198,14 @@ ${modifiersList}
 Instructions:
 1. For each content warning found, provide:
    - subcategory_id (format: category.subcategory)
-   - description (brief, clear description - avoid revealing major plot twists or character relationships not mentioned in the book description)
+   - description: Describe TYPES OF CONTENT, not specific plot events. Use trauma-aware, advisory language.
+     * GOOD: "Depictions of explicit gun violence resulting in death"
+     * GOOD: "Scenes involving sexual assault with graphic detail"
+     * GOOD: "Descriptions of self-harm behaviors"
+     * BAD: "Alicia shoots her husband five times"
+     * BAD: "Character X is raped by Character Y"
+     * BAD: "The protagonist cuts themselves in Chapter 12"
+     Focus on content categories and types rather than specific character actions or plot details. This reduces spoilers and improves trauma-aware tone.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any)
@@ -424,7 +440,9 @@ For drop_reason:
 - "duplicate": Duplicate of another warning
 - "other": Any other reason
 
-Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust severity/subcategory if close but not quite right.`
+Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust severity/subcategory if close but not quite right.
+
+IMPORTANT: If a warning's description reads like a plot summary (e.g., "Character X does Y to Character Z"), suggest a rewrite to describe content types instead (e.g., "Depictions of [content type]"). Use the "reason" field to note description improvements.`
 
     let verificationResults: VerificationResult[] = []
 
