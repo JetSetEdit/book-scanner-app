@@ -122,9 +122,16 @@ async function logAuditDecision(params: {
   modelVersion?: string
   taxonomyVersion?: string
   pipelinePath?: string
+  metadataIssues?: {
+    missingCover?: boolean
+    missingDescription?: boolean
+    coverReason?: string
+    descriptionReason?: string
+    bookInfoIssues?: string[]
+  }
 }) {
   try {
-    const auditLog: AuditLogInsert = {
+    const auditLog: any = {
       book_id: params.bookId,
       isbn: params.isbn,
       decision_type: params.decisionType,
@@ -139,7 +146,8 @@ async function logAuditDecision(params: {
       raw_ai_response: params.rawAiResponse || null,
       model_version: params.modelVersion || null,
       taxonomy_version: params.taxonomyVersion || null,
-      pipeline_path: params.pipelinePath || null
+      pipeline_path: params.pipelinePath || null,
+      metadata_issues: params.metadataIssues || null
     }
 
     await supabaseAdmin
@@ -385,7 +393,71 @@ export async function processIsbnScan(
       onProgress?.(`Found metadata for "${bookData.title}". Saving to database...`);
 
       // Validate cover URL before saving (reject placeholders)
-      const validatedCoverUrl = await validateCoverUrl(bookData.cover_url);
+      let validatedCoverUrl = await validateCoverUrl(bookData.cover_url);
+      
+      // If no cover found, try to fetch from alternative sources
+      if (!validatedCoverUrl) {
+        onProgress?.('🖼️ No cover found - trying alternative sources...')
+        
+        // Try Open Library cover API directly
+        try {
+          const openLibraryCoverUrl = `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`
+          const altCover = await validateCoverUrl(openLibraryCoverUrl)
+          if (altCover) {
+            validatedCoverUrl = altCover
+            onProgress?.('✅ Found cover from Open Library')
+            console.log(`[Cover Enhancement] Found cover from Open Library: ${altCover}`)
+          }
+        } catch (err) {
+          console.log('[Cover Enhancement] Open Library cover fetch failed:', err)
+        }
+        
+        // If still no cover, try Google Books cover API
+        if (!validatedCoverUrl) {
+          try {
+            // Try to fetch from Google Books API if we haven't already
+            const { fetchBookByISBN } = await import('@/lib/book-api')
+            const googleBook = await fetchBookByISBN(cleanIsbn)
+            if (googleBook?.cover_url) {
+              const googleCover = await validateCoverUrl(googleBook.cover_url)
+              if (googleCover) {
+                validatedCoverUrl = googleCover
+                onProgress?.('✅ Found cover from Google Books')
+                console.log(`[Cover Enhancement] Found cover from Google Books: ${googleCover}`)
+              }
+            }
+          } catch (err) {
+            console.log('[Cover Enhancement] Google Books cover fetch failed:', err)
+          }
+        }
+        
+        if (!validatedCoverUrl) {
+          onProgress?.('⚠️ No valid cover found from any source')
+        }
+      }
+      
+      // Track metadata issues for audit log
+      const metadataIssues: {
+        missingCover?: boolean
+        missingDescription?: boolean
+        coverReason?: string
+        descriptionReason?: string
+        bookInfoIssues?: string[]
+      } = {}
+      
+      if (!validatedCoverUrl) {
+        metadataIssues.missingCover = true
+        metadataIssues.coverReason = 'Cover not found in primary source. Tried Open Library direct API and Google Books API, but no valid cover image was available. This may indicate the book is not widely cataloged or the ISBN does not match available cover images.'
+      }
+      
+      if (!bookData.description || bookData.description.length < 50) {
+        metadataIssues.missingDescription = true
+        if (!bookData.description) {
+          metadataIssues.descriptionReason = 'No description found in external APIs (Google Books, Open Library). Web search was performed to gather context for analysis.'
+        } else {
+          metadataIssues.descriptionReason = `Description is minimal (${bookData.description.length} chars). Web search was performed to gather additional context for analysis.`
+        }
+      }
       
       // CRITICAL: Always use the scanned ISBN, not what the API returned
       // This ensures we never save a book with a different ISBN than what was scanned
@@ -411,9 +483,14 @@ export async function processIsbnScan(
       if (bookData.cover_url && !validatedCoverUrl) {
         onProgress?.({
           action: 'Cover validation rejected placeholder image',
-          result: 'Cover URL was rejected as placeholder, saved book without cover',
+          result: 'Cover URL was rejected as placeholder, tried alternative sources but none found',
           timestamp: performance.now()
         });
+      }
+      
+      // Store metadata issues for later use in audit log
+      if (Object.keys(metadataIssues).length > 0) {
+        (bookForAnalysis as any).metadataIssues = metadataIssues
       }
 
       if (insertError) {
@@ -526,38 +603,68 @@ export async function processIsbnScan(
         descriptionForAnalysis.startsWith('A book by') ||
         descriptionForAnalysis === `A book by ${bookForAnalysis.author || 'Unknown Author'}.`
       
-      // If forceRefresh is true, run analysis even with minimal description
-      // Otherwise, skip analysis to avoid genre-based assumptions
-      if (isMinimalDescription && !forceRefresh) {
-        onProgress?.('⚠️ Description too minimal - skipping analysis to avoid genre-based assumptions')
-        onProgress?.('💡 Tip: Try fetching a description from external APIs or provide book details manually')
-        onProgress?.('📋 This scan has been logged for manual handling')
-        console.log('Skipping analysis: Description is too minimal, would lead to genre-based assumptions')
+      // If description is minimal, use web search to get context BEFORE analysis
+      let webSearchContext = ''
+      if (isMinimalDescription) {
+        onProgress?.('⚠️ Description is minimal - performing web search to gather context...')
+        const webSearchStartTime = performance.now()
         
-        // Log for manual handling
         try {
-          await supabaseAdmin
-            .from('manual_handling_scans')
-            .insert({
-              isbn: cleanIsbn,
-              reason: 'description_too_minimal',
-              status: 'pending',
-              metadata: {
-                book_title: bookForAnalysis.title,
-                book_author: bookForAnalysis.author,
-                description_length: bookForAnalysis.description?.length || 0,
-                attempted_at: new Date().toISOString(),
-                source: 'scan_service'
+          const { default: OpenAI } = await import('openai')
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+          
+          const searchQuery = `${bookForAnalysis.title} ${bookForAnalysis.author || ''} book description plot summary`.trim()
+          onProgress?.(`🌐 Searching for book information: "${searchQuery}"`)
+          
+          const searchPrompt = `Find information about the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} (ISBN: ${cleanIsbn}).
+
+Please provide:
+1. A brief plot summary or description (2-4 sentences)
+2. Any content warnings, themes, or sensitive topics mentioned in reviews or discussions
+3. Genre and target audience
+
+Be factual and specific. If you cannot find information, say so.`
+
+          const searchResponse = await openai.chat.completions.create({
+            model: 'gpt-4o',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a helpful assistant that provides factual information about books based on available knowledge and information.'
+              },
+              {
+                role: 'user',
+                content: searchPrompt
               }
-            })
-        } catch (logError) {
-          console.error('Failed to log manual handling scan:', logError)
+            ],
+            max_tokens: 500
+          }).catch(err => {
+            console.error('Web search for minimal description failed:', err)
+            return null
+          })
+          
+          timings.webSearch += performance.now() - webSearchStartTime
+          usedWebSearch = true
+          
+          if (searchResponse?.choices?.[0]?.message?.content) {
+            webSearchContext = searchResponse.choices[0].message.content
+            onProgress?.('✅ Web search found additional context')
+            console.log('[Web Search] Found context for minimal description:', webSearchContext.substring(0, 200))
+            
+            // Enhance description with web search context
+            descriptionForAnalysis = `${descriptionForAnalysis}\n\nAdditional context from web search:\n${webSearchContext}`
+            onProgress?.(`📄 Enhanced description: ${descriptionForAnalysis.length} characters`)
+          } else {
+            onProgress?.('⚠️ Web search did not find additional context, proceeding with minimal description')
+          }
+        } catch (webSearchError) {
+          console.error('Web search error for minimal description:', webSearchError)
+          onProgress?.('⚠️ Web search failed, proceeding with minimal description')
         }
-      } else {
-        if (isMinimalDescription && forceRefresh) {
-          onProgress?.('⚠️ Description is minimal, but proceeding with analysis due to force refresh')
-        }
-        onProgress?.('🤖 Starting AI content analysis with OpenAI (GPT-4o)...')
+      }
+      
+      // ALWAYS run analysis - never skip
+      onProgress?.('🤖 Starting AI content analysis with OpenAI (GPT-4o)...')
         onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
         onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
         
@@ -731,22 +838,23 @@ export async function processIsbnScan(
               onProgress?.(`✅ Saved ${savedCount} content warnings`)
               
               // Log audit decision: warnings were generated
-              await logAuditDecision({
-                bookId: bookId,
-                isbn: cleanIsbn,
-                decisionType: 'warnings_generated',
-                warningsCount: savedCount,
-                aiReasoning: `AI analysis identified ${savedCount} content warning(s) for this book. Analysis completed successfully.`,
-                confidenceLevel: 'high',
-                bookTitle: bookForAnalysis.title,
-                bookAuthor: bookForAnalysis.author,
-                descriptionLength: descriptionForAnalysis.length,
-                hadThinMetadata: isMinimalDescription,
-                usedWebSearch: usedWebSearch,
-                modelVersion: MODEL_VERSION,
-                taxonomyVersion: TAXONOMY_VERSION,
-                pipelinePath: pipelinePath
-              })
+                await logAuditDecision({
+                  bookId: bookId,
+                  isbn: cleanIsbn,
+                  decisionType: 'warnings_generated',
+                  warningsCount: savedCount,
+                  aiReasoning: `AI analysis identified ${savedCount} content warning(s) for this book. Analysis completed successfully.`,
+                  confidenceLevel: 'high',
+                  bookTitle: bookForAnalysis.title,
+                  bookAuthor: bookForAnalysis.author,
+                  descriptionLength: descriptionForAnalysis.length,
+                  hadThinMetadata: isMinimalDescription,
+                  usedWebSearch: usedWebSearch,
+                  modelVersion: MODEL_VERSION,
+                  taxonomyVersion: TAXONOMY_VERSION,
+                  pipelinePath: pipelinePath,
+                  metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
+                })
             }
           } else {
             onProgress?.('ℹ️ No content warnings identified by AI analysis')
@@ -892,7 +1000,8 @@ If you find any content warnings mentioned online or in reviews, list them brief
                           usedWebSearch: true,
                           modelVersion: MODEL_VERSION,
                           taxonomyVersion: TAXONOMY_VERSION,
-                          pipelinePath: `${pipelinePath} -> web_search_verification`
+                          pipelinePath: `${pipelinePath} -> web_search_verification`,
+                          metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
                         })
                       }
                     }
@@ -926,7 +1035,8 @@ If you find any content warnings mentioned online or in reviews, list them brief
                   usedWebSearch: usedWebSearch,
                   modelVersion: MODEL_VERSION,
                   taxonomyVersion: TAXONOMY_VERSION,
-                  pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath
+                  pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath,
+                  metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
                 })
               }
             } catch (webSearchError) {
@@ -949,13 +1059,51 @@ If you find any content warnings mentioned online or in reviews, list them brief
                 usedWebSearch: false,
                 modelVersion: MODEL_VERSION,
                 taxonomyVersion: TAXONOMY_VERSION,
-                pipelinePath: pipelinePath
+                pipelinePath: pipelinePath,
+                metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
               })
             }
           }
         } catch (analysisError) {
           console.error('Error in analyzeBookWithMultiModel:', analysisError)
-          onProgress?.(`❌ AI analysis error: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`)
+          
+          // Check if it's a rate limit error
+          const isRateLimit = (analysisError instanceof Error && 
+                              ((analysisError as any).isRateLimit || 
+                               analysisError.message.includes('rate limit') ||
+                               analysisError.message.includes('429')))
+          
+          if (isRateLimit) {
+            onProgress?.(`⚠️ Rate limit exceeded - analysis could not complete. Book will be marked as "Unknown" until analysis can be retried.`)
+          } else {
+            onProgress?.(`❌ AI analysis error: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`)
+          }
+          
+          // Log for manual handling - this is a failed analysis, NOT a "no warnings" result
+          try {
+            await supabaseAdmin
+              .from('manual_handling_scans')
+              .insert({
+                isbn: cleanIsbn,
+                reason: isRateLimit ? 'rate_limit_exceeded' : 'analysis_failed',
+                status: 'pending',
+                error_message: analysisError instanceof Error ? analysisError.message : 'Unknown error',
+                metadata: {
+                  book_id: bookId,
+                  book_title: bookForAnalysis.title,
+                  attempted_at: new Date().toISOString(),
+                  source: 'scan_service',
+                  error_type: analysisError instanceof Error ? analysisError.constructor.name : 'Unknown',
+                  is_rate_limit: isRateLimit
+                }
+              })
+          } catch (logError) {
+            console.error('Failed to log manual handling scan:', logError)
+          }
+          
+          // DO NOT create an audit log for "no_warnings" - analysis failed!
+          // The book should show as "Unknown" (not analyzed) not "Comfort Read" (analyzed and safe)
+          
           throw analysisError; // Re-throw to be caught by outer catch
         }
       }

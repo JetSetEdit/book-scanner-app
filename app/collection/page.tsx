@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle, ScanBarcode } from "lucide-react"
+import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle, ScanBarcode, HelpCircle } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
@@ -59,6 +59,11 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
         id,
         description,
         severity
+      ),
+      ai_audit_logs!left (
+        id,
+        decision_type,
+        created_at
       )
     `)
 
@@ -254,6 +259,13 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
             {sortedBooks.map((book) => {
               const warningSummary = getContentWarningSummary(book.content_warnings)
               const hasWarnings = warningSummary.severe > 0 || warningSummary.moderate > 0 || warningSummary.mild > 0
+              
+              // Check if book has been analyzed (has audit log)
+              const auditLogs = (book.ai_audit_logs as any[]) || []
+              const hasAnalysis = auditLogs.length > 0
+              const isAnalyzed = hasAnalysis && auditLogs.some(log => 
+                log.decision_type === 'warnings_generated' || log.decision_type === 'no_warnings'
+              )
 
               return (
                 <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full relative">
@@ -323,13 +335,21 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                                 )}
                               </ul>
                             </div>
-                          ) : (
+                          ) : isAnalyzed ? (
                             <div className="space-y-1">
                               <div className="flex items-center gap-2 text-muted-foreground">
                                 <Shield className="h-3 w-3" />
                                 <span className="text-xs font-medium">Content Warnings:</span>
                               </div>
                               <p className="text-xs text-muted-foreground pl-5">No specific warnings</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-muted-foreground">
+                                <HelpCircle className="h-3 w-3" />
+                                <span className="text-xs font-medium">Status:</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground pl-5 italic">Not analyzed yet</p>
                             </div>
                           )}
 

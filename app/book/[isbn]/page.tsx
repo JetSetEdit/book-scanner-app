@@ -29,10 +29,10 @@ export default async function BookPage({ params }: BookPageProps) {
     .eq("book_id", book.id)
     .order("helpful_count", { ascending: false })
 
-  // Fetch audit logs to determine if analysis has been completed
+  // Fetch audit logs to determine if analysis has been completed and get metadata issues
   const { data: auditLogs } = await supabase
     .from("ai_audit_logs")
-    .select("decision_type")
+    .select("decision_type, metadata_issues")
     .eq("book_id", book.id)
     .in("decision_type", ["warnings_generated", "no_warnings"])
     .order("created_at", { ascending: false })
@@ -42,6 +42,7 @@ export default async function BookPage({ params }: BookPageProps) {
   // Analysis is complete if there's an audit log with 'warnings_generated' or 'no_warnings'
   const hasAnalysisCompleted = auditLogs && auditLogs.length > 0
   const analysisStatus: 'complete' | 'unknown' = hasAnalysisCompleted ? 'complete' : 'unknown'
+  const metadataIssues = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any).metadata_issues : null
 
   // No user validation needed - all warnings are shown without user-specific data
   const warningsWithValidations = warnings || []
@@ -54,6 +55,7 @@ export default async function BookPage({ params }: BookPageProps) {
             book={book}
             warnings={warningsWithValidations}
             analysisStatus={analysisStatus}
+            metadataIssues={metadataIssues}
           />
         </div>
       </div>

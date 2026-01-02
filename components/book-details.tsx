@@ -22,6 +22,13 @@ interface BookDetailsProps {
   book: any
   warnings: any[]
   analysisStatus?: 'complete' | 'unknown'
+  metadataIssues?: {
+    missingCover?: boolean
+    missingDescription?: boolean
+    coverReason?: string
+    descriptionReason?: string
+    bookInfoIssues?: string[]
+  } | null
 }
 
 // Check if we're in dev mode (localhost or dev environment)
@@ -34,7 +41,7 @@ function isDevMode(): boolean {
   )
 }
 
-export function BookDetails({ book, warnings, analysisStatus = 'unknown' }: BookDetailsProps) {
+export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
@@ -371,6 +378,35 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown' }: Book
                 </div>
               )
             })()}
+
+            {/* Metadata Issues - Display even for Comfort Read books */}
+            {metadataIssues && (metadataIssues.missingCover || metadataIssues.missingDescription) && (
+              <div className="mt-12 p-6 border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 space-y-3">
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100">Metadata Limitations</h4>
+                    <div className="space-y-2 text-sm text-amber-800 dark:text-amber-200">
+                      {metadataIssues.missingCover && (
+                        <div>
+                          <p className="font-medium mb-1">Cover Image Not Available</p>
+                          <p className="text-amber-700 dark:text-amber-300">{metadataIssues.coverReason || 'Cover image could not be sourced from available APIs.'}</p>
+                        </div>
+                      )}
+                      {metadataIssues.missingDescription && (
+                        <div>
+                          <p className="font-medium mb-1">Limited Description</p>
+                          <p className="text-amber-700 dark:text-amber-300">{metadataIssues.descriptionReason || 'Book description was minimal or unavailable from external sources.'}</p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 italic mt-3">
+                      Analysis was performed using available information. Results may be less comprehensive due to limited metadata.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Content Warnings - The "Feature" Block */}
             <div className="mt-16">

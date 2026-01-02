@@ -253,6 +253,28 @@ DESCRIPTION FORMAT (Australian Classification Board style):
     return processWarnings(analysis.warnings || [], 'openai')
   } catch (error) {
     console.error('OpenAI analysis error:', error)
+    
+    // Check if it's a rate limit error - these should be thrown, not caught
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorCode = (error as any)?.status || (error as any)?.code
+    
+    const isRateLimit = errorCode === 429 || 
+                       errorMessage.includes('429') || 
+                       errorMessage.includes('rate limit') || 
+                       errorMessage.includes('quota') ||
+                       errorMessage.includes('Rate limit') ||
+                       errorMessage.includes('rate_limit')
+    
+    if (isRateLimit) {
+      console.error('OpenAI rate limit exceeded - throwing error to prevent false "no warnings" result')
+      onProgress?.('⚠️ OpenAI rate limit exceeded - analysis cannot complete')
+      // Throw a specific error that can be caught and handled appropriately
+      const rateLimitError = new Error('OpenAI rate limit exceeded')
+      ;(rateLimitError as any).isRateLimit = true
+      throw rateLimitError
+    }
+    
+    // For other errors, also throw to prevent false "no warnings"
     throw error
   }
 }
@@ -888,11 +910,10 @@ export async function analyzeBookWithMultiModel(
   onProgress?.('Starting AI content analysis with OpenAI...')
 
   // Run OpenAI analysis only (Gemini disabled)
-  const openaiWarnings = await analyzeWithOpenAI(metadata, onProgress).catch(err => {
-    console.error('OpenAI analysis failed:', err)
-    onProgress?.('⚠️ OpenAI analysis failed')
-    return []
-  })
+  // IMPORTANT: Don't catch errors here - let them propagate to scan-service
+  // If we catch and return empty array, it will be treated as "no warnings" which is wrong
+  // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
+  const openaiWarnings = await analyzeWithOpenAI(metadata, onProgress)
 
   // Gemini disabled - return empty array
   const geminiWarnings: EnhancedContentWarning[] = []
