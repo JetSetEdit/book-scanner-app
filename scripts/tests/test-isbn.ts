@@ -133,7 +133,7 @@ async function testISBN(isbn: string) {
     
     if (isThinMetadata) {
       console.log(`\n  → Would trigger AI agent web search (thin metadata)`)
-      console.log(`  → AI would search: Google Books, Apple Books, Goodreads, etc.`)
+      console.log(`  → AI would search: Google Books, Open Library, etc.`)
       console.log(`  → AI would generate content warnings`)
     } else {
       console.log(`\n  → Would use metadata-based analysis first`)

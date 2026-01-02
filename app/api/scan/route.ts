@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const { isbn, forceRefresh } = body;
+        const { isbn, forceRefresh, selectedCandidate } = body;
 
         if (!isbn) {
             return NextResponse.json({ error: 'ISBN is required' }, { status: 400 });
@@ -33,10 +33,10 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                console.log(`[Scan API] Starting scan for ISBN: ${isbn}, forceRefresh: ${forceRefresh}`)
+                console.log(`[Scan API] Starting scan for ISBN: ${isbn}, forceRefresh: ${forceRefresh}, selectedCandidate: ${selectedCandidate ? 'provided' : 'none'}`)
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '🚀 Starting scan process...' })}\n\n`))
 
-                const result = await processIsbnScan(isbn, onProgress, undefined, forceRefresh === true)
+                const result = await processIsbnScan(isbn, onProgress, selectedCandidate, forceRefresh === true)
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '✅ Scan process completed' })}\n\n`))

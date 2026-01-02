@@ -308,22 +308,13 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             )}>
               {warning.severity} Intensity
             </span>
-            {isSpoiler && (
+            {isSpoiler && isRevealed && (
               <button
-                onClick={() => setIsRevealed(!isRevealed)}
+                onClick={() => setIsRevealed(false)}
                 className="text-[10px] text-muted-foreground/60 hover:text-foreground font-medium flex items-center gap-1 transition-colors cursor-pointer w-fit"
               >
-                {isRevealed ? (
-                  <>
-                    <EyeOff className="h-3 w-3" />
-                    <span>Hide spoiler</span>
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-3 w-3" />
-                    <span>Reveal spoiler</span>
-                  </>
-                )}
+                <EyeOff className="h-3 w-3" />
+                <span>Hide spoiler</span>
               </button>
             )}
           </div>
@@ -352,14 +343,26 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
           })()}
           
           <div className="mb-3">
-            <p 
-              className={cn(
-                "text-muted-foreground text-base leading-relaxed font-serif transition-all duration-300",
-                isSpoiler && !isRevealed && "blur-sm select-none opacity-75"
-              )}
-            >
-              {warning.description}
-            </p>
+            {isSpoiler && !isRevealed ? (
+              <div className="relative">
+                <div className="bg-muted/50 border border-border rounded-lg p-4 text-center">
+                  <p className="text-sm text-muted-foreground mb-3 font-serif italic">
+                    This warning contains spoilers about plot elements, character outcomes, or major story reveals.
+                  </p>
+                  <button
+                    onClick={() => setIsRevealed(true)}
+                    className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-2 mx-auto transition-colors underline underline-offset-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Reveal spoiler warning</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-base leading-relaxed font-serif">
+                {warning.description}
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-4 opacity-40 group-hover:opacity-100 transition-opacity">

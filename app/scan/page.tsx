@@ -19,6 +19,55 @@ import { cn } from "@/lib/utils"
 import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
 import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
 
+// Helper function to format status messages for display
+function formatStatusMessage(message: string): string {
+  // Remove emojis
+  let cleaned = message.replace(/📖|📝|🔍|🤖|⏳|✅|❌|⚠️|💡|📋|🔄|📥|🌐|💾|📚|📄|🚀/g, '').trim()
+  
+  // Convert technical messages to user-friendly ones
+  const replacements: [RegExp, string][] = [
+    [/validating isbn and checking local database/i, 'Checking if we already have this book...'],
+    [/checking local database for existing book/i, 'Checking our database...'],
+    [/found metadata for "([^"]+)"/i, 'Found book: $1'],
+    [/saving to database/i, 'Saving book information...'],
+    [/book found in local database/i, 'Book found in our database'],
+    [/fetching book metadata from external libraries/i, 'Searching online libraries...'],
+    [/external api fetch completed/i, 'Found book information'],
+    [/found \d+ candidate\(s\) from external libraries/i, 'Found book matches'],
+    [/calling fetchbookbyisbn/i, 'Fetching book details...'],
+    [/fetched data from (.+)/i, 'Retrieved from $1'],
+    [/saving description \(\d+ chars\) to database/i, 'Saving book description...'],
+    [/fetched and saved fresh description/i, 'Updated book description'],
+    [/checking if description is sufficient for analysis/i, 'Checking book description...'],
+    [/description for analysis: (\d+) characters/i, 'Using description ($1 characters)'],
+    [/starting ai content analysis with openai/i, 'Starting AI analysis...'],
+    [/analyzing: "([^"]+)"/i, 'Analyzing: $1'],
+    [/using description:/i, 'Reviewing book description'],
+    [/calling analyzebookwithmultimodel/i, 'Running AI analysis...'],
+    [/ai analysis complete: (\d+) warnings generated/i, 'Analysis complete: Found $1 content warnings'],
+    [/analysis took (\d+)ms/i, 'Analysis completed'],
+    [/saving (\d+) content warnings to database/i, 'Saving $1 content warnings...'],
+    [/deleting existing ai-generated warnings/i, 'Clearing previous warnings...'],
+    [/deleted existing ai-generated warnings/i, 'Cleared previous warnings'],
+    [/saved (\d+) content warnings/i, 'Saved $1 content warnings'],
+    [/no content warnings identified by ai analysis/i, 'No content warnings found'],
+    [/description too minimal/i, 'Description is too short'],
+    [/proceeding with analysis due to force refresh/i, 'Proceeding with analysis...'],
+    [/scan process completed/i, 'Scan completed successfully'],
+  ]
+  
+  for (const [pattern, replacement] of replacements) {
+    cleaned = cleaned.replace(pattern, replacement)
+  }
+  
+  // Capitalize first letter
+  if (cleaned.length > 0) {
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1)
+  }
+  
+  return cleaned
+}
+
 export default function ScanTestPage() {
   // Browser storage for last ISBN
   const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
@@ -53,12 +102,8 @@ export default function ScanTestPage() {
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState("")
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
 
-  // Load last ISBN on mount (only if input is empty)
-  useEffect(() => {
-    if (lastIsbn && !isbn) {
-      setIsbn(lastIsbn)
-    }
-  }, [lastIsbn]) // Note: intentionally not including isbn in deps to only run on mount
+  // Note: We store lastIsbn for history, but don't auto-fill the input
+  // Users can manually enter or scan a new ISBN each time
 
   const performScan = async (isbnToScan: string, selectedCandidate?: any) => {
     // Start timing
@@ -94,7 +139,11 @@ export default function ScanTestPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ isbn: isbnToScan, forceRefresh: true }),
+          body: JSON.stringify({ 
+            isbn: isbnToScan, 
+            forceRefresh: true,
+            selectedCandidate: selectedCandidate || undefined
+          }),
         })
 
         if (!response.ok) {
@@ -179,13 +228,20 @@ export default function ScanTestPage() {
 
         markStage('result-received')
         
+        // Handle ambiguous results (multiple candidates)
+        if (result.status === 'ambiguous' && result.candidates && result.candidates.length > 0) {
+          setCandidates(result.candidates)
+          setResult(null) // Clear result to show candidate selection UI
+          setLoading(false)
+          return
+        }
+        
         // Transform result to match expected format
         const transformedResult = {
           success: result.success,
           book: result.book,
           isNewBook: result.isNewBook || false,
           contentWarningsGenerated: result.contentWarningsGenerated || false,
-          authorContextInvestigated: false,
           timings: result.timings,
           flags: result.flags
         }
@@ -557,7 +613,7 @@ export default function ScanTestPage() {
             </Card>
           )}
 
-          {/* Simplified Progress Display */}
+          {/* Enhanced Progress Display */}
           {(() => {
             const currentStage = getCurrentStage(statusUpdates)
             const shouldShowLoader = loading && currentStage !== null && !result && !candidates && !error
@@ -565,25 +621,65 @@ export default function ScanTestPage() {
             if (!shouldShowLoader) return null
 
             const StageIcon = currentStage.icon
+            const latestMessage = statusUpdates[statusUpdates.length - 1] || ''
+            // Format message for user-friendly display
+            const cleanMessage = formatStatusMessage(latestMessage)
 
             return (
               <div className="mb-6 border rounded-lg p-6 bg-muted/30 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <StageIcon className="h-5 w-5 text-primary" />
-                    {loading && (
-                      <Loader2 className="h-3 w-3 animate-spin text-primary absolute -top-1 -right-1" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground">{currentStage.displayText}</p>
-                    <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
-                      <div
-                        className="bg-primary h-1.5 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${(currentStage.stage / 4) * 100}%` }}
-                      />
+                <div className="space-y-4">
+                  {/* Stage Header */}
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <StageIcon className="h-5 w-5 text-primary" />
+                      {loading && (
+                        <Loader2 className="h-3 w-3 animate-spin text-primary absolute -top-1 -right-1" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-foreground">{currentStage.displayText}</p>
+                      <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
+                        <div
+                          className="bg-primary h-1.5 rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${(currentStage.stage / 4) * 100}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Current Status Message */}
+                  {cleanMessage && (
+                    <div className="pt-3 border-t border-border/50">
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-medium text-foreground">Current step:</span> {cleanMessage}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Recent Steps (last 3) */}
+                  {statusUpdates.length > 1 && (
+                    <div className="pt-2 border-t border-border/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Recent steps:</p>
+                      <ul className="space-y-1">
+                        {statusUpdates.slice(-3).map((update, idx) => {
+                          const cleanUpdate = formatStatusMessage(update)
+                          const isLatest = idx === statusUpdates.slice(-3).length - 1
+                          return (
+                            <li 
+                              key={idx} 
+                              className={cn(
+                                "text-xs text-muted-foreground flex items-start gap-2",
+                                isLatest && "text-foreground font-medium"
+                              )}
+                            >
+                              <span className="text-muted-foreground mt-0.5">•</span>
+                              <span>{cleanUpdate}</span>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             )
@@ -835,10 +931,6 @@ export default function ScanTestPage() {
                         <span className="font-mono">{result.multiModelAnalysis.classification_rating || "N/A"}</span>
                       </div>
                     )}
-                     <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Context Investigated?</span>
-                        <span className="font-mono">{result.authorContextInvestigated ? "Yes" : "No"}</span>
-                    </div>
                  </div>
                  
                  {/* Display Combined Warnings for Multi-Model */}

@@ -38,3 +38,7 @@ cursor-wip/
 node_modules
 *.md
 backups/
+# Dataset downloads (can be large)
+data/
+!data/training/.gitkeep
+!data/models/.gitkeepdatasets/

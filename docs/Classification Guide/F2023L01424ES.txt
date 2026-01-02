@@ -1,0 +1,156 @@
+EXPLANATORY STATEMENT
+Issued by authority of the Minister for Communications
+Classification (Publications, Films and Computer Games) Act 1995
+Guidelines for the Classification of Computer Games 2023
+Authority
+The Classification (Publications, Films and Computer Games) Act 1995 (Classification Act)
+forms part of cooperative arrangements between the Commonwealth, states and territories
+under the National Classification Scheme.
+The Guidelines for the Classification of Computer Games 2023 (Games Guidelines) are made
+under section 12 of the Classification Act, which provides that the Minister may, with the
+agreement of each participating state and territory Minister, determine guidelines to assist the
+Classification Board in applying the criteria in the National Classification Code. If the
+Minister and each participating Minister agree to an amendment of the guidelines, the
+guidelines are taken to be amended accordingly.
+On 22 September 2023 the Games Guidelines were unanimously agreed to by participating
+Ministers.
+Purpose and operation
+The Games Guidelines are used, in conjunction with the National Classification Code, to
+classify computer games. They help to explain the different classification categories for
+computer games distributed in Australia and the scope and limits of material suitable for each
+category.
+Updates to the Games Guidelines will address growing community concern about children
+accessing gambling-like content in computer games, especially games containing simulated
+gambling and paid loot boxes, and the potential harms associated with these products.
+Currently such games receive consumer advice labelling including ‘in-game purchases’ and
+‘simulated gambling’, but there is no mandated classification for gambling-like content.
+The introduction of mandatory classifications for gambling-like content in computer games
+was proposed by the 2020 Review of Australian classification regulation (the Stevens
+Review). The Stevens Review recommended a minimum classification rating of MA15+
+(Mature Accompanied – legally restricted to persons under the age of 15 unless they are in
+the company of a parent or guardian) for games exclusively containing simulated gambling
+and PG (Parental Guidance – not recommended for persons under the age of 15 without
+guidance from a parent or guardian) for games containing paid loot boxes.
+However, since this time stronger evidence has emerged around the potential harms
+associated with gambling-like content in computer games, which has resulted in higher
+recommended mandatory minimum classifications for games containing these products.
+A 2022 review conducted by the Australian Institute of Family Studies on Harms associated
+with loot boxes, simulated gambling and other in-game purchases in video games: a review
+of the evidence found associations between paid loot boxes, in-game purchases and simulated
+gambling mechanics, and problem gambling. It also found evidence of links to other harms
+including internet gaming disorder, financial harms, emotional and behavioural problems.
+
+Authorised Version Explanatory Statement registered 27/10/2023 to F2023L01424
+
+Further research from the Australian Institute of Family Studies on What is the link between
+video gaming and gambling? in 2022, using data from the Longitudinal Study of Australian
+Children, found a causal link between young people who played simulated gambling games
+and the uptake of real world gambling as young adults.
+The Games Guidelines will introduce mandatory minimum classification ratings of:
+(a) M (Mature – not recommended for persons under 15 years of age) for computer
+games which contain loot boxes and other in-game purchases linked to elements of
+chance, and
+(b) R 18+ (Restricted – legally restricted to adults 18 years and older) for computer
+games that contain simulated gambling.
+The Games Guidelines have no financial implications.
+Details of key updates in the Games Guidelines are set out in Attachment A.
+Consultation
+As part of the Stevens Review, a full public submission process occurred between
+8 January 2020 and 19 February 2020. During this six-week period, 104 submissions were
+received and the Government also undertook targeted consultations with state and territory
+governments, industry and community groups.
+A further public consultation process on the proposed Games Guidelines was undertaken
+from May to June 2023, following targeted consultations with state and territory governments
+and key stakeholders, including representative bodies for the computer games industry.
+During the most recent public consultation process, 22 submissions were received from a
+range of industry, community and advocacy groups, as well as the Federal Member for
+Denison.
+Impact analysis
+The Office of Impact Analysis assessed the proposed introduction of mandatory minimum
+classifications for gambling-like content in computer games as having no more than minor
+regulatory impacts (OBPR22-03305).
+Commencement and sunsetting arrangements
+The Games Guidelines will commence on 22 September 2024. The delayed commencement
+date will provide time for industry to adjust to the new classification requirements.
+The Games Guidelines are a legislative instrument for the purposes of the Legislation Act
+2003 (Legislation Act). In accordance with subsections 44(1) and 54(1) of the Legislation
+Act, they are not subject to disallowance or sunsetting because the Classification Act
+facilitates the establishment or operation of an intergovernmental scheme involving the
+Commonwealth and one or more of the states, and authorises the instrument to be made by
+the Minister for the purpose of the scheme.
+Statement of compatibility with human rights
+As section 42 of the Legislation Act does not apply to this instrument, being exempted under
+subsection 44(1) of the Legislation Act, a statement of compatibility with human rights is not
+required under section 9 of the Human Rights (Parliamentary Scrutiny) Act 2011.
+
+Authorised Version Explanatory Statement registered 27/10/2023 to F2023L01424
+
+Attachment A
+
+Details of the Guidelines for the Classification of Computer Games 2023 and changes to
+the guidelines
+Section 1 – Name
+This section provides that the name of the instrument is the Guidelines for the Classification
+of Computer Games 2023 (Games Guidelines).
+Section 2 – Commencement
+This section provides that the entirety of the instrument commences on 22 September 2024.
+Section 3 – Authority
+This section states that the instrument is made under subsection 12(1) of the Classification
+(Publications, Films and Computer Games) Act 1995 (the Act).
+Section 4 – Definitions
+This section includes definitions used in the instrument and includes a note directing readers
+to some of the expressions used that are defined in the Act.
+Section 5 – Determination of guidelines
+This section determines that the guidelines specified in Schedule 1 to the instrument are
+determined under subsection 12(1) of the Act to assist the Board in applying the criteria in the
+Code when classifying computer games.
+The newly determined Games Guidelines specified in Schedule 1 reproduce the Guidelines
+for the Classification of Computer Games 2012 and include mandatory minimum
+classification ratings of:
+(a) M (Mature – not recommended for persons under 15 years of age) for computer
+games which contain loot boxes and other in-game purchases linked to elements of
+chance, and
+(b) R 18+ (Restricted – legally restricted to adults 18 years and older) for computer
+games that contain simulated gambling.
+Specific details of how these mandatory minimum classification ratings are given effect in
+the Games Guidelines are identified below.
+The participating Ministers agreed to the Games Guidelines on 22 September 2023 through
+the Standing Council of Attorneys-General.
+The Games Guidelines will apply to classification decisions on and from 22 September 2024.
+Section 6 – Repeals
+This section repeals the Guidelines for the Classification of Computer Games 2012, which
+will occur on 22 September 2024.
+
+Authorised Version Explanatory Statement registered 27/10/2023 to F2023L01424
+
+Schedule 1 – Guidelines
+The Games Guidelines are specified in Schedule 1 to the instrument and, as described above
+in the note to section 5, reproduce the Guidelines for the Classification of Computer Games
+2012 with the inclusion of mandatory minimum classification ratings to address gamblinglike content.
+To give effect to the mandatory minimum classification ratings, the Games Guidelines
+include the following changes to the Guidelines for the Classification of Computer Games
+2012.
+G (General) category
+Under the heading ‘Themes’, a second line is inserted to clarify that in-game purchases
+linked to elements of chance and simulated gambling are not permitted.
+PG (Parental Guidance) category
+Under the heading ‘Themes’, a second line is inserted to clarify that in-game purchases
+linked to elements of chance and simulated gambling are not permitted.
+M (Mature) category
+Under the heading ‘Themes’, two additional lines are inserted to clarify that in-game
+purchases linked to elements of chance are permitted and that simulated gambling is not
+permitted.
+MA 15+ (Mature Accompanied) category
+Under the heading ‘Themes’, two additional lines are inserted to clarify that in-game
+purchases linked to elements of chance are permitted and that simulated gambling is not
+permitted.
+R 18+ (Restricted) category
+Under the heading ‘Themes’, a second line is inserted to clarify that in-game purchases
+linked to elements of chance and simulated gambling are permitted.
+List of Terms
+Under the list of terms, new definitions are included for the terms ‘In-game purchases linked
+to elements of chance’, ‘Paid Loot Box’, ‘Real World Currency’ and ‘Simulated Gambling’.
+
+Authorised Version Explanatory Statement registered 27/10/2023 to F2023L01424
+
+

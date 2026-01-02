@@ -159,19 +159,27 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
   const openLibBook = openLibResult.status === 'fulfilled' ? openLibResult.value : null
   const googleBook = googleResult.status === 'fulfilled' ? googleResult.value : null
 
-  // Prefer the result that has a description (needed for content warning analysis)
+  // Prefer the result that has a LONGER description (needed for content warning analysis)
   if (openLibBook && googleBook) {
-    // Both succeeded - prefer the one with description
-    if (openLibBook.description && openLibBook.description.length > 50) {
-      console.log(`[Book API] ✅ Found book via Open Library (with description): ${openLibBook.title}`)
-      return openLibBook
-    }
-    if (googleBook.description && googleBook.description.length > 50) {
-      console.log(`[Book API] ✅ Found book via Google Books (with description): ${googleBook.title}`)
+    // Both succeeded - prefer the one with longer description (better for AI analysis)
+    const openLibDescLength = openLibBook.description?.length || 0
+    const googleDescLength = googleBook.description?.length || 0
+    
+    if (googleDescLength > openLibDescLength && googleDescLength > 100) {
+      console.log(`[Book API] ✅ Found book via Google Books (better description: ${googleDescLength} chars): ${googleBook.title}`)
       return googleBook
     }
-    // Neither has good description, prefer Open Library as primary source
-    console.log(`[Book API] ✅ Found book via Open Library (no description): ${openLibBook.title}`)
+    if (openLibDescLength > googleDescLength && openLibDescLength > 100) {
+      console.log(`[Book API] ✅ Found book via Open Library (better description: ${openLibDescLength} chars): ${openLibBook.title}`)
+      return openLibBook
+    }
+    // If both have descriptions but neither is great, prefer the longer one
+    if (googleDescLength > openLibDescLength) {
+      console.log(`[Book API] ✅ Found book via Google Books (longer description: ${googleDescLength} vs ${openLibDescLength} chars): ${googleBook.title}`)
+      return googleBook
+    }
+    // Default to Open Library if descriptions are similar or both short
+    console.log(`[Book API] ✅ Found book via Open Library: ${openLibBook.title}`)
     return openLibBook
   }
 

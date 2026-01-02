@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   const manifest = {
-    name: 'Subtext - Book Content Warnings',
+    name: 'Subtext',
     short_name: 'Subtext',
     description: 'Reveal the hidden content in every book. Scan books to get detailed content warnings and age ratings.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#ffffff',
-    theme_color: '#fef3c7',
+    background_color: '#FDFBF7',
+    theme_color: '#FDFBF7',
     orientation: 'portrait-primary',
     icons: [
       {

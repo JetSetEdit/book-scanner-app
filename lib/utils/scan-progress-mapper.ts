@@ -23,20 +23,24 @@ export function mapProgressToStage(message: string): ScanStage | null {
     return null
   }
 
-  // Stage 1: Search
+  // Stage 1: Search & Metadata Fetching
   if (
     lowerMessage.includes('validating') ||
-    lowerMessage.includes('fetching') ||
-    lowerMessage.includes('found book') ||
     lowerMessage.includes('checking local database') ||
-    lowerMessage.includes('book not found locally') ||
+    lowerMessage.includes('book found in local database') ||
+    lowerMessage.includes('fetching book metadata') ||
+    lowerMessage.includes('fetching from external') ||
     lowerMessage.includes('found metadata') ||
     lowerMessage.includes('saving to database') ||
-    lowerMessage.includes('book found in local database')
+    lowerMessage.includes('found book') ||
+    lowerMessage.includes('book not found locally') ||
+    lowerMessage.includes('external api fetch') ||
+    lowerMessage.includes('calling fetchbookbyisbn') ||
+    lowerMessage.includes('fetched data from')
   ) {
     return {
       stage: 1,
-      displayText: 'Searching global archives...',
+      displayText: 'Finding book information...',
       icon: Search,
     }
   }
@@ -44,17 +48,24 @@ export function mapProgressToStage(message: string): ScanStage | null {
   // Stage 2: Analysis (The AI Step)
   if (
     lowerMessage.includes('analyzing') ||
+    lowerMessage.includes('starting ai content analysis') ||
+    lowerMessage.includes('calling analyzebookwithmultimodel') ||
+    lowerMessage.includes('analyzing with') ||
+    lowerMessage.includes('ai analysis') ||
     lowerMessage.includes('deep ai') ||
     lowerMessage.includes('web search') ||
     lowerMessage.includes('initiating') ||
     lowerMessage.includes('ai found book') ||
     lowerMessage.includes('ai is reading') ||
     lowerMessage.includes('performing comprehensive') ||
-    lowerMessage.includes('deep search')
+    lowerMessage.includes('deep search') ||
+    lowerMessage.includes('checking if description is sufficient') ||
+    lowerMessage.includes('description for analysis') ||
+    lowerMessage.includes('using description')
   ) {
     return {
       stage: 2,
-      displayText: 'AI is reading the synopsis...',
+      displayText: 'Analyzing content for warnings...',
       icon: Sparkles,
     }
   }
@@ -76,14 +87,19 @@ export function mapProgressToStage(message: string): ScanStage | null {
   // Stage 4: Completion
   if (
     lowerMessage.includes('saving') ||
+    lowerMessage.includes('saved') ||
     lowerMessage.includes('complete') ||
     lowerMessage.includes('generated') ||
     lowerMessage.includes('finalizing') ||
-    lowerMessage.includes('scan completed')
+    lowerMessage.includes('scan completed') ||
+    lowerMessage.includes('ai analysis complete') ||
+    lowerMessage.includes('warnings generated') ||
+    lowerMessage.includes('deleted existing') ||
+    lowerMessage.includes('saved content warnings')
   ) {
     return {
       stage: 4,
-      displayText: 'Finalizing report...',
+      displayText: 'Saving results...',
       icon: CheckCircle,
     }
   }

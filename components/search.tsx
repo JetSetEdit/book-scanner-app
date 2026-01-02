@@ -282,16 +282,8 @@ export function SearchComponent({ className }: SearchProps) {
               )}
               {/* Google Books Attribution for search results */}
               <div className="px-4 py-2 border-t border-border">
-                <p className="text-xs text-muted-foreground text-center">
-                  Data sourced via{' '}
-                  <a
-                    href="https://books.google.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Google Books
-                  </a>
+                <p className="text-[10px] text-stone-400 dark:text-stone-500 text-center">
+                  Data sourced via Google Books
                 </p>
               </div>
             </div>

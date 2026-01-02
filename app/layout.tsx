@@ -10,6 +10,7 @@ import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { PWARegister } from '@/components/pwa-register'
 import { ThemeProvider } from '@/components/theme-provider'
 import { BetaBanner } from '@/components/beta-banner'
+import { BetaOnboardingModal } from '@/components/beta-onboarding-modal'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -29,7 +30,10 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: '/logo_var_2.png',
-    apple: '/logo_var_2.png',
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+      { url: '/logo_var_2.png', sizes: '512x512', type: 'image/png' },
+    ],
   },
 }
 
@@ -39,7 +43,7 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#fef3c7',
+  themeColor: '#FDFBF7',
 }
 
 export default function RootLayout({
@@ -64,6 +68,7 @@ export default function RootLayout({
           <Footer />
           <PWARegister />
           <PWAInstallPrompt />
+          <BetaOnboardingModal />
           <Analytics />
           <Toaster position="top-right" />
         </ThemeProvider>

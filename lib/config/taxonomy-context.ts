@@ -98,6 +98,7 @@ export interface EnhancedContentWarning {
   severity_signals?: SeveritySignals; // Optional, computed if not provided
   other_note?: string; // Required if subcategory_id starts with 'other_'
   description?: string; // Description of the warning (preserved from AI response)
+  reasoning?: string; // AI reasoning for the warning assignment (preserved from AI response)
   taxonomy_version: string; // Track which taxonomy version was used
   is_spoiler?: boolean; // True if this warning reveals major plot twists or significant plot points
 }

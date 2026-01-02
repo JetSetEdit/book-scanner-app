@@ -3,7 +3,7 @@
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode, Flag } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -357,6 +357,108 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                 <div className="h-px bg-border flex-1"></div>
               </div>
               
+              {/* Classification Rating Summary */}
+              {(() => {
+                const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
+                const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+                
+                if (!classificationRating) return null
+                
+                // Map rating to impact level (per Australian Classification Board)
+                const impactLevels: Record<string, string> = {
+                  'G': 'very mild',
+                  'PG': 'mild',
+                  'M': 'moderate',
+                  'MA15+': 'strong',
+                  'R18+': 'high',
+                  'RC': 'very high'
+                }
+                const impactLevel = impactLevels[classificationRating] || 'moderate'
+                
+                // Generate explanation based on warnings using official methodology
+                // The Board assesses 6 classifiable elements: themes, violence, sex, language, drug use, nudity
+                const severeWarnings = warnings.filter((w: any) => w.severity === 'severe')
+                const moderateWarnings = warnings.filter((w: any) => w.severity === 'moderate')
+                const mildWarnings = warnings.filter((w: any) => w.severity === 'mild')
+                
+                // Map our categories to classifiable elements
+                const classifiableElements: Record<string, string> = {
+                  'violence': 'violence',
+                  'sexual_content': 'sex',
+                  'language': 'language',
+                  'substance_use_or_alcohol': 'drug use',
+                  'mental_health': 'themes',
+                  'abuse': 'themes',
+                  'emotional_abuse_or_toxic_relationships': 'themes',
+                  'other': 'themes'
+                }
+                
+                // Get top classifiable elements (consumer advice style)
+                const elementCounts: Record<string, number> = {}
+                warnings.forEach((w: any) => {
+                  const cat = w.category_id || w.category || 'other'
+                  const element = classifiableElements[cat] || 'themes'
+                  elementCounts[element] = (elementCounts[element] || 0) + 1
+                })
+                
+                const topElements = Object.entries(elementCounts)
+                  .sort(([, a], [, b]) => b - a)
+                  .slice(0, 3)
+                  .map(([element]) => element)
+                
+                // Build explanation using official terminology from Publications Guidelines
+                // Reference: Guidelines for the Classification of Publications 2005 (F2008C00129)
+                let explanation = `Based on our analysis, we suggest this book is equivalent to an Australian Classification rating of ${classificationRating} `
+                
+                // Determine impact descriptor based on highest severity
+                // Per Publications Guidelines p.124-129: impact assessed through emphasis, tone, frequency, context, and detail
+                let impactDescriptor = ''
+                if (severeWarnings.length > 0) {
+                  impactDescriptor = 'strong'
+                } else if (moderateWarnings.length > 0) {
+                  impactDescriptor = 'moderate'
+                } else if (mildWarnings.length > 0) {
+                  impactDescriptor = 'mild'
+                } else {
+                  impactDescriptor = 'very mild'
+                }
+                
+                // Build consumer advice style explanation
+                const reasons: string[] = []
+                
+                if (topElements.length > 0) {
+                  // Format like official consumer advice: "Strong violence and themes"
+                  const elementList = topElements.map(e => e.charAt(0).toUpperCase() + e.slice(1)).join(' and ')
+                  reasons.push(`${impactDescriptor.charAt(0).toUpperCase() + impactDescriptor.slice(1)} ${elementList}`)
+                }
+                
+                // Add context about impact level
+                if (impactLevel !== impactDescriptor) {
+                  reasons.push(`content with ${impactLevel} impact`)
+                }
+                
+                if (reasons.length > 0) {
+                  explanation += `because of ${reasons.join(' and ')}.`
+                } else {
+                  explanation += `based on the overall impact of classifiable elements (themes, violence, sex, language, drug use, nudity).`
+                }
+                
+                // Add note about methodology per official Publications Guidelines
+                // Per Guidelines p.124-129: impact assessed through emphasis, tone, frequency, context, detail, and cumulative effect
+                explanation += ` The rating reflects the ${impactLevel} impact level of content, assessed through emphasis, tone, frequency, context, detail, and cumulative effect, following the methodology in the Guidelines for the Classification of Publications.`
+                
+                return (
+                  <div className="mb-6 p-4 bg-muted/30 border border-border rounded-lg max-w-2xl mx-auto">
+                    <p className="text-sm text-foreground text-center leading-relaxed">
+                      {explanation}
+                    </p>
+                    <p className="text-xs text-muted-foreground italic mt-2 text-center">
+                      This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating. Our analysis follows the official methodology from the Guidelines for the Classification of Publications 2005 (F2008C00129), assessing the six classifiable elements (themes, violence, sex, language, drug use, nudity) based on impact factors including emphasis, tone, frequency, context, detail, and cumulative effect.
+                    </p>
+                  </div>
+                )
+              })()}
+              
               {/* Disclaimer */}
               <p className="text-sm text-muted-foreground italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
@@ -366,6 +468,26 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                 warnings={warnings}
                 isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
               />
+
+              {/* Feedback / Report Section */}
+              <div className="mt-12 pt-8 border-t border-border">
+                <div className="flex flex-col items-center justify-center">
+                  <a
+                    href="https://tally.so/r/placeholder"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent"
+                    >
+                      <Flag className="h-3.5 w-3.5 mr-1.5" />
+                      Found an error? Report this book.
+                    </Button>
+                  </a>
+                </div>
+              </div>
             </div>
 
             {/* Google Books Attribution (TOS Compliance) */}

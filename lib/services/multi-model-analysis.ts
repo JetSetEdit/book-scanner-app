@@ -77,9 +77,20 @@ async function analyzeWithOpenAI(
 
   const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.
 
-Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
+Official References:
+- Guidelines for the Classification of Publications 2005 (F2008C00129)
+- National Classification Code (F2013C00006)
+- https://www.classification.gov.au/classification-ratings/how-rating-decided
 
 The Board assesses content based on six classifiable elements: themes, violence, language, drug use, nudity, and sex. Ratings are determined by the IMPACT of these elements (very mild, mild, moderate, strong, high).
+
+Per the Publications Guidelines (p.124-129), impact is assessed through:
+- Emphasis: How prominently the element is featured
+- Tone: The manner in which content is presented
+- Frequency: How often the element appears
+- Context: The setting and justification for the content
+- Detail: The amount of visual or written detail
+- Cumulative effect: How elements combine to create overall impact
 
 Book Information:
 - Title: ${metadata.title}
@@ -107,14 +118,23 @@ Instructions:
      Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
-   - context_modifiers (array of applicable modifiers, if any)
+   - context_modifiers (array of applicable modifiers, if any):
+     * Use context modifiers to indicate contextual nuance that affects impact:
+       - historical_context: Content in historical setting (reduces impact)
+       - educational_or_analytical: Educational/informational context (reduces impact)
+       - condemned_by_narrative: Content explicitly condemned (reduces impact)
+       - quoted_or_discussed: Content quoted/discussed rather than directly depicted (reduces impact)
+       - endorsed_by_narrative: Content endorsed/normalized (increases impact)
+       - character_held_bias: Bias held by character, not narrative (reduces impact)
+       - satire_or_parody: Satirical context (reduces impact)
+     * IMPORTANT: Context modifiers should influence severity assessment. Educational/historical/condemned content should generally have lower severity than exploitative/endorsed content, even if the content itself is similar.
    - frequency_hint (single, repeated, theme)
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with at least one evidence span containing: source: "text", excerpt: short quote, confidence: 0-1)
-   - reasoning: A clear explanation of why this warning was assigned, using Australian Classification Board style language. Explain what evidence supports the warning and why the severity level (Strong/Moderate/Mild) is appropriate. DO NOT mention specific character names, plot events, or story details. Keep it generic and focused on content types.
-     * GOOD: "Strong themes of emotional abuse are present as a central element of the narrative. The content explores psychological manipulation and control within relationships, which justifies a high severity classification."
-     * GOOD: "Moderate violence is depicted, including physical abuse within relationships. The content includes scenes of domestic violence, supporting a moderate severity rating."
+   - reasoning: A clear explanation of why this warning was assigned, using Australian Classification Board style language. Explain what evidence supports the warning and why the severity level (Strong/Moderate/Mild) is appropriate. When assessing impact, explicitly consider: Emphasis (how prominently featured), Tone (manner of presentation), Frequency (how often it appears), Context (setting and justification), Detail (amount of detail), and Cumulative effect (how it combines with other elements). CRITICAL: If context modifiers are applied (e.g., educational_or_analytical, historical_context, condemned_by_narrative), explicitly explain how the context reduces the impact and justifies a lower severity level. Conversely, if content is endorsed_by_narrative or exploitative, explain how this increases impact. DO NOT mention specific character names, plot events, or story details. Keep it generic and focused on content types.
+     * GOOD: "Strong themes of emotional abuse are present as a central element of the narrative (emphasis: central, frequency: repeated theme). The content explores psychological manipulation and control within relationships with moderate detail (detail: moderate), presented in a serious tone (tone: serious), which justifies a high severity classification."
+     * GOOD: "Moderate violence is depicted, including physical abuse within relationships. The content includes scenes of domestic violence (frequency: repeated scenes, detail: moderate, context: relationship setting), supporting a moderate severity rating."
      * BAD: "The disappearance of [Character Name] is central to the plot..." (mentions character names - spoiler)
      * BAD: "A character dies in Chapter 12..." (mentions specific plot events - spoiler)
    - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
@@ -172,22 +192,48 @@ Instructions:
       messages: [
         {
           role: 'system',
-          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology (see: https://www.classification.gov.au/classification-ratings/how-rating-decided).
+          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.
+
+Official References:
+- Guidelines for the Classification of Publications 2005 (F2008C00129)
+- National Classification Code (F2013C00006)
+- https://www.classification.gov.au/classification-ratings/how-rating-decided
 
 The Australian Classification Board assesses content based on six classifiable elements: themes, violence, language, drug use, nudity, and sex. Ratings are determined by the IMPACT of these elements (very mild, mild, moderate, strong, high).
+
+Per the Publications Guidelines (p.124-129), impact is assessed through:
+- Emphasis: How prominently the element is featured
+- Tone: The manner in which content is presented
+- Frequency: How often the element appears
+- Context: The setting and justification for the content
+- Detail: The amount of visual or written detail
+- Cumulative effect: How elements combine to create overall impact
 
 CRITICAL INSTRUCTIONS:
 1. Always use the hierarchical category.subcategory format.
 2. Be precise, evidence-based, and avoid over-tagging.
 3. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description.
 4. If the description is too minimal or generic, return an empty warnings array.
+5. When assessing impact, ALWAYS consider all six factors from the Publications Guidelines:
+   - Emphasis: How prominently the element is featured (e.g., "central theme", "incidental reference")
+   - Tone: The manner in which content is presented (e.g., "serious", "graphic", "discreet")
+   - Frequency: How often the element appears (e.g., "throughout", "repeated scenes", "single incident")
+   - Context: The setting and justification (e.g., "relationship setting", "historical context", "gratuitous")
+   - Detail: The amount of visual or written detail (e.g., "moderate detail", "graphic", "vague")
+   - Cumulative effect: How elements combine to create overall impact
+6. CONTEXT MODIFIERS AFFECT SEVERITY: Apply context modifiers appropriately and adjust severity accordingly:
+   - Educational/historical/condemned content → Lower severity (e.g., "severe" becomes "moderate", "moderate" becomes "mild")
+   - Exploitative/endorsed content → Higher or maintained severity
+   - Example: Violence in historical/educational context with condemned_by_narrative should be "moderate" or "mild", not "severe"
+   - Example: Violence that is endorsed_by_narrative and gratuitous should be "severe"
+7. In your reasoning, explicitly reference these impact factors AND context modifiers when explaining severity levels.
 
 DESCRIPTION FORMAT (Australian Classification Board style):
 - Use standardized terminology with intensity descriptors: "Strong [content type]", "Moderate [content type]", "Mild [content type]", or "[Content type] themes"
 - Be direct, clear, and avoid euphemism
 - Examples: "Strong themes of violence", "Moderate sexual content", "Mild language", "Strong themes of emotional abuse"
 - Focus on content categories and intensity (impact), not specific plot events or character actions
-- Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided`
+- Reference the official Publications Guidelines methodology`
         },
         {
           role: 'user',
@@ -248,7 +294,16 @@ Instructions:
      Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
-   - context_modifiers (array of applicable modifiers, if any)
+   - context_modifiers (array of applicable modifiers, if any):
+     * Use context modifiers to indicate contextual nuance that affects impact:
+       - historical_context: Content in historical setting (reduces impact)
+       - educational_or_analytical: Educational/informational context (reduces impact)
+       - condemned_by_narrative: Content explicitly condemned (reduces impact)
+       - quoted_or_discussed: Content quoted/discussed rather than directly depicted (reduces impact)
+       - endorsed_by_narrative: Content endorsed/normalized (increases impact)
+       - character_held_bias: Bias held by character, not narrative (reduces impact)
+       - satire_or_parody: Satirical context (reduces impact)
+     * IMPORTANT: Context modifiers should influence severity assessment. Educational/historical/condemned content should generally have lower severity than exploitative/endorsed content, even if the content itself is similar.
    - frequency_hint (single, repeated, theme)
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
@@ -614,8 +669,8 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
         if (!text || text.length <= maxLength) return text.trim()
 
         // Try to find a sentence or phrase that captures the essence
-        const sentences = text?.match(/[^.!?]+[.!?]+/g) || []
-        if (sentences.length > 0) {
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || []
+        if (sentences.length > 0 && sentences[0]) {
           const firstSentence = sentences[0].trim()
           if (firstSentence.length >= 10 && firstSentence.length <= maxLength) {
             return firstSentence

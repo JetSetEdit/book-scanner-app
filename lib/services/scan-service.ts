@@ -508,7 +508,9 @@ export async function processIsbnScan(
         descriptionForAnalysis.startsWith('A book by') ||
         descriptionForAnalysis === `A book by ${bookForAnalysis.author || 'Unknown Author'}.`
       
-      if (isMinimalDescription) {
+      // If forceRefresh is true, run analysis even with minimal description
+      // Otherwise, skip analysis to avoid genre-based assumptions
+      if (isMinimalDescription && !forceRefresh) {
         onProgress?.('⚠️ Description too minimal - skipping analysis to avoid genre-based assumptions')
         onProgress?.('💡 Tip: Try fetching a description from external APIs or provide book details manually')
         onProgress?.('📋 This scan has been logged for manual handling')
@@ -534,6 +536,9 @@ export async function processIsbnScan(
           console.error('Failed to log manual handling scan:', logError)
         }
       } else {
+        if (isMinimalDescription && forceRefresh) {
+          onProgress?.('⚠️ Description is minimal, but proceeding with analysis due to force refresh')
+        }
         onProgress?.('🤖 Starting AI content analysis with OpenAI (GPT-4o)...')
         onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
         onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
@@ -583,7 +588,19 @@ export async function processIsbnScan(
             // Filter and map warnings, ensuring other_* subcategories have valid other_note
             const warningsToInsert = analysisResult.warnings
               .map(w => {
+                // Validate subcategory_id format
+                if (!w.subcategory_id || !w.subcategory_id.includes('.')) {
+                  console.error(`[Warning] Invalid subcategory_id format: ${w.subcategory_id}, skipping warning`)
+                  return null
+                }
+                
                 const [categoryId, subcategoryId] = w.subcategory_id.split('.')
+                
+                // Validate split result
+                if (!categoryId || !subcategoryId) {
+                  console.error(`[Warning] Failed to parse subcategory_id: ${w.subcategory_id}, skipping warning`)
+                  return null
+                }
                 
                 // Map to legacy category for database constraint compatibility
                 const category = getCategoryById(categoryId)

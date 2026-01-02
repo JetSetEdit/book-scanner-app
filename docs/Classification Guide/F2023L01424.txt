@@ -1,0 +1,712 @@
+Guidelines for the Classification of Computer
+Games 2023
+Classification (Publications, Films and Computer Games) Act 1995
+I, Michelle Rowland, Minister for Communications, determine the following legislative
+
+instrument under subsection 12(1) of the Classification (Publications, Films and Computer
+Games) Act 1995.
+Dated 24/10/2023
+
+Michelle Rowland
+Minister for Communications
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+Contents
+1 Name ...................................................................................................................................... 1
+2 Commencement ..................................................................................................................... 1
+3 Authority ................................................................................................................................ 1
+4 Definitions ............................................................................................................................. 1
+5 Determination of guidelines ................................................................................................... 1
+6 Repeal .................................................................................................................................... 1
+
+Schedule 1—Guidelines
+
+22
+
+GUIDELINES FOR THE CLASSIFICATION OF COMPUTER GAMES .............................22
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+i
+
+1 Name
+This instrument is the Guidelines for the Classification of Computer Games
+2023.
+
+2 Commencement
+This instrument commences on 22 September 2024.
+
+3 Authority
+This instrument is made under subsection 12(1) of the Classification
+(Publications, Films and Computer Games) Act 1995.
+
+4 Definitions
+Note:
+
+A number of expressions used in this instrument are defined in the Act, including the
+following:
+(a) participating Minister;
+(b) Board;
+(c) Code;
+(d) computer game.
+
+In this instrument:
+Act means the Classification (Publications, Films and Computer Games) Act
+1995.
+
+5 Determination of guidelines
+With the agreement of each participating Minister, the guidelines
+specified in Schedule 1 to this instrument are determined to assist the
+Board in applying the criteria in the Code when classifying computer
+games.
+6 Repeal
+This instrument repeals the Guidelines for the Classification of Computer Games
+2012.
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+1
+
+Schedule 1—Guidelines
+GUIDELINES FOR THE CLASSIFICATION OF COMPUTER GAMES
+Introduction to the Guidelines
+Background
+The Guidelines for the Classification of Computer Games (the Guidelines) are a tool for
+classifying computer games. They help explain the different classification categories, and the
+scope and limits of material suitable for each category. They are revised from time to time,
+with extensive community input.
+The legal context
+The National Classification Scheme (the Scheme) is based on:
+the Commonwealth Classification (Publications, Films and Computer Games) Act
+1995 (the Act), and
+a cooperative agreement between Commonwealth, State and Territory governments.
+Under the Scheme, the Commonwealth makes the classification decisions, and the States and
+Territories enforce them.
+The Act contains a National Classification Code (the Code). It also allows Guidelines to be
+made. By agreement, the Commonwealth, State and Territory Ministers can vary the Code
+and the Guidelines.
+The Act requires films and computer games to be classified, using the Code and the
+Guidelines, before they are released or advertised.
+Classification decisions are made by the Classification Board or by other methods authorised
+under the Act (for example, using an approved classification tool). There are avenues for
+review of certain decisions, including by the Classification Review Board. Administrative
+support for both Boards is provided by the Australian Government, currently by the
+Department of Infrastructure, Transport, Regional Development, Communications and the
+Arts.
+
+2
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+Classification categories
+The Act names the classification categories for computer games, and the Code describes
+them. The categories are:
+G
+PG
+M
+MA 15+
+R 18+
+RC
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+3
+
+Classification criteria
+The Act
+Under the Act, each of the following matters must be taken into account in classifying
+computer games:
+(a)
+
+the standards of morality, decency and propriety generally accepted by reasonable
+adults;
+
+(b)
+
+the literary, artistic or educational merit (if any) of the computer game;
+
+(c)
+
+the general character of the computer game, including whether it is of a medical,
+legal or scientific character;
+
+(d)
+
+the persons or class of persons to or amongst whom it is published or is intended or
+likely to be published.
+
+The Code
+Under the Code, classification decisions are to give effect, as far as possible, to the following
+principles:
+(a)
+
+adults should be able to read, hear, see and play what they want;
+
+(b)
+
+minors should be protected from material likely to harm or disturb them;
+
+(c)
+
+everyone should be protected from exposure to unsolicited material that they find
+offensive;
+
+(d)
+
+the need to take account of community concerns about:
+(i) depictions that condone or incite violence, particularly sexual violence; and
+(ii) the portrayal of persons in a demeaning manner.
+
+Consumer advice
+The Act requires the provision of consumer advice about the content of computer games that
+are classified by the Classification Board or in accordance with a different method authorised
+under the Act. This information helps consumers make informed choices.
+
+4
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+The Guidelines
+Using the Guidelines: Essential principles
+Three essential principles underlie the use of the Guidelines:
+the importance of context
+assessing impact
+the six classifiable elements
+Each classification category takes a similar form. It begins with an “impact test” that
+determines the threshold for the category. It then lists the six classifiable elements, with a
+statement limiting the content of each element.
+Importance of context
+Context is crucial in determining whether a classifiable element is justified by the story-line
+or themes. In particular, the way in which important social issues are dealt with may require
+a mature or adult perspective. This means that material that falls into a particular
+classification category in one context may fall outside it in another.
+Assessing impact
+The Guidelines use the following hierarchy of impact:
+very mild
+
+-
+
+G
+
+mild
+
+-
+
+PG
+
+moderate
+
+-
+
+M
+
+strong
+
+-
+
+MA 15+
+
+high
+
+-
+
+R 18+
+
+very high
+
+-
+
+RC
+
+Assessing the impact of material requires considering not only the treatment of individual
+classifiable elements but also their cumulative effect. It also requires considering the purpose
+and tone of a sequence.
+Impact may be higher where a scene or game-play sequence
+contains greater detail, including the use of close-ups and slow motion
+uses accentuation techniques, such as lighting, perspective and resolution
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+5
+
+uses special effects, such as lighting and sound, resolution, colour, size of image,
+characterisation and tone
+is prolonged
+is repeated frequently
+is realistic, rather than stylised
+is highly interactive
+links incentives or rewards to high impact elements.
+Impact may be lessened where reference to a classifiable element is verbal rather than visual.
+Also, some visual impacts have less impact than others: for example, an incidental depiction
+may have less impact than a direct one.
+Interactivity and computer games
+Interactivity is an important consideration that must be taken into account when classifying
+computer games. This is because there are differences in what some sections of the
+community condone in relation to passive viewing or the effects passive viewing may have on
+the viewer (as may occur in a film) compared to actively controlling outcomes by making
+choices to take or not take action.
+Due to the interactive nature of computer games and the active repetitive involvement of the
+participant, as a general rule computer games may have a higher impact than similarly
+themed depictions of the classifiable elements in film, and therefore greater potential for
+harm or detriment, particularly to minors.
+Interactivity may increase the impact of some content: for example, impact may be higher
+where interactivity enables action such as inflicting realistically depicted injuries or death or
+post-mortem damage, attacking civilians or engaging in sexual activity. Greater degrees of
+interactivity (such as first-person gameplay compared to third-person gameplay) may also
+increase the impact of some content.
+Interactivity includes the use of incentives and rewards, technical features and competitive
+intensity. Except in material restricted to adults, nudity and sexual activity must not be related
+to incentives or rewards.
+
+6
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+Computer games will be Refused Classification if they contain:
+(i)
+
+illicit or proscribed drug use related to incentives or rewards;
+
+(ii)
+
+interactive drug use which is detailed and realistic.
+
+The classifiable elements
+The six classifiable elements in a computer game are:
+themes
+violence
+sex
+language
+drug use
+nudity
+The classification takes account of the context and impact of each of these elements,
+including their frequency and intensity, and their cumulative effect. It also takes account of
+the purpose and tone of a sequence, and how material is treated.
+Classification Board’s application of the Guidelines
+Classification decisions are made by the Classification Board or by other methods authorised
+under the Act (for example, by using an approved classification tool). There are avenues for
+review of certain decisions, including by the Classification Review Board.
+In making classification decisions, the Board is required to apply these Guidelines.
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+7
+
+The Categories
+G
+
+GENERAL
+
+Impact test
+The impact of the classifiable elements for material classified G should be very mild only.
+Note: The G classification is for a general audience. However, it does not necessarily
+indicate that children will enjoy the computer game. Some G games contain themes, storylines or game play that do not interest children.
+Classifiable elements
+THEMES
+The treatment of themes should have a very low sense of threat or menace, and be justified by
+context.
+In-game purchases linked to elements of chance and simulated gambling are not permitted.
+VIOLENCE
+Violence should have only a low sense of threat or menace, and be justified by context.
+Sexual violence, implied or otherwise, is not permitted.
+SEX
+Sexual activity should be very mild and very discreetly implied, and be justified by context.
+Sexual activity must not be related to incentives or rewards.
+LANGUAGE
+Coarse language should be very mild and infrequent, and be justified by context.
+DRUG USE
+Drug use should be implied only very discreetly, and be justified by context.
+Drug use related to incentives or rewards is not permitted.
+Interactive illicit or proscribed drug use is not permitted.
+NUDITY
+Nudity should be infrequent and justified by context.
+Nudity must not be related to incentives or rewards.
+Note: Some of the terms used in this category are defined in the List of Terms at the end of
+these Guidelines.
+
+8
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+PG
+
+PARENTAL GUIDANCE
+
+Impact test
+The impact of the classifiable elements for material classified PG should be no higher than
+mild.
+Note: Material classified PG may contain material which some children find confusing or
+upsetting, and may require the guidance of parents or guardians. It is not recommended for
+playing by persons under 15 without guidance from parents or guardians.
+Classifiable elements
+THEMES
+The treatment of themes should generally have a low sense of threat or menace and be
+justified by context.
+In-game purchases linked to elements of chance and simulated gambling are not permitted.
+VIOLENCE
+Violence should be mild and infrequent, and be justified by context.
+Sexual violence, implied or otherwise, is not permitted.
+SEX
+Sexual activity should be mild and discreetly implied, and be justified by context.
+Sexual activity must not be related to incentives or rewards.
+LANGUAGE
+Coarse language should be mild and infrequent, and be justified by context.
+DRUG USE
+Drug use should be infrequent and justified by context.
+Drug use related to incentives or rewards is not permitted.
+Interactive illicit or proscribed drug use is not permitted.
+NUDITY
+Nudity should be infrequent and justified by context.
+Nudity must not be related to incentives or rewards.
+Note: Some of the terms used in this category are defined in the List of Terms at the end of
+these Guidelines.
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+9
+
+M
+
+MATURE
+
+Impact test
+The impact of the classifiable elements for material classified M should be no higher than
+moderate.
+Note: Material classified M is not recommended for persons under 15 years of age. There
+are no legal restrictions on access.
+Classifiable elements
+THEMES
+The treatment of themes may have a moderate sense of threat or menace, if justified by
+context.
+In-game purchases linked to elements of chance are permitted.
+Simulated gambling is not permitted.
+VIOLENCE
+Moderate violence is permitted, if justified by context.
+Sexual violence, implied or otherwise, is not permitted
+SEX
+Sexual activity should be discreetly implied, if justified by context.
+Sexual activity must not be related to incentives or rewards.
+LANGUAGE
+Coarse language may be used.
+Aggressive or strong coarse language should be infrequent, justified by context, and not
+gratuitous, exploitative or offensive.
+DRUG USE
+Drug use should be justified by context.
+Drug use related to incentives or rewards is not permitted.
+Interactive illicit or proscribed drug use is not permitted.
+NUDITY
+Nudity should be justified by context.
+Nudity must not be related to incentives or rewards.
+Note: Some of the terms used in this category are defined in the List of Terms at the end of
+these Guidelines.
+10
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+MA 15+
+
+MATURE ACCOMPANIED
+
+Impact test
+The impact of material classified MA 15+ should be no higher than strong.
+Note: Material classified MA 15+ is considered unsuitable for persons under 15 years of age.
+It is a legally restricted category.
+
+Classifiable elements
+THEMES
+The treatment of strong themes should be justified by context.
+In-game purchases linked to elements of chance are permitted.
+Simulated gambling is not permitted.
+VIOLENCE
+Violence should be justified by context.
+Strong and realistic violence should not be frequent or unduly repetitive.
+Sexual violence, implied or otherwise, is not permitted.
+SEX
+Sexual activity may be implied.
+Sexual activity must not be related to incentives or rewards.
+LANGUAGE
+Strong coarse language may be used.
+Aggressive or strong coarse language should be infrequent, and not exploitative or offensive.
+DRUG USE
+Drug use should be justified by context.
+Drug use related to incentives or rewards is not permitted.
+Interactive illicit or proscribed drug use is not permitted.
+NUDITY
+Nudity should be justified by context.
+Nudity must not be related to incentives or rewards.
+Note: Some of the terms used in this category are defined in the List of Terms at the end of
+these Guidelines.
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+11
+
+R 18+
+
+RESTRICTED
+
+Impact test
+The impact of material classified R 18+ should not exceed high.
+Note: Material classified R 18+ is legally restricted to adults. Some material classified R 18+
+may be offensive to sections of the adult community.
+Classifiable elements
+THEMES
+There are virtually no restrictions on the treatment of themes.
+In-game purchases linked to elements of chance and simulated gambling are permitted.
+VIOLENCE
+Violence is permitted. High impact violence that is, in context, frequently gratuitous,
+exploitative and offensive to a reasonable adult will not be permitted.
+Actual sexual violence is not permitted.
+Implied sexual violence that is visually depicted, interactive, not justified by context or
+related to incentives or rewards is not permitted.
+SEX
+Depictions of actual sexual activity are not permitted.
+Depictions of simulated sexual activity may be permitted.
+Depictions of simulated sexual activity that are explicit and realistic are not permitted.
+LANGUAGE
+There are virtually no restrictions on language.
+DRUG USE
+Drug use is permitted.
+Drug use related to incentives and rewards is not permitted.
+Interactive illicit or proscribed drug use that is detailed and realistic is not permitted.
+NUDITY
+Nudity is permitted.
+Note: Some of the terms used in this category are defined in the List of Terms at the end of
+these Guidelines.
+
+12
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+RC
+
+REFUSED CLASSIFICATION
+
+Note: Computer games that exceed the R 18+ classification category will be Refused
+Classification.
+Computer games will be refused classification if they include or contain any of the following:
+CRIME OR VIOLENCE
+Detailed instruction or promotion in matters of crime or violence.
+The promotion or provision of instruction in paedophile activity.
+Descriptions or depictions of child sexual abuse or any other exploitative or offensive
+descriptions or depictions involving a person who is, or appears to be, a child under 18 years.
+Depictions of:
+(i)
+(ii)
+(iii)
+
+violence with a very high degree of impact which are excessively frequent,
+prolonged, detailed or repetitive;
+cruelty or realistic violence which are very detailed and which have a very high
+impact;
+actual sexual violence.
+
+Implied sexual violence related to incentives and rewards.
+SEX
+Depictions of actual sexual activity are not permitted.
+Depictions of simulated sexual activity that are explicit and realistic are not permitted.
+Depictions of practices such as bestiality.
+Gratuitous, exploitative or offensive depictions of:
+(i)
+(ii)
+
+activity accompanied by fetishes or practices which are offensive or abhorrent;
+incest fantasies or other fantasies which are offensive or abhorrent.
+
+DRUG USE
+Detailed instruction in the use of proscribed drugs.
+Material promoting or encouraging proscribed drug use.
+Computer games will also be Refused Classification if they contain:
+(i)
+
+illicit or proscribed drug use related to incentives or rewards;
+
+(ii)
+
+interactive drug use which is detailed and realistic.
+
+Note: Some of the terms used in this category are defined in the List of Terms at the end of
+these Guidelines.
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+13
+
+LIST OF TERMS
+Note: Words which are used in the Guidelines but which are not contained in this List of
+Terms take their usual dictionary meaning. Refer to the latest edition of The Macquarie
+Dictionary.
+Coercion:
+
+The use of threat or power to force agreement to
+sexual activity.
+
+Demean:
+
+A depiction or description, directly or indirectly
+sexual in nature, which debases or appears to
+debase the person or the character depicted.
+
+Elements:
+
+Themes, violence, sex, coarse language, drug use
+and nudity.
+
+Exploitative:
+
+Appearing to purposefully debase or abuse for
+the enjoyment of others, and lacking moral,
+artistic or other values.
+
+Fetish:
+
+An object, an action or a non-sexual part of the
+body which gives sexual gratification.
+
+In-game purchases
+linked to elements of chance:
+
+Digital goods or services determined by chance,
+including Paid Loot Boxes, that can be acquired
+within a game:
+a) using real world currency; or
+b) using in-game virtual currency, items or
+credits that can be purchased using realworld currency.
+
+Intensity:
+
+Strength of the treatment or subject matter;
+strength of engagement or involvement.
+
+Interactivity:
+
+The quality of being interactive. Providing or
+capable of providing for user participation that
+enables some measure of control in relation to
+user action, data input and commands. The
+user’s participation may influence outcomes that
+in turn, may affect what options are available to
+them for subsequent interaction.
+
+Offensive:
+
+Material which causes outrage or extreme
+disgust.
+
+Paid Loot Box:
+
+A virtual container, however described:
+a) that can be purchased or unlocked using real
+world currency or using in-game virtual
+
+14
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+currency, items or credits that can be
+purchased using real world currency; and
+b) that rewards players with an in-game digital
+item or items, where the exact reward the
+player is to receive is not disclosed to the
+player prior to purchase.
+Note:
+
+Real World Currency:
+
+Paid Loot Boxes may be known by other names
+in the computer game industry including but not
+limited to prize crates and card packs.
+
+Real world physical and digital currency,
+including cryptocurrency.
+Note:
+
+This does not include tokens, credits or other ingame items and currencies that cannot readily be
+redeemed or exchanged for value outside the
+game environment.
+
+Sexual Activity:
+
+Matters pertaining to sexual acts, but not limited
+to sexual intercourse.
+
+Sexual Violence:
+
+Sexual assault or aggression, in which the victim
+does not consent.
+
+Sexualised Violence:
+
+Where sex and violence are connected in the
+story, although sexual violence may not
+necessarily occur.
+
+Simulated Gambling:
+
+Interactive activity within a game that:
+a) resembles or functions like a real world age
+restricted betting or gambling service; and
+b) does not provide rewards that can be
+redeemed for real world currency or traded to
+other players in-game for real world
+currency.
+Note:
+
+For example, interactive activity within games
+that resembles or functions like real world
+commercial casinos, slot machines, lotteries,
+sports betting services or other betting services
+will be simulated gambling.
+
+Themes:
+
+Social issues such as crime, suicide, drug and
+alcohol dependency, death, serious illness,
+family breakdown and racism.
+
+Treatment:
+
+The way in which material is handled or
+presented.
+
+Violence:
+
+Acts of violence; the threat or effects of
+violence.
+
+Guidelines for the Classification of Computer Games 2023
+
+Authorised Version F2023L01424 registered 27/10/2023
+
+15
+
+
