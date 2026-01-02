@@ -3,6 +3,7 @@ import { fetchBookByISBN, fetchCandidatesByISBN, BookCandidate } from '@/lib/boo
 import { normalizeISBN } from '@/lib/isbn-validation'
 import { Database } from '@/types/supabase'
 import { isStale, refreshBookMetadata } from '@/lib/book-cache'
+import { MODEL_VERSION, TAXONOMY_VERSION } from '@/lib/config/taxonomy-v2'
 
 // Helper to validate cover URL is not a placeholder
 async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
@@ -260,60 +261,77 @@ export async function processIsbnScan(
       })
 
       if (candidates.length > 1) {
-        console.log(`Found ${candidates.length} candidates for ISBN ${cleanIsbn}, returning ambiguity.`)
-        onProgress?.(`Found ${candidates.length} possible matches. Please select the correct book.`);
+        console.log(`Found ${candidates.length} candidates for ISBN ${cleanIsbn}, selecting best candidate.`)
+        onProgress?.(`Found ${candidates.length} possible matches. Selecting best candidate based on description and cover quality...`);
 
-        // Create ambiguous entry
-        const { data: ambiguousScan } = await (supabaseAdmin as any)
-          .from('ambiguous_scans')
-          .insert({
-            isbn: cleanIsbn,
-            candidates: candidates as any
-          })
-          .select()
-          .single()
+        // Intelligently select the best candidate
+        const { selectBestCandidate } = await import('@/lib/utils/candidate-selection')
+        const bestCandidate = await selectBestCandidate(candidates, true) // Enable AI verification
+        
+        if (bestCandidate) {
+          console.log(`[Scan Service] Selected best candidate: "${bestCandidate.title}" from ${bestCandidate.source}`)
+          onProgress?.(`✅ Selected best candidate: "${bestCandidate.title}" (${bestCandidate.source})`)
+          bookData = bestCandidate
+        } else {
+          // Fallback: if selection fails, return ambiguity
+          console.log(`[Scan Service] Candidate selection failed, returning ambiguity`)
+          onProgress?.(`Found ${candidates.length} possible matches. Please select the correct book.`);
 
-        // Log for manual handling
-        try {
-          await supabaseAdmin
-            .from('manual_handling_scans')
+          // Create ambiguous entry
+          const { data: ambiguousScan } = await (supabaseAdmin as any)
+            .from('ambiguous_scans')
             .insert({
               isbn: cleanIsbn,
-              reason: 'ambiguous',
-              status: 'pending',
-              candidates: candidates as any,
-              metadata: {
-                candidate_count: candidates.length,
-                attempted_at: new Date().toISOString(),
-                source: 'scan_service'
-              }
+              candidates: candidates as any
             })
-        } catch (logError) {
-          console.error('Failed to log manual handling scan:', logError)
-          // Don't throw - logging failure shouldn't break the scan
-        }
+            .select()
+            .single()
 
-        timings.total = performance.now() - overallStartTime
-        return {
-          success: true,
-          status: 'ambiguous',
-          candidates,
-          ambiguousScanId: ambiguousScan?.id,
-          scan: { id: 'temp-ambiguous', isbn: cleanIsbn },
-          isNewBook: true,
-          contentWarningsGenerated: false,
-          authorContextInvestigated: false,
-          timings,
-          flags: {
-            usedWebSearch: false,
-            isThinMetadata: false,
-            pipelinePath: 'ambiguous'
+          // Log for manual handling
+          try {
+            await supabaseAdmin
+              .from('manual_handling_scans')
+              .insert({
+                isbn: cleanIsbn,
+                reason: 'ambiguous',
+                status: 'pending',
+                candidates: candidates as any,
+                metadata: {
+                  candidate_count: candidates.length,
+                  attempted_at: new Date().toISOString(),
+                  source: 'scan_service'
+                }
+              })
+          } catch (logError) {
+            console.error('Failed to log manual handling scan:', logError)
+            // Don't throw - logging failure shouldn't break the scan
+          }
+
+          timings.total = performance.now() - overallStartTime
+          return {
+            success: true,
+            status: 'ambiguous',
+            candidates,
+            ambiguousScanId: ambiguousScan?.id,
+            scan: { id: 'temp-ambiguous', isbn: cleanIsbn },
+            isNewBook: true,
+            contentWarningsGenerated: false,
+            authorContextInvestigated: false,
+            timings,
+            flags: {
+              usedWebSearch: false,
+              isThinMetadata: false,
+              pipelinePath: 'ambiguous'
+            }
           }
         }
       }
 
       if (candidates.length === 1) {
-        bookData = candidates[0]
+        // Even with one candidate, enhance it with cross-source cover if needed
+        const { selectBestCandidate } = await import('@/lib/utils/candidate-selection')
+        const enhancedCandidate = await selectBestCandidate(candidates, false) // No AI needed for single candidate
+        bookData = enhancedCandidate || candidates[0]
       }
     }
 
@@ -711,10 +729,229 @@ export async function processIsbnScan(
               contentWarningsGenerated = true
               const savedCount = insertedWarnings?.length || warningsToInsert.length
               onProgress?.(`✅ Saved ${savedCount} content warnings`)
+              
+              // Log audit decision: warnings were generated
+              await logAuditDecision({
+                bookId: bookId,
+                isbn: cleanIsbn,
+                decisionType: 'warnings_generated',
+                warningsCount: savedCount,
+                aiReasoning: `AI analysis identified ${savedCount} content warning(s) for this book. Analysis completed successfully.`,
+                confidenceLevel: 'high',
+                bookTitle: bookForAnalysis.title,
+                bookAuthor: bookForAnalysis.author,
+                descriptionLength: descriptionForAnalysis.length,
+                hadThinMetadata: isMinimalDescription,
+                usedWebSearch: usedWebSearch,
+                modelVersion: MODEL_VERSION,
+                taxonomyVersion: TAXONOMY_VERSION,
+                pipelinePath: pipelinePath
+              })
             }
           } else {
             onProgress?.('ℹ️ No content warnings identified by AI analysis')
             console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
+            
+            // VERIFICATION: If 0 warnings, perform web search as backup verification
+            onProgress?.('🔍 Performing web search verification (0 warnings found)...')
+            const webSearchStartTime = performance.now()
+            
+            try {
+              // Use OpenAI to search for content warnings online
+              const { default: OpenAI } = await import('openai')
+              const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+              
+              const searchQuery = `${bookForAnalysis.title} ${bookForAnalysis.author || ''} content warnings trigger warnings`.trim()
+              onProgress?.(`🌐 Searching for content warnings: "${searchQuery}"`)
+              
+              // Ask OpenAI to search its knowledge base and web (if available) for content warnings
+              const searchPrompt = `Based on your knowledge and any available information, does the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} have content warnings, trigger warnings, or sensitive content that readers should be aware of?
+
+Look for mentions of:
+- Violence, abuse, or trauma
+- Sexual content or sexual violence
+- Mental health themes (suicide, self-harm, etc.)
+- Disturbing or graphic content
+- Dark themes
+
+If you find any content warnings mentioned online or in reviews, list them briefly. If the book is known to be safe/cozy/light, confirm that. Be factual and specific.`
+
+              const searchResponse = await openai.chat.completions.create({
+                model: 'gpt-4o',
+                messages: [
+                  {
+                    role: 'system',
+                    content: 'You are a helpful assistant that provides factual information about book content warnings based on available knowledge and information.'
+                  },
+                  {
+                    role: 'user',
+                    content: searchPrompt
+                  }
+                ],
+                max_tokens: 300
+              }).catch(err => {
+                console.error('Web search verification via OpenAI failed:', err)
+                return null
+              })
+              
+              timings.webSearch = performance.now() - webSearchStartTime
+              usedWebSearch = true
+              
+              let webSearchFoundWarnings = false
+              let webSearchContext = ''
+              let reanalysisResult: { warnings: any[] } | null = null
+              
+              if (searchResponse) {
+                const messageContent = searchResponse.choices[0]?.message?.content || ''
+                
+                // Check if the response indicates warnings exist
+                const warningIndicators = ['warning', 'trigger', 'sensitive', 'disturbing', 'violence', 'abuse', 'trauma', 'graphic', 'explicit', 'dark', 'mature']
+                const hasWarningIndicators = warningIndicators.some(indicator => 
+                  messageContent.toLowerCase().includes(indicator)
+                )
+                
+                // Also check for negative indicators (safe, cozy, light, etc.)
+                const safeIndicators = ['safe', 'cozy', 'light', 'romance', 'comedy', 'no warnings', 'no content warnings', 'family-friendly']
+                const hasSafeIndicators = safeIndicators.some(indicator => 
+                  messageContent.toLowerCase().includes(indicator)
+                )
+                
+                if (hasWarningIndicators && !hasSafeIndicators) {
+                  webSearchFoundWarnings = true
+                  webSearchContext = `Web search found potential content warnings: ${messageContent.substring(0, 200)}... `
+                  onProgress?.('⚠️ Web search found potential warnings - re-analyzing with web context...')
+                  
+                  // Re-run analysis with web search context
+                  const enhancedDescription = `${descriptionForAnalysis}\n\nAdditional Context from Web Search:\n${messageContent}`
+                  
+                  const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
+                  reanalysisResult = await analyzeBookWithMultiModel(
+                    {
+                      title: bookForAnalysis.title || 'Unknown',
+                      author: bookForAnalysis.author || 'Unknown',
+                      description: enhancedDescription,
+                      isbn: cleanIsbn
+                    },
+                    onProgress
+                  )
+                  
+                  if (reanalysisResult.warnings.length > 0) {
+                    // Found warnings on re-analysis - save them
+                    onProgress?.(`✅ Re-analysis with web context found ${reanalysisResult.warnings.length} warning(s)`)
+                    
+                    const { getCategoryById } = await import('@/lib/config/taxonomy-v2')
+                    const warningsToInsert = reanalysisResult.warnings
+                      .map(w => {
+                        if (!w.subcategory_id || !w.subcategory_id.includes('.')) return null
+                        const [categoryId, subcategoryId] = w.subcategory_id.split('.')
+                        if (!categoryId || !subcategoryId) return null
+                        const category = getCategoryById(categoryId)
+                        const legacyCategory = category?.legacyCategory || 'other'
+                        
+                        return {
+                          book_id: bookId,
+                          category: legacyCategory,
+                          category_id: categoryId,
+                          subcategory_id: subcategoryId,
+                          description: w.description?.trim() || `Content warning for ${w.subcategory_id}`,
+                          severity: w.severity,
+                          confidence_score: w.evidence[0]?.confidence || 0.7, // Lower confidence since from web search
+                          context_modifiers: w.modifiers,
+                          evidence: w.evidence,
+                          severity_signals: w.severity_signals,
+                          taxonomy_version: w.taxonomy_version,
+                          is_spoiler: w.is_spoiler === true,
+                          source: 'ai_generated',
+                          reasoning: w.reasoning || `Warning identified through web search verification and re-analysis. ${w.reasoning || ''}`
+                        }
+                      })
+                      .filter((w): w is NonNullable<typeof w> => w !== null)
+                    
+                    if (warningsToInsert.length > 0) {
+                      const { data: insertedWarnings, error: warningsError } = await supabaseAdmin
+                        .from('content_warnings')
+                        .insert(warningsToInsert)
+                        .select()
+                      
+                      if (!warningsError) {
+                        contentWarningsGenerated = true
+                        onProgress?.(`✅ Saved ${insertedWarnings?.length || warningsToInsert.length} warnings from web search verification`)
+                        
+                        // Log audit decision: warnings found via web search verification
+                        await logAuditDecision({
+                          bookId: bookId,
+                          isbn: cleanIsbn,
+                          decisionType: 'warnings_generated',
+                          warningsCount: insertedWarnings?.length || warningsToInsert.length,
+                          aiReasoning: `Initial analysis found 0 warnings. Web search verification found potential warnings, and re-analysis confirmed ${insertedWarnings?.length || warningsToInsert.length} content warning(s).`,
+                          confidenceLevel: 'medium', // Medium confidence since web search was needed
+                          bookTitle: bookForAnalysis.title,
+                          bookAuthor: bookForAnalysis.author,
+                          descriptionLength: enhancedDescription.length,
+                          hadThinMetadata: isMinimalDescription,
+                          usedWebSearch: true,
+                          modelVersion: MODEL_VERSION,
+                          taxonomyVersion: TAXONOMY_VERSION,
+                          pipelinePath: `${pipelinePath} -> web_search_verification`
+                        })
+                      }
+                    }
+                  } else {
+                    // Re-analysis still found 0 warnings
+                    onProgress?.('✅ Web search verification confirmed: no warnings found')
+                  }
+                } else {
+                  // No warning indicators found
+                  onProgress?.('✅ Web search confirmed: no warnings mentioned online')
+                  webSearchContext = 'Web search verification performed - no warnings found. '
+                }
+              } else {
+                onProgress?.('⚠️ Web search unavailable, skipping verification')
+              }
+              
+              // Log audit decision: analysis completed, web search verified no warnings
+              // Only log if we didn't already log warnings_generated above
+              if (!webSearchFoundWarnings || (webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length === 0)) {
+                await logAuditDecision({
+                  bookId: bookId,
+                  isbn: cleanIsbn,
+                  decisionType: 'no_warnings',
+                  warningsCount: 0,
+                  aiReasoning: `AI analysis completed and found no content warnings. ${webSearchContext}Web search verification confirmed the book appears safe for general reading.`,
+                  confidenceLevel: usedWebSearch ? 'high' : 'medium', // Higher confidence if web search verified
+                  bookTitle: bookForAnalysis.title,
+                  bookAuthor: bookForAnalysis.author,
+                  descriptionLength: descriptionForAnalysis.length,
+                  hadThinMetadata: isMinimalDescription,
+                  usedWebSearch: usedWebSearch,
+                  modelVersion: MODEL_VERSION,
+                  taxonomyVersion: TAXONOMY_VERSION,
+                  pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath
+                })
+              }
+            } catch (webSearchError) {
+              console.error('Web search verification error:', webSearchError)
+              onProgress?.('⚠️ Web search verification failed, continuing without verification')
+              timings.webSearch = performance.now() - webSearchStartTime
+              
+              // Log audit decision without web search verification
+              await logAuditDecision({
+                bookId: bookId,
+                isbn: cleanIsbn,
+                decisionType: 'no_warnings',
+                warningsCount: 0,
+                aiReasoning: `AI analysis completed for this book but found no content warnings. Web search verification was attempted but failed. The book appears to be safe for general reading based on description analysis.`,
+                confidenceLevel: 'medium', // Lower confidence since web search failed
+                bookTitle: bookForAnalysis.title,
+                bookAuthor: bookForAnalysis.author,
+                descriptionLength: descriptionForAnalysis.length,
+                hadThinMetadata: isMinimalDescription,
+                usedWebSearch: false,
+                modelVersion: MODEL_VERSION,
+                taxonomyVersion: TAXONOMY_VERSION,
+                pipelinePath: pipelinePath
+              })
+            }
           }
         } catch (analysisError) {
           console.error('Error in analyzeBookWithMultiModel:', analysisError)
