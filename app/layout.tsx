@@ -22,23 +22,24 @@ export const metadata: Metadata = {
   title: 'Subtext',
   description: 'Reveal the hidden content in every book.',
   manifest: '/manifest.json',
-  themeColor: '#fef3c7',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'Subtext',
   },
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover',
-  },
   icons: {
     icon: '/logo_var_2.png',
     apple: '/logo_var_2.png',
   },
+}
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#fef3c7',
 }
 
 export default function RootLayout({

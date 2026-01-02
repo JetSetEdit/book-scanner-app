@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera, Flag } from "lucide-react"
 import Link from "next/link"
 import { useLocalStorage } from "@/hooks/use-browser-storage"
 import { useScanHistory } from "@/hooks/use-scan-history"
@@ -46,6 +46,12 @@ export default function ScanTestPage() {
   const [candidates, setCandidates] = useState<any[] | null>(null)
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
   const [isProcessingSelection, setIsProcessingSelection] = useState(false)
+  const [showReportForm, setShowReportForm] = useState(false)
+  const [reportSubmitted, setReportSubmitted] = useState(false)
+  const [reportTitle, setReportTitle] = useState("")
+  const [reportAuthor, setReportAuthor] = useState("")
+  const [reportAdditionalInfo, setReportAdditionalInfo] = useState("")
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false)
 
   // Load last ISBN on mount (only if input is empty)
   useEffect(() => {
@@ -70,6 +76,12 @@ export default function ScanTestPage() {
     // Reset selection state
     setSelectedCandidateId(null)
     setIsProcessingSelection(false)
+    // Reset report form state
+    setShowReportForm(false)
+    setReportSubmitted(false)
+    setReportTitle("")
+    setReportAuthor("")
+    setReportAdditionalInfo("")
 
     try {
       markStage('api-request-sent')
@@ -181,6 +193,11 @@ export default function ScanTestPage() {
         setResult(transformedResult)
         setCandidates(null)
         
+        // If scan failed, set error message
+        if (!result.success && result.message) {
+          setError(result.message)
+        }
+        
         markStage('result-processed')
         
         // Save to scan history
@@ -242,6 +259,46 @@ export default function ScanTestPage() {
 
   const handleScannerError = (errorMsg: string) => {
     setError(errorMsg)
+  }
+
+  const handleReportBook = async () => {
+    if (!isbn) return
+    
+    setIsSubmittingReport(true)
+    try {
+      const response = await fetch("/api/report-book", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          isbn: isbn,
+          title: reportTitle || undefined,
+          author: reportAuthor || undefined,
+          additionalInfo: reportAdditionalInfo || undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to submit report")
+      }
+
+      const data = await response.json()
+      setReportSubmitted(true)
+      setShowReportForm(false)
+      // Reset form after a delay
+      setTimeout(() => {
+        setReportTitle("")
+        setReportAuthor("")
+        setReportAdditionalInfo("")
+        setReportSubmitted(false)
+      }, 5000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to submit report")
+    } finally {
+      setIsSubmittingReport(false)
+    }
   }
 
   return (
@@ -398,8 +455,106 @@ export default function ScanTestPage() {
             <Alert variant="destructive" className="mb-6">
               <XCircle className="h-4 w-4" />
               <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error}
+                {error.includes("not found") && !showReportForm && !reportSubmitted && (
+                  <div className="mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowReportForm(true)}
+                      className="w-full sm:w-auto"
+                    >
+                      <Flag className="h-4 w-4 mr-2" />
+                      Report this ISBN
+                    </Button>
+                  </div>
+                )}
+              </AlertDescription>
             </Alert>
+          )}
+
+          {reportSubmitted && (
+            <Alert className="mb-6 border-green-500 text-green-700 bg-green-50 dark:bg-green-950/20">
+              <CheckCircle className="h-4 w-4" />
+              <AlertTitle>Report Submitted</AlertTitle>
+              <AlertDescription>
+                Thank you! Your report has been submitted. We'll investigate this ISBN.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {showReportForm && !reportSubmitted && (
+            <Card className="mb-6 border-blue-500">
+              <CardHeader>
+                <CardTitle className="text-lg">Report Missing Book</CardTitle>
+                <CardDescription>
+                  Help us find this book by providing any information you know about it.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="report-title">Book Title (if known)</Label>
+                  <Input
+                    id="report-title"
+                    placeholder="e.g., The Great Gatsby"
+                    value={reportTitle}
+                    onChange={(e) => setReportTitle(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="report-author">Author (if known)</Label>
+                  <Input
+                    id="report-author"
+                    placeholder="e.g., F. Scott Fitzgerald"
+                    value={reportAuthor}
+                    onChange={(e) => setReportAuthor(e.target.value)}
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="report-info">Additional Information (optional)</Label>
+                  <textarea
+                    id="report-info"
+                    placeholder="Any other details that might help us find this book..."
+                    value={reportAdditionalInfo}
+                    onChange={(e) => setReportAdditionalInfo(e.target.value)}
+                    className="mt-1 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleReportBook}
+                    disabled={isSubmittingReport}
+                    className="flex-1"
+                  >
+                    {isSubmittingReport ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      <>
+                        <Flag className="mr-2 h-4 w-4" />
+                        Submit Report
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowReportForm(false)
+                      setReportTitle("")
+                      setReportAuthor("")
+                      setReportAdditionalInfo("")
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Simplified Progress Display */}
@@ -523,7 +678,7 @@ export default function ScanTestPage() {
             </div>
           )}
 
-                 {result && (
+                 {result && result.success && (
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
               <Alert className="border-green-500 text-green-700 bg-green-50 dark:bg-green-950/20">
                 <CheckCircle className="h-4 w-4" />

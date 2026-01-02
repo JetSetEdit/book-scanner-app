@@ -23,6 +23,13 @@ export interface Database {
           categories: string[] | null
           created_at: string
           updated_at: string | null
+          content_briefing: string | null
+          audio_url: string | null
+          audio_duration: number | null
+          audio_transcript: string | null
+          audio_generated_at: string | null
+          audio_voice_id: string | null
+          last_synced_at: string | null
         }
         Insert: {
           id?: string
@@ -37,6 +44,13 @@ export interface Database {
           categories?: string[] | null
           created_at?: string
           updated_at?: string | null
+          content_briefing?: string | null
+          audio_url?: string | null
+          audio_duration?: number | null
+          audio_transcript?: string | null
+          audio_generated_at?: string | null
+          audio_voice_id?: string | null
+          last_synced_at?: string | null
         }
         Update: {
           id?: string
@@ -51,6 +65,13 @@ export interface Database {
           categories?: string[] | null
           created_at?: string
           updated_at?: string | null
+          content_briefing?: string | null
+          audio_url?: string | null
+          audio_duration?: number | null
+          audio_transcript?: string | null
+          audio_generated_at?: string | null
+          audio_voice_id?: string | null
+          last_synced_at?: string | null
         }
         Relationships: []
       }
