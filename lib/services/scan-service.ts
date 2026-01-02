@@ -589,7 +589,7 @@ export async function processIsbnScan(
       onProgress?.('🔍 Checking if description is sufficient for analysis...')
       
       // If we have a description, use it. Otherwise, use a minimal description based on metadata
-      const descriptionForAnalysis = bookForAnalysis.description && bookForAnalysis.description.length > 50
+      let descriptionForAnalysis = bookForAnalysis.description && bookForAnalysis.description.length > 50
         ? bookForAnalysis.description
         : bookForAnalysis.description && bookForAnalysis.description.length > 0
         ? bookForAnalysis.description
@@ -1106,14 +1106,13 @@ If you find any content warnings mentioned online or in reviews, list them brief
           
           throw analysisError; // Re-throw to be caught by outer catch
         }
+      } else {
+        onProgress?.('⚠️ Skipping analysis: Book title missing')
+        console.error('Cannot run analysis: bookForAnalysis is null or missing title', { 
+          hasBook: !!bookForAnalysis, 
+          hasTitle: !!bookForAnalysis?.title 
+        })
       }
-    } else {
-      onProgress?.('⚠️ Skipping analysis: Book title missing')
-      console.error('Cannot run analysis: bookForAnalysis is null or missing title', { 
-        hasBook: !!bookForAnalysis, 
-        hasTitle: !!bookForAnalysis?.title 
-      })
-    }
   } catch (error) {
     console.error('Content warning analysis failed:', error)
     console.error('Error details:', error instanceof Error ? error.stack : error)
