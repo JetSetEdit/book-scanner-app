@@ -152,14 +152,14 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       )
     }
     
-    // If analysis is complete and no warnings, show "Safe" message
+    // If analysis is complete and no warnings, show "Safe" message with positive framing
     return (
       <div className="py-12 text-center border-y border-border">
         <div className="flex justify-center mb-4">
           <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />
         </div>
-        <h3 className="text-lg font-serif font-medium text-foreground mb-1">No Content Warnings</h3>
-        <p className="text-muted-foreground text-sm">Our analysis found no sensitive content warnings for this book.</p>
+        <h3 className="text-lg font-serif font-medium text-foreground mb-1">✨ Comfort Read</h3>
+        <p className="text-muted-foreground text-sm">We analyzed this book and found no concerning content. This appears to be a safe, cozy read.</p>
       </div>
     )
   }
