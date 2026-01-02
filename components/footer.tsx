@@ -1,7 +1,45 @@
+"use client"
+
 import Link from "next/link"
 import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE } from "@/lib/config/version"
+import { usePathname } from "next/navigation"
+import { useState, useEffect } from "react"
 
 export function Footer() {
+  const pathname = usePathname()
+  const [isComfortRead, setIsComfortRead] = useState(false)
+  const [isDismissed, setIsDismissed] = useState(false)
+
+  // Check if we're on a book page and if it's a Comfort Read
+  useEffect(() => {
+    if (pathname?.startsWith('/book/')) {
+      // Check for Comfort Read badge in the DOM (hacky but works without prop drilling)
+      const checkComfortRead = () => {
+        const comfortReadBadge = document.querySelector('[data-comfort-read="true"]')
+        setIsComfortRead(!!comfortReadBadge)
+      }
+      
+      // Check after a short delay to allow page to render
+      const timer = setTimeout(checkComfortRead, 100)
+      checkComfortRead() // Also check immediately
+      
+      return () => clearTimeout(timer)
+    } else {
+      setIsComfortRead(false)
+    }
+  }, [pathname])
+
+  // Load dismissed state from localStorage
+  useEffect(() => {
+    const dismissed = localStorage.getItem('beta-disclaimer-dismissed') === 'true'
+    setIsDismissed(dismissed)
+  }, [])
+
+  const handleDismiss = () => {
+    localStorage.setItem('beta-disclaimer-dismissed', 'true')
+    setIsDismissed(true)
+  }
+
   return (
     <footer className="border-t border-border bg-card/30 mt-auto pb-20 md:pb-8">
       <div className="container mx-auto px-4 py-8">
@@ -9,6 +47,31 @@ export function Footer() {
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
             Subtext provides transparent content analysis: every AI-generated warning includes source citations and reasoning so you can verify how it was determined. When authors provide their own content notes, we prioritize those above all else. While no system is perfect, we've built multiple verification layers and clear reasoning trails to ensure accuracy. Severity ratings are subjective—they vary by individual sensitivity and the nature of the content. Subtext is a tool for information, not a substitute for your own judgment.
           </p>
+          
+          {/* Beta Disclaimer - Contextualized for Comfort Read */}
+          {!isDismissed && (
+            <div className="text-xs text-muted-foreground/70 text-center mb-4">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {isComfortRead ? (
+                  <p className="italic">
+                    Verified by AI Beta • {APP_VERSION_LABEL}
+                  </p>
+                ) : (
+                  <p>
+                    {APP_VERSION_LABEL} • AI analysis is actively being improved. Results may vary.
+                  </p>
+                )}
+                <button
+                  onClick={handleDismiss}
+                  className="text-muted-foreground/50 hover:text-muted-foreground transition-colors underline underline-offset-2"
+                  aria-label="Dismiss beta disclaimer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+          
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
             Subtext is a participant in the Amazon Services LLC Associates Program. As an Amazon Associate, we earn from qualifying purchases.
           </p>

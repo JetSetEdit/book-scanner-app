@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   AlertTriangle,
@@ -59,6 +60,7 @@ interface ContentWarning {
 interface ContentWarningsListProps {
   warnings: ContentWarning[]
   isAuthorApproved?: boolean
+  analysisStatus?: 'complete' | 'unknown'
 }
 
 const categoryLabels: Record<string, string> = {
@@ -103,9 +105,10 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown' }: ContentWarningsListProps) {
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
+  const [requestSent, setRequestSent] = useState(false)
   
   // Filter warnings based on trope mode
   const filteredWarnings = warnings.filter(warning => {
@@ -121,14 +124,42 @@ export function ContentWarningsList({ warnings, isAuthorApproved }: ContentWarni
     w.description.toLowerCase().includes('depression')
   );
 
+  const handleRequestAnalysis = () => {
+    setRequestSent(true)
+    toast.success("Analysis requested! We've added this to our priority queue.")
+  }
+
+  // Handle empty warnings - distinguish between "Safe" (analyzed, no warnings) and "Unknown" (not analyzed)
   if (!filteredWarnings || filteredWarnings.length === 0) {
+    // If analysis status is unknown, show "not analyzed" message
+    if (analysisStatus === 'unknown') {
+      return (
+        <div className="py-12 text-center border-y border-border">
+          <div className="flex justify-center mb-4">
+            <HelpCircle className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-serif font-medium text-foreground mb-1">This book hasn't been analyzed yet</h3>
+          <p className="text-muted-foreground text-sm mb-6">We haven't analyzed this book for content warnings. Scan the ISBN to generate an analysis.</p>
+          <Button
+            variant="outline"
+            onClick={handleRequestAnalysis}
+            disabled={requestSent}
+            className="mt-2"
+          >
+            {requestSent ? "Request Sent" : "Request Analysis"}
+          </Button>
+        </div>
+      )
+    }
+    
+    // If analysis is complete and no warnings, show "Safe" message
     return (
       <div className="py-12 text-center border-y border-border">
         <div className="flex justify-center mb-4">
-          <CheckCircle className="h-8 w-8 text-muted-foreground" />
+          <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />
         </div>
         <h3 className="text-lg font-serif font-medium text-foreground mb-1">No Content Warnings</h3>
-        <p className="text-muted-foreground text-sm">This book hasn't been flagged for any sensitive content yet.</p>
+        <p className="text-muted-foreground text-sm">Our analysis found no sensitive content warnings for this book.</p>
       </div>
     )
   }

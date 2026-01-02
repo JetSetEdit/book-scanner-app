@@ -3,6 +3,7 @@
 import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode, Flag } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
@@ -20,6 +21,7 @@ const DESCRIPTION_TRUNCATE_LENGTH = 600
 interface BookDetailsProps {
   book: any
   warnings: any[]
+  analysisStatus?: 'complete' | 'unknown'
 }
 
 // Check if we're in dev mode (localhost or dev environment)
@@ -32,7 +34,7 @@ function isDevMode(): boolean {
   )
 }
 
-export function BookDetails({ book, warnings }: BookDetailsProps) {
+export function BookDetails({ book, warnings, analysisStatus = 'unknown' }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
@@ -184,6 +186,27 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
                         {category}
                       </span>
                     ))}
+                  {/* Comfort Read Badge */}
+                  {analysisStatus === 'complete' && warnings.length === 0 && (
+                    <Badge
+                      data-comfort-read="true"
+                      className="px-3 py-1 text-[10px] font-medium tracking-wide rounded-full bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800"
+                    >
+                      ✨ Comfort Read
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Comfort Read Badge (if no categories) */}
+              {(!book.categories || book.categories.length === 0) && analysisStatus === 'complete' && warnings.length === 0 && (
+                <div className="mb-4">
+                  <Badge
+                    data-comfort-read="true"
+                    className="px-3 py-1 text-[10px] font-medium tracking-wide rounded-full bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800"
+                  >
+                    ✨ Comfort Read
+                  </Badge>
                 </div>
               )}
 
@@ -467,6 +490,7 @@ export function BookDetails({ book, warnings }: BookDetailsProps) {
               <ContentWarningsList
                 warnings={warnings}
                 isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
+                analysisStatus={analysisStatus}
               />
 
               {/* Feedback / Report Section */}
