@@ -651,12 +651,18 @@ export async function processIsbnScan(
                   }
                 }
                 
+                // Use AI-generated description (clinical, advisory language) instead of evidence excerpt
+                // The AI description is more detailed and trauma-aware, while evidence is just a quote
+                const description = w.description && w.description.trim().length > 20
+                  ? w.description.trim()
+                  : w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`
+
                 return {
                   book_id: bookId,
                   category: legacyCategory, // Legacy field - must match DB constraint
                   category_id: categoryId,
                   subcategory_id: subcategoryId,
-                  description: w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`,
+                  description: description,
                   severity: w.severity,
                   confidence_score: w.evidence[0]?.confidence || 0.8,
                   context_modifiers: w.modifiers,
@@ -669,7 +675,8 @@ export async function processIsbnScan(
                      w.severity_signals.explicitness > 0.5 ? 'moderate' : 'vague') : undefined,
                   is_spoiler: w.is_spoiler === true,
                   source: 'ai_generated',
-                  other_note: otherNote // Will be undefined for non-other_* subcategories
+                  other_note: otherNote, // Will be undefined for non-other_* subcategories
+                  reasoning: w.reasoning || undefined // Include AI reasoning if available
                 }
               })
               .filter((w): w is NonNullable<typeof w> => w !== null) // Remove null entries

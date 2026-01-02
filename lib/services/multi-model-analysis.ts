@@ -41,6 +41,18 @@ function buildTaxonomyContext(): string {
   return categories
 }
 
+/**
+ * Map severity to Australian Classification Board intensity terminology
+ */
+function getIntensityTerm(severity: 'mild' | 'moderate' | 'severe'): string {
+  switch (severity) {
+    case 'severe': return 'Strong'
+    case 'moderate': return 'Moderate'
+    case 'mild': return 'Mild'
+    default: return 'Moderate'
+  }
+}
+
 function buildContextModifiersList(): string {
   return `
 Context Modifiers (add nuance):
@@ -63,7 +75,11 @@ async function analyzeWithOpenAI(
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
 
-  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.
+  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.
+
+Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
+
+The Board assesses content based on six classifiable elements: themes, violence, language, drug use, nudity, and sex. Ratings are determined by the IMPACT of these elements (very mild, mild, moderate, strong, high).
 
 Book Information:
 - Title: ${metadata.title}
@@ -80,14 +96,15 @@ ${modifiersList}
 Instructions:
 1. For each content warning found, provide:
    - subcategory_id (format: category.subcategory, e.g., "violence.graphic_violence")
-   - description: Describe TYPES OF CONTENT, not specific plot events. Use trauma-aware, advisory language.
-     * GOOD: "Depictions of explicit gun violence resulting in death"
-     * GOOD: "Scenes involving sexual assault with graphic detail"
-     * GOOD: "Descriptions of self-harm behaviors"
-     * BAD: "Alicia shoots her husband five times"
-     * BAD: "Character X is raped by Character Y"
-     * BAD: "The protagonist cuts themselves in Chapter 12"
-     Focus on content categories and types rather than specific character actions or plot details. This reduces spoilers and improves trauma-aware tone.
+   - description: Write a clear, specific advisory description in the style of the Australian Classification Board (classification.gov.au). Use standardized terminology: "Strong [content type]", "Moderate [content type]", "Mild [content type]", or "[Content type] themes". Be direct and avoid euphemism. Describe the nature and intensity (impact) of the content clearly.
+     * GOOD: "Strong themes of emotional abuse and psychological manipulation within relationships."
+     * GOOD: "Moderate violence, including physical abuse and scenes of domestic violence."
+     * GOOD: "Strong themes of mental health struggles, including depression and psychological trauma."
+     * GOOD: "Mild themes of grief and loss."
+     * BAD: "The book centers around a troubled relationship..." (too narrative, not advisory)
+     * BAD: "Passages from Amy's diary reveal..." (too quote-like, not descriptive enough)
+     * BAD: "Alicia shoots her husband five times" (too specific, reveals plot)
+     Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any)
@@ -95,6 +112,11 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with at least one evidence span containing: source: "text", excerpt: short quote, confidence: 0-1)
+   - reasoning: A clear explanation of why this warning was assigned, using Australian Classification Board style language. Explain what evidence supports the warning and why the severity level (Strong/Moderate/Mild) is appropriate. DO NOT mention specific character names, plot events, or story details. Keep it generic and focused on content types.
+     * GOOD: "Strong themes of emotional abuse are present as a central element of the narrative. The content explores psychological manipulation and control within relationships, which justifies a high severity classification."
+     * GOOD: "Moderate violence is depicted, including physical abuse within relationships. The content includes scenes of domestic violence, supporting a moderate severity rating."
+     * BAD: "The disappearance of [Character Name] is central to the plot..." (mentions character names - spoiler)
+     * BAD: "A character dies in Chapter 12..." (mentions specific plot events - spoiler)
    - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
 
 2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
@@ -104,8 +126,8 @@ Instructions:
    - ONLY include warnings if you can point to specific content mentioned in the description
    - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
    - If you cannot identify specific content warnings from the description, return [] (empty array)
-   - DO NOT quote the book description verbatim. Summarize the content type (e.g., "Depicts emotional abuse" instead of quoting a diary entry).
-   - Use clinical, advisory language appropriate for content warnings.
+   - DO NOT quote the book description verbatim. Use Australian Classification Board terminology (e.g., "Strong themes of emotional abuse" instead of quoting a diary entry).
+   - Use the Board's standardized advisory language. Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
 
 3. For sexual content, carefully distinguish:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
@@ -132,6 +154,7 @@ Instructions:
       "frequency_hint": "theme",
       "centrality_hint": "central",
       "is_spoiler": false,
+      "reasoning": "Detailed explanation of why this warning was assigned...",
       "evidence": [
         {
           "source": "text",
@@ -149,9 +172,22 @@ Instructions:
       messages: [
         {
           role: 'system',
-          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}. Always use the hierarchical category.subcategory format. Be precise, evidence-based, and avoid over-tagging. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description. If the description is too minimal or generic, return an empty warnings array.
+          content: `You are a content warning analyzer using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology (see: https://www.classification.gov.au/classification-ratings/how-rating-decided).
 
-CRITICAL: When writing descriptions, describe TYPES OF CONTENT (e.g., "Depictions of gun violence") rather than specific plot events (e.g., "Character X shoots Character Y"). Use trauma-aware, advisory language that focuses on content categories, not character actions or plot details. This reduces spoilers and improves the user experience.`
+The Australian Classification Board assesses content based on six classifiable elements: themes, violence, language, drug use, nudity, and sex. Ratings are determined by the IMPACT of these elements (very mild, mild, moderate, strong, high).
+
+CRITICAL INSTRUCTIONS:
+1. Always use the hierarchical category.subcategory format.
+2. Be precise, evidence-based, and avoid over-tagging.
+3. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description.
+4. If the description is too minimal or generic, return an empty warnings array.
+
+DESCRIPTION FORMAT (Australian Classification Board style):
+- Use standardized terminology with intensity descriptors: "Strong [content type]", "Moderate [content type]", "Mild [content type]", or "[Content type] themes"
+- Be direct, clear, and avoid euphemism
+- Examples: "Strong themes of violence", "Moderate sexual content", "Mild language", "Strong themes of emotional abuse"
+- Focus on content categories and intensity (impact), not specific plot events or character actions
+- Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided`
         },
         {
           role: 'user',
@@ -201,14 +237,15 @@ ${modifiersList}
 Instructions:
 1. For each content warning found, provide:
    - subcategory_id (format: category.subcategory)
-   - description: Describe TYPES OF CONTENT, not specific plot events. Use trauma-aware, advisory language.
-     * GOOD: "Depictions of explicit gun violence resulting in death"
-     * GOOD: "Scenes involving sexual assault with graphic detail"
-     * GOOD: "Descriptions of self-harm behaviors"
-     * BAD: "Alicia shoots her husband five times"
-     * BAD: "Character X is raped by Character Y"
-     * BAD: "The protagonist cuts themselves in Chapter 12"
-     Focus on content categories and types rather than specific character actions or plot details. This reduces spoilers and improves trauma-aware tone.
+   - description: Write a clear, specific advisory description in the style of the Australian Classification Board (classification.gov.au). Use standardized terminology: "Strong [content type]", "Moderate [content type]", "Mild [content type]", or "[Content type] themes". Be direct and avoid euphemism. Describe the nature and intensity of the content clearly.
+     * GOOD: "Strong themes of emotional abuse and psychological manipulation within relationships."
+     * GOOD: "Moderate violence, including physical abuse and scenes of domestic violence."
+     * GOOD: "Strong themes of mental health struggles, including depression and psychological trauma."
+     * GOOD: "Mild themes of grief and loss."
+     * BAD: "The book centers around a troubled relationship..." (too narrative, not advisory)
+     * BAD: "Passages from Amy's diary reveal..." (too quote-like, not descriptive enough)
+     * BAD: "Alicia shoots her husband five times" (too specific, reveals plot)
+     Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any)
@@ -359,6 +396,7 @@ function processWarnings(
       is_spoiler: w.is_spoiler === true || w.is_spoiler === 'true',
       other_note: w.other_note, // Preserve AI-provided other_note if available
       description: w.description, // Preserve description for fallback logic
+      reasoning: w.reasoning, // Preserve AI reasoning if available
     })
 
     return acc;
