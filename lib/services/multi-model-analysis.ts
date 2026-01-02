@@ -7,7 +7,8 @@
 
 import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { WARNING_CATEGORIES, TAXONOMY_VERSION, MODEL_VERSION } from '../config/taxonomy-v2'
+import { WARNING_CATEGORIES, TAXONOMY_VERSION, MODEL_VERSION, getSubcategoryById } from '../config/taxonomy-v2'
+
 import { ContextModifier, EvidenceSpan, EnhancedContentWarning } from '../config/taxonomy-context'
 import { buildSeveritySignals, computeSeverityFromSignals } from '../utils/severity-computation'
 import { isActualSexualViolence } from '../utils/sexual-violence-evaluation'
@@ -30,13 +31,13 @@ type ProgressCallback = (message: string) => void
 
 function buildTaxonomyContext(): string {
   const categories = WARNING_CATEGORIES.map(cat => {
-    const subcats = cat.subcategories.map(sub => 
+    const subcats = cat.subcategories.map(sub =>
       `    - ${cat.id}.${sub.id}: ${sub.userLabel} (${sub.shortDescription}) [Default: ${sub.defaultSeverityHint || 'none'}]`
     ).join('\n')
-    
+
     return `  ${cat.id} (${cat.userLabel}):\n${subcats}`
   }).join('\n\n')
-  
+
   return categories
 }
 
@@ -58,10 +59,10 @@ async function analyzeWithOpenAI(
   onProgress?: ProgressCallback
 ): Promise<EnhancedContentWarning[]> {
   onProgress?.('Analyzing with OpenAI (GPT-4o)...')
-  
+
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
-  
+
   const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.
 
 Book Information:
@@ -103,6 +104,8 @@ Instructions:
    - ONLY include warnings if you can point to specific content mentioned in the description
    - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
    - If you cannot identify specific content warnings from the description, return [] (empty array)
+   - DO NOT quote the book description verbatim. Summarize the content type (e.g., "Depicts emotional abuse" instead of quoting a diary entry).
+   - Use clinical, advisory language appropriate for content warnings.
 
 3. For sexual content, carefully distinguish:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
@@ -177,10 +180,10 @@ async function analyzeWithGemini(
   onProgress?: ProgressCallback
 ): Promise<EnhancedContentWarning[]> {
   onProgress?.('Analyzing with Gemini...')
-  
+
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
-  
+
   const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.
 
 Book Information:
@@ -220,8 +223,10 @@ Instructions:
    - DO NOT use phrases like "often includes", "typically features", "usually contains"
    - DO NOT infer warnings from genre labels (e.g., "dark romance", "thriller")
    - ONLY include warnings if you can point to specific content mentioned in the description
-   - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
-   - If you cannot identify specific content warnings from the description, return [] (empty array)
+    - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
+    - If you cannot identify specific content warnings from the description, return [] (empty array)
+    - DO NOT quote the book description verbatim. Summarize the content type (e.g., "Depicts emotional abuse" instead of quoting a diary entry).
+    - Use clinical, advisory language appropriate for content warnings.
 
 3. For sexual content, carefully distinguish sexual_violence from consent_ambiguity/cnc.
 
@@ -251,39 +256,44 @@ Instructions:
 }`
 
   try {
-    // Try gemini-pro first (stable model), fallback to gemini-1.5-flash if needed
-    // Note: gemini-1.5-pro is not available in v1beta API
+    // Use gemini-2.0-flash (fast and currently available)
+    // Fallback to gemini-2.5-flash if needed
     let model
     try {
-      model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+      model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
     } catch (e) {
-      // Fallback to flash if pro fails
-      model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+      console.warn('Primary model failed, trying fallback...')
+      model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
     }
-    
+
     const result = await model.generateContent(prompt)
     const response = await result.response
     const text = response.text()
-    
+
     // Extract JSON from response (might have markdown code blocks)
     let jsonText = text
     const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/)
     if (jsonMatch) {
       jsonText = jsonMatch[1]
     }
-    
+
     const analysis = JSON.parse(jsonText)
     return processWarnings(analysis.warnings || [], 'gemini')
   } catch (error) {
     console.error('Gemini analysis error:', error)
-    // Check if it's a model availability error
-    if (error instanceof Error && (error.message.includes('not found') || error.message.includes('404'))) {
-      console.error('Gemini model not available - this may be a model name or API version issue')
-      onProgress?.('⚠️ Gemini model unavailable - using OpenAI only. Check GEMINI_API_KEY and model availability.')
+    if (error instanceof Error) {
+      if (error.message.includes('not found') || error.message.includes('404')) {
+        console.error('Gemini model not available - this may be a model name or API version issue')
+        onProgress?.('⚠️ Gemini model unavailable - using OpenAI only. Check GEMINI_API_KEY and model availability.')
+      } else if (error.message.includes('429') || error.message.includes('quota') || error.message.includes('rate limit')) {
+        console.error('Gemini API rate limit exceeded - using OpenAI only')
+        onProgress?.('⚠️ Gemini rate limit exceeded - using OpenAI only. Check your API quota.')
+      } else {
+        onProgress?.('⚠️ Gemini analysis failed, continuing with OpenAI only...')
+      }
     } else {
       onProgress?.('⚠️ Gemini analysis failed, continuing with OpenAI only...')
     }
-    // Don't throw - let the caller handle gracefully
     return []
   }
 }
@@ -292,7 +302,26 @@ function processWarnings(
   rawWarnings: any[],
   source: 'openai' | 'gemini'
 ): EnhancedContentWarning[] {
-  return rawWarnings.map((w) => {
+  const seenDescriptions = new Set<string>();
+
+  return rawWarnings.reduce<EnhancedContentWarning[]>((acc, w) => {
+    // Dedup descriptions
+    const desc = w.description?.trim() || '';
+    if (desc.length > 20 && seenDescriptions.has(desc)) {
+      return acc;
+    }
+    seenDescriptions.add(desc);
+
+    // Get taxonomy info for default severity
+    let defaultSeverityHint: 'mild' | 'moderate' | 'severe' | undefined;
+    if (w.subcategory_id) {
+      const parts = w.subcategory_id.split('.');
+      if (parts.length === 2) {
+        const sub = getSubcategoryById(parts[0], parts[1]);
+        defaultSeverityHint = sub?.defaultSeverityHint;
+      }
+    }
+
     // Build severity signals
     const signals = buildSeveritySignals({
       presence: w.presence,
@@ -302,10 +331,10 @@ function processWarnings(
       frequency_hint: w.frequency_hint,
       centrality_hint: w.centrality_hint
     })
-    
+
     // Compute severity from signals
-    const severity = computeSeverityFromSignals(signals)
-    
+    const severity = computeSeverityFromSignals(signals, defaultSeverityHint)
+
     // Validate sexual violence if applicable
     let subcategoryId = w.subcategory_id
     if (subcategoryId?.includes('sexual')) {
@@ -314,13 +343,13 @@ function processWarnings(
         description: w.description,
         reasoning: w.reasoning || ''
       } as any)
-      
+
       if (!violenceCheck.isViolence && subcategoryId === 'sexual_content.sexual_violence') {
         subcategoryId = 'sexual_content.consent_ambiguity'
       }
     }
-    
-    return {
+
+    acc.push({
       subcategory_id: subcategoryId,
       severity,
       modifiers: (w.context_modifiers || []) as ContextModifier[],
@@ -330,8 +359,10 @@ function processWarnings(
       is_spoiler: w.is_spoiler === true || w.is_spoiler === 'true',
       other_note: w.other_note, // Preserve AI-provided other_note if available
       description: w.description, // Preserve description for fallback logic
-    }
-  })
+    })
+
+    return acc;
+  }, [])
 }
 
 interface VerificationResult {
@@ -374,7 +405,13 @@ async function verifyUniqueWarnings(
     dropped: 0,
     adjusted: 0,
     latency_ms: 0,
-    failed: false
+    failed: false,
+    dropped_reasons: {
+      no_evidence: 0,
+      misclassified: 0,
+      duplicate: 0,
+      other: 0
+    }
   }
 
   // If no unique warnings, return early
@@ -386,7 +423,7 @@ async function verifyUniqueWarnings(
 
   try {
     const taxonomyContext = buildTaxonomyContext()
-    
+
     // Build the verification prompt
     const warningsList = uniqueWarnings.map((w, idx) => {
       const evidenceText = w.evidence[0]?.excerpt || 'No evidence excerpt provided'
@@ -440,7 +477,7 @@ For drop_reason:
 - "duplicate": Duplicate of another warning
 - "other": Any other reason
 
-Be strict: Only keep warnings with clear evidence. Drop false positives. Adjust severity/subcategory if close but not quite right.
+Be balanced: Keep warnings that have reasonable evidence from the book description. Only drop warnings that are clearly false positives or completely unsupported. When in doubt, keep the warning rather than drop it. Adjust severity/subcategory if close but not quite right.
 
 IMPORTANT: If a warning's description reads like a plot summary (e.g., "Character X does Y to Character Z"), suggest a rewrite to describe content types instead (e.g., "Depictions of [content type]"). Use the "reason" field to note description improvements.`
 
@@ -454,7 +491,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
           messages: [
             {
               role: 'system',
-              content: 'You are a content warning verifier. Be strict and evidence-based. Only keep warnings with clear support from the evidence.'
+              content: 'You are a content warning verifier. Be balanced and evidence-based. Keep warnings that have reasonable support from the evidence. Only drop warnings that are clearly false positives or completely unsupported. When in doubt, err on the side of keeping the warning to ensure readers are properly informed.'
             },
             {
               role: 'user',
@@ -462,7 +499,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             }
           ],
           response_format: { type: 'json_object' },
-          temperature: 0.2, // Lower temperature for verification (more conservative)
+          temperature: 0.3, // Slightly higher temperature for more balanced verification
           max_tokens: 2000
         })
 
@@ -476,32 +513,32 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       } else {
         // Use Gemini for verification
         try {
-          const model = genAI.getGenerativeModel({ model: 'gemini-pro' })
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
           const result = await model.generateContent(prompt)
           const response = result.response
           const text = response.text()
-          
+
           // Extract JSON from response (may have markdown code blocks)
           const jsonMatch = text.match(/\{[\s\S]*\}/)
           if (!jsonMatch) {
             throw new Error('No JSON found in Gemini response')
           }
-          
+
           const parsed = JSON.parse(jsonMatch[0])
           return parsed.verifications || []
         } catch (geminiError) {
-          // Fallback to gemini-1.5-flash
-          console.warn('gemini-pro failed, trying gemini-1.5-flash:', geminiError)
-          const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+          // Fallback to gemini-2.5-flash
+          console.warn('gemini-2.0-flash failed, trying gemini-2.5-flash:', geminiError)
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
           const result = await model.generateContent(prompt)
           const response = result.response
           const text = response.text()
-          
+
           const jsonMatch = text.match(/\{[\s\S]*\}/)
           if (!jsonMatch) {
             throw new Error('No JSON found in Gemini response')
           }
-          
+
           const parsed = JSON.parse(jsonMatch[0])
           return parsed.verifications || []
         }
@@ -534,12 +571,12 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       // Extract meaningful context from description/evidence
       const evidenceText = warning.evidence[0]?.excerpt || ''
       const descriptionText = warning.description || ''
-      
+
       const extractKeyPhrase = (text: string, maxLength: number = 150): string => {
         if (!text || text.length <= maxLength) return text.trim()
-        
+
         // Try to find a sentence or phrase that captures the essence
-        const sentences = text.match(/[^.!?]+[.!?]+/g) || []
+        const sentences = text?.match(/[^.!?]+[.!?]+/g) || []
         if (sentences.length > 0) {
           const firstSentence = sentences[0].trim()
           if (firstSentence.length >= 10 && firstSentence.length <= maxLength) {
@@ -551,19 +588,19 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...'
           }
         }
-        
+
         // Fallback: truncate at word boundary
         const truncated = text.substring(0, maxLength)
         const lastSpace = truncated.lastIndexOf(' ')
         return lastSpace > 0 ? truncated.substring(0, lastSpace) + '...' : truncated + '...'
       }
-      
+
       // Prefer evidence excerpt (more specific) over description
       const sourceText = evidenceText || descriptionText
       if (sourceText && sourceText.trim().length >= 10) {
         return extractKeyPhrase(sourceText, 150)
       }
-      
+
       // Last resort: create a descriptive note based on subcategory
       const categoryName = subcategoryId.replace('other_', '').replace(/_/g, ' ')
       return `Content related to ${categoryName} as described in the book.`
@@ -575,7 +612,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
 
     for (const warning of uniqueWarnings) {
       const verification = verificationMap.get(warning.subcategory_id)
-      
+
       if (!verification) {
         // No verification result for this warning - keep it (fallback)
         const keptWarning = { ...warning }
@@ -609,7 +646,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
           severity: verification.adjusted_severity || warning.severity,
           subcategory_id: verification.adjusted_subcategory_id || warning.subcategory_id
         }
-        
+
         // Safety check: If adjusted to other_* subcategory, ensure other_note is normalized
         const newSubcategoryId = adjusted.subcategory_id.split('.')[1] || adjusted.subcategory_id
         if (newSubcategoryId.startsWith('other_')) {
@@ -622,7 +659,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             continue
           }
         }
-        
+
         verified.push(adjusted)
       } else {
         // action === 'keep'
@@ -651,7 +688,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
     metrics.failed = true
     metrics.latency_ms = Date.now() - startTime
     onProgress?.('⚠️ Verification failed, using original unique warnings')
-    
+
     // Fallback: return original warnings
     return { verified: uniqueWarnings, metrics }
   }
@@ -676,7 +713,7 @@ function combineResults(
   // Create maps by subcategory_id
   const openaiMap = new Map(openaiWarnings.map(w => [w.subcategory_id, w]))
   const geminiMap = new Map(geminiWarnings.map(w => [w.subcategory_id, w]))
-  
+
   const combined: EnhancedContentWarning[] = []
   const uniqueToOpenAI: EnhancedContentWarning[] = []
   const uniqueToGemini: EnhancedContentWarning[] = []
@@ -685,11 +722,11 @@ function combineResults(
     openai_severity: string
     gemini_severity: string
   }> = []
-  
+
   // Process OpenAI warnings
   for (const warning of openaiWarnings) {
     const geminiWarning = geminiMap.get(warning.subcategory_id)
-    
+
     if (!geminiWarning) {
       uniqueToOpenAI.push(warning)
       combined.push(warning)
@@ -702,14 +739,14 @@ function combineResults(
           gemini_severity: geminiWarning.severity
         })
       }
-      
+
       // Use the more severe one, or OpenAI if equal
-      combined.push(warning.severity === 'severe' || 
-                   (warning.severity === 'moderate' && geminiWarning.severity === 'mild')
-                   ? warning : geminiWarning)
+      combined.push(warning.severity === 'severe' ||
+        (warning.severity === 'moderate' && geminiWarning.severity === 'mild')
+        ? warning : geminiWarning)
     }
   }
-  
+
   // Process Gemini-only warnings
   for (const warning of geminiWarnings) {
     if (!openaiMap.has(warning.subcategory_id)) {
@@ -717,12 +754,12 @@ function combineResults(
       combined.push(warning)
     }
   }
-  
+
   // Calculate agreement score
   const totalWarnings = Math.max(openaiWarnings.length, geminiWarnings.length)
   const agreedWarnings = combined.length - uniqueToOpenAI.length - uniqueToGemini.length
   const agreementScore = totalWarnings > 0 ? agreedWarnings / totalWarnings : 0
-  
+
   return {
     combined,
     analysis: {
@@ -755,26 +792,22 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
 }> {
-  onProgress?.('Starting multi-model analysis...')
-  
-  // Run both analyses in parallel
-  const [openaiWarnings, geminiWarnings] = await Promise.all([
-    analyzeWithOpenAI(metadata, onProgress).catch(err => {
-      console.error('OpenAI analysis failed:', err)
-      onProgress?.('⚠️ OpenAI analysis failed, continuing with Gemini...')
-      return []
-    }),
-    analyzeWithGemini(metadata, onProgress).catch(err => {
-      console.error('Gemini analysis failed:', err)
-      onProgress?.('⚠️ Gemini analysis failed, continuing with OpenAI...')
-      return []
-    })
-  ])
-  
-  onProgress?.('Combining results from both models...')
-  
+  onProgress?.('Starting AI content analysis with OpenAI...')
+
+  // Run OpenAI analysis only (Gemini disabled)
+  const openaiWarnings = await analyzeWithOpenAI(metadata, onProgress).catch(err => {
+    console.error('OpenAI analysis failed:', err)
+    onProgress?.('⚠️ OpenAI analysis failed')
+    return []
+  })
+
+  // Gemini disabled - return empty array
+  const geminiWarnings: EnhancedContentWarning[] = []
+
+  onProgress?.('Processing results...')
+
   const { combined, analysis } = combineResults(openaiWarnings, geminiWarnings)
-  
+
   // POC: Verify unique warnings only
   const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
   let finalWarnings = combined
@@ -796,7 +829,7 @@ export async function analyzeBookWithMultiModel(
     // Remove original unique warnings
     const uniqueSubcategoryIds = new Set(allUniqueWarnings.map(w => w.subcategory_id))
     finalWarnings = combined.filter(w => !uniqueSubcategoryIds.has(w.subcategory_id))
-    
+
     // Add verified warnings
     finalWarnings.push(...verified)
 
@@ -811,9 +844,9 @@ export async function analyzeBookWithMultiModel(
       failed: metrics.failed
     })
   }
-  
+
   onProgress?.(`Analysis complete: ${finalWarnings.length} warnings found${verificationMetrics ? ` (${verificationMetrics.dropped} unique warnings dropped)` : ''}`)
-  
+
   return {
     warnings: finalWarnings,
     analysis: {

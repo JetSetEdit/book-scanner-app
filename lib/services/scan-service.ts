@@ -534,7 +534,7 @@ export async function processIsbnScan(
           console.error('Failed to log manual handling scan:', logError)
         }
       } else {
-        onProgress?.('🤖 Starting AI content analysis with multi-model (GPT-4o + Gemini)...')
+        onProgress?.('🤖 Starting AI content analysis with OpenAI (GPT-4o)...')
         onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
         onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
         
