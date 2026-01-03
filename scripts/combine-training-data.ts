@@ -12,7 +12,8 @@ async function main() {
   const files = [
     'data/training/backup_training_data.json',
     'data/training/backup2_training_data.json',
-    'data/training/exported_training_data.json'
+    'data/training/exported_training_data.json',
+    'data/training/intelligent_training_data.json'
   ]
 
   const allExamples: any[] = []
