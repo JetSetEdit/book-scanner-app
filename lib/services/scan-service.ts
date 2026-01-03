@@ -884,8 +884,31 @@ Be factual and specific. If you cannot find information, say so.`
               const searchQuery = `${bookForAnalysis.title} ${bookForAnalysis.author || ''} content warnings trigger warnings`.trim()
               onProgress?.(`🌐 Searching for content warnings: "${searchQuery}"`)
               
+              // Check if this is a Romance book to tailor the search
+              const isRomanceBook = bookForAnalysis.categories?.some((cat: string) => 
+                cat.toLowerCase().includes('romance')
+              ) || bookForAnalysis.description?.toLowerCase().includes('romance') || false
+              
               // Ask OpenAI to search its knowledge base and web (if available) for content warnings
-              const searchPrompt = `Based on your knowledge and any available information, does the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} have content warnings, trigger warnings, or sensitive content that readers should be aware of?
+              const searchPrompt = isRomanceBook 
+                ? `Search for content warnings and community tags for the Romance book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'}.
+
+CRITICAL: For Romance books, check:
+1. Community tagging sites like Romance.io or The StoryGraph for:
+   - Heat/Spice level (explicit, moderate, mild, clean/sweet)
+   - Common tropes flagged by readers (cheating, secret baby, loss/grief, emotional abuse, dubious consent, age gaps, stalking, toxic dynamics)
+   - Emotional intensity levels
+   - Content warnings specifically flagged by the romance reading community
+
+2. General content warnings:
+   - Violence, abuse, or trauma
+   - Sexual content or sexual violence
+   - Mental health themes (suicide, self-harm, etc.)
+   - Disturbing or graphic content
+   - Dark themes
+
+If you find any content warnings, heat levels, or tropes mentioned on Romance.io, The StoryGraph, or other community sites, list them specifically. If the book is known to be safe/cozy/light/clean romance, confirm that. Be factual and specific. If community reviews suggest content not mentioned in the blurb, state: "Community reviews suggest [X] may be present."`
+                : `Based on your knowledge and any available information, does the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} have content warnings, trigger warnings, or sensitive content that readers should be aware of?
 
 Look for mentions of:
 - Violence, abuse, or trauma
@@ -1046,7 +1069,15 @@ If you find any content warnings mentioned online or in reviews, list them brief
               if (webSearchContext) {
                 reasoning += ` ${webSearchContext}`
               }
-              if (usedWebSearch) {
+              
+              // Add safety disclaimer for Romance books if analysis was based on blurb only
+              const isRomanceBook = bookForAnalysis.categories?.some((cat: string) => 
+                cat.toLowerCase().includes('romance')
+              ) || bookForAnalysis.description?.toLowerCase().includes('romance') || false
+              
+              if (isRomanceBook && !usedWebSearch) {
+                reasoning += ' Analysis based on blurb only; community reviews on Romance.io or The StoryGraph may indicate different heat/spice levels or tropes not mentioned in the description.'
+              } else if (usedWebSearch) {
                 reasoning += ' Web search verification confirmed the book appears safe for general reading.'
               } else if (!aiNoWarningsReasoning) {
                 reasoning += ' The book appears safe for general reading based on description analysis.'

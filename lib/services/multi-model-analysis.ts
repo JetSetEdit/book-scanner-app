@@ -150,6 +150,28 @@ Instructions:
    - Use the Board's standardized advisory language. Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
    - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field explaining why no warnings were identified. This should explain what content was reviewed (e.g., "romance themes", "lighthearted tone", "no violence or sensitive themes mentioned") and why it does not meet the threshold for content warnings according to Australian Classification Board standards.
 
+2a. GENRE AWARENESS FOR ROMANCE BOOKS:
+   - If the book appears to be a Romance novel (based on title, description, or categories like "Sports Romance", "Small Town Romance", "Contemporary Romance", "Romance", etc.), you MUST be especially thorough:
+   - Look for HEAT/SPICE LEVEL indicators in the description:
+     * Explicit sexual content (detailed sexual scenes)
+     * Moderate sexual content (fade-to-black or moderate detail)
+     * Mild sexual content (kissing, implied intimacy)
+     * No sexual content (sweet/clean romance)
+   - Look for COMMON ROMANCE TROPES that are content warnings:
+     * Cheating/infidelity themes
+     * Secret baby/pregnancy tropes
+     * Loss of a parent/child (grief themes)
+     * Emotional abuse/manipulation in relationships
+     * Dubious consent (dub-con) or power imbalances
+     * Age gap relationships (especially significant age differences)
+     * Stalking or obsessive behavior
+     * Toxic relationship dynamics
+   - Assess EMOTIONAL INTENSITY:
+     * High emotional intensity (angst, trauma, heavy themes)
+     * Moderate emotional intensity (some conflict, but generally light)
+     * Low emotional intensity (lighthearted, low conflict)
+   - IMPORTANT: If the description is vague or doesn't mention heat level, you should note in "no_warnings_reasoning" that "Analysis based on blurb only; community reviews may indicate different heat/spice levels or tropes not mentioned in the description."
+
 3. For sexual content, carefully distinguish:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
    - consent_ambiguity (dub-con): Unclear consent in dark romance
@@ -216,7 +238,12 @@ CRITICAL INSTRUCTIONS:
 2. Be precise, evidence-based, and avoid over-tagging.
 3. NEVER make assumptions based on genre or categories alone - only identify warnings from actual content described in the book description.
 4. If the description is too minimal or generic, return an empty warnings array.
-5. When assessing impact, ALWAYS consider all six factors from the Publications Guidelines:
+5. GENRE-SPECIFIC AWARENESS: For Romance books (including "Sports Romance", "Small Town Romance", "Contemporary Romance", etc.), be especially thorough:
+   - Look for heat/spice level indicators (explicit, moderate, mild, or clean/sweet)
+   - Identify common romance tropes that are content warnings (cheating, secret baby, loss/grief, emotional abuse, dubious consent, age gaps, stalking, toxic dynamics)
+   - Assess emotional intensity levels
+   - If the description is vague about heat level or tropes, note in reasoning that "Analysis based on blurb only; community reviews may indicate different content."
+6. When assessing impact, ALWAYS consider all six factors from the Publications Guidelines:
    - Emphasis: How prominently the element is featured (e.g., "central theme", "incidental reference")
    - Tone: The manner in which content is presented (e.g., "serious", "graphic", "discreet")
    - Frequency: How often the element appears (e.g., "throughout", "repeated scenes", "single incident")
