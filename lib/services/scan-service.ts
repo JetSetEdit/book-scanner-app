@@ -860,6 +860,12 @@ Be factual and specific. If you cannot find information, say so.`
             onProgress?.('ℹ️ No content warnings identified by AI analysis')
             console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
             
+            // Initialize variables for web search verification
+            let webSearchFoundWarnings = false
+            let webSearchContext = ''
+            let reanalysisResult: { warnings: any[] } | null = null
+            let usedWebSearch = false
+            
             // VERIFICATION: If 0 warnings, perform web search as backup verification
             onProgress?.('🔍 Performing web search verification (0 warnings found)...')
             const webSearchStartTime = performance.now()
@@ -904,10 +910,6 @@ If you find any content warnings mentioned online or in reviews, list them brief
               
               timings.webSearch = performance.now() - webSearchStartTime
               usedWebSearch = true
-              
-              let webSearchFoundWarnings = false
-              let webSearchContext = ''
-              let reanalysisResult: { warnings: any[] } | null = null
               
               if (searchResponse) {
                 const messageContent = searchResponse.choices[0]?.message?.content || ''
@@ -1017,54 +1019,34 @@ If you find any content warnings mentioned online or in reviews, list them brief
               } else {
                 onProgress?.('⚠️ Web search unavailable, skipping verification')
               }
-              
-              // Log audit decision: analysis completed, web search verified no warnings
-              // CRITICAL: Always create audit log for "no_warnings" unless warnings were actually found and saved via web search re-analysis
-              // Check if warnings were saved in the web search re-analysis block above
-              const warningsFoundViaWebSearch = webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length > 0 && contentWarningsGenerated
-              
-              // Only create "no_warnings" audit log if we didn't find warnings via web search
-              // (If we did find warnings, a "warnings_generated" audit log was already created above)
-              if (!warningsFoundViaWebSearch) {
-                await logAuditDecision({
-                  bookId: bookId,
-                  isbn: cleanIsbn,
-                  decisionType: 'no_warnings',
-                  warningsCount: 0,
-                  aiReasoning: `AI analysis completed and found no content warnings. ${webSearchContext}Web search verification confirmed the book appears safe for general reading.`,
-                  confidenceLevel: usedWebSearch ? 'high' : 'medium', // Higher confidence if web search verified
-                  bookTitle: bookForAnalysis.title,
-                  bookAuthor: bookForAnalysis.author,
-                  descriptionLength: descriptionForAnalysis.length,
-                  hadThinMetadata: isMinimalDescription,
-                  usedWebSearch: usedWebSearch,
-                  modelVersion: MODEL_VERSION,
-                  taxonomyVersion: TAXONOMY_VERSION,
-                  pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath,
-                  metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
-                })
-              }
             } catch (webSearchError) {
               console.error('Web search verification error:', webSearchError)
               onProgress?.('⚠️ Web search verification failed, continuing without verification')
               timings.webSearch = performance.now() - webSearchStartTime
-              
-              // Log audit decision without web search verification
+              // Don't set usedWebSearch = true if it failed
+            }
+            
+            // CRITICAL: Always create audit log for "no_warnings" AFTER web search verification completes
+            // This ensures audit logs are created regardless of whether web search verification succeeds or fails
+            // Only skip if warnings were actually found and saved via web search re-analysis
+            const warningsFoundViaWebSearch = webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length > 0 && contentWarningsGenerated
+            
+            if (!warningsFoundViaWebSearch) {
               await logAuditDecision({
                 bookId: bookId,
                 isbn: cleanIsbn,
                 decisionType: 'no_warnings',
                 warningsCount: 0,
-                aiReasoning: `AI analysis completed for this book but found no content warnings. Web search verification was attempted but failed. The book appears to be safe for general reading based on description analysis.`,
-                confidenceLevel: 'medium', // Lower confidence since web search failed
+                aiReasoning: `AI analysis completed and found no content warnings. ${webSearchContext}${usedWebSearch ? 'Web search verification confirmed the book appears safe for general reading.' : 'The book appears safe for general reading based on description analysis.'}`,
+                confidenceLevel: usedWebSearch ? 'high' : 'medium', // Higher confidence if web search verified
                 bookTitle: bookForAnalysis.title,
                 bookAuthor: bookForAnalysis.author,
                 descriptionLength: descriptionForAnalysis.length,
                 hadThinMetadata: isMinimalDescription,
-                usedWebSearch: false,
+                usedWebSearch: usedWebSearch,
                 modelVersion: MODEL_VERSION,
                 taxonomyVersion: TAXONOMY_VERSION,
-                pipelinePath: pipelinePath,
+                pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath,
                 metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
               })
             }
