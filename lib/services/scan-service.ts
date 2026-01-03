@@ -1019,8 +1019,13 @@ If you find any content warnings mentioned online or in reviews, list them brief
               }
               
               // Log audit decision: analysis completed, web search verified no warnings
-              // Only log if we didn't already log warnings_generated above
-              if (!webSearchFoundWarnings || (webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length === 0)) {
+              // CRITICAL: Always create audit log for "no_warnings" unless warnings were actually found and saved via web search re-analysis
+              // Check if warnings were saved in the web search re-analysis block above
+              const warningsFoundViaWebSearch = webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length > 0 && contentWarningsGenerated
+              
+              // Only create "no_warnings" audit log if we didn't find warnings via web search
+              // (If we did find warnings, a "warnings_generated" audit log was already created above)
+              if (!warningsFoundViaWebSearch) {
                 await logAuditDecision({
                   bookId: bookId,
                   isbn: cleanIsbn,
@@ -1169,6 +1174,55 @@ If you find any content warnings mentioned online or in reviews, list them brief
   }
 
   onProgress?.('Scan completed successfully.');
+
+  // SAFETY CHECK: Ensure audit log was created if analysis ran
+  // This prevents books from being marked as "Unknown" when they were actually analyzed
+  if (bookId && bookForAnalysis && bookForAnalysis.title) {
+    try {
+      const { data: existingAuditLog } = await supabaseAdmin
+        .from('ai_audit_logs')
+        .select('id')
+        .eq('book_id', bookId)
+        .in('decision_type', ['warnings_generated', 'no_warnings'])
+        .limit(1)
+      
+      if (!existingAuditLog || existingAuditLog.length === 0) {
+        console.warn(`[Safety Check] No audit log found for book ${bookId} (${bookForAnalysis.title}) - creating one now`)
+        onProgress?.('⚠️ Safety check: Creating missing audit log...')
+        
+        // Create audit log based on whether warnings were generated
+        const warningCount = contentWarningsGenerated ? (await supabaseAdmin
+          .from('content_warnings')
+          .select('id', { count: 'exact', head: true })
+          .eq('book_id', bookId)).count || 0 : 0
+        
+        await logAuditDecision({
+          bookId: bookId,
+          isbn: cleanIsbn,
+          decisionType: warningCount > 0 ? 'warnings_generated' : 'no_warnings',
+          warningsCount: warningCount,
+          aiReasoning: warningCount > 0 
+            ? `AI analysis identified ${warningCount} content warning(s) for this book. Analysis completed successfully. (Audit log created via safety check)`
+            : `AI analysis completed and found no content warnings. The book appears safe for general reading. (Audit log created via safety check)`,
+          confidenceLevel: 'medium', // Lower confidence since this is a safety check
+          bookTitle: bookForAnalysis.title,
+          bookAuthor: bookForAnalysis.author,
+          descriptionLength: bookForAnalysis.description?.length || null,
+          hadThinMetadata: !bookForAnalysis.description || bookForAnalysis.description.length < 150,
+          usedWebSearch: usedWebSearch,
+          modelVersion: MODEL_VERSION,
+          taxonomyVersion: TAXONOMY_VERSION,
+          pipelinePath: `${pipelinePath} -> safety_check`,
+          metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
+        })
+        
+        onProgress?.('✅ Safety check: Created missing audit log')
+      }
+    } catch (safetyCheckError) {
+      console.error('[Safety Check] Failed to verify/create audit log:', safetyCheckError)
+      // Don't throw - this is a safety check, not critical path
+    }
+  }
 
   // Calculate total time before returning
   timings.total = performance.now() - overallStartTime
