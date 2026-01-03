@@ -69,7 +69,7 @@ Context Modifiers (add nuance):
 async function analyzeWithOpenAI(
   metadata: BookMetadata,
   onProgress?: ProgressCallback
-): Promise<EnhancedContentWarning[]> {
+): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
   onProgress?.('Analyzing with OpenAI (GPT-4o)...')
 
   const taxonomyContext = buildTaxonomyContext()
@@ -148,6 +148,7 @@ Instructions:
    - If you cannot identify specific content warnings from the description, return [] (empty array)
    - DO NOT quote the book description verbatim. Use Australian Classification Board terminology (e.g., "Strong themes of emotional abuse" instead of quoting a diary entry).
    - Use the Board's standardized advisory language. Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
+   - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field explaining why no warnings were identified. This should explain what content was reviewed (e.g., "romance themes", "lighthearted tone", "no violence or sensitive themes mentioned") and why it does not meet the threshold for content warnings according to Australian Classification Board standards.
 
 3. For sexual content, carefully distinguish:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
@@ -183,7 +184,8 @@ Instructions:
         }
       ]
     }
-  ]
+  ],
+  "no_warnings_reasoning": "If warnings array is empty, provide a brief explanation (2-4 sentences) of why no content warnings were identified. Explain what content was reviewed (e.g., 'romance themes', 'lighthearted tone', 'no violence or sensitive themes mentioned') and why it does not meet the threshold for content warnings. Use Australian Classification Board terminology. This field should only be present when warnings array is empty."
 }`
 
   try {
@@ -250,7 +252,9 @@ DESCRIPTION FORMAT (Australian Classification Board style):
     }
 
     const analysis = JSON.parse(content)
-    return processWarnings(analysis.warnings || [], 'openai')
+    const warnings = processWarnings(analysis.warnings || [], 'openai')
+    const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
+    return { warnings, noWarningsReasoning }
   } catch (error) {
     console.error('OpenAI analysis error:', error)
     
@@ -891,6 +895,7 @@ export async function analyzeBookWithMultiModel(
   onProgress?: ProgressCallback
 ): Promise<{
   warnings: EnhancedContentWarning[]
+  noWarningsReasoning?: string
   analysis: {
     agreement_score: number
     unique_to_openai: EnhancedContentWarning[]
@@ -913,7 +918,9 @@ export async function analyzeBookWithMultiModel(
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
   // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
-  const openaiWarnings = await analyzeWithOpenAI(metadata, onProgress)
+  const openaiResult = await analyzeWithOpenAI(metadata, onProgress)
+  const openaiWarnings = openaiResult.warnings
+  const openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
 
   // Gemini disabled - return empty array
   const geminiWarnings: EnhancedContentWarning[] = []
@@ -963,6 +970,7 @@ export async function analyzeBookWithMultiModel(
 
   return {
     warnings: finalWarnings,
+    noWarningsReasoning: finalWarnings.length === 0 ? openaiNoWarningsReasoning : undefined,
     analysis: {
       ...analysis,
       verification_metrics: verificationMetrics

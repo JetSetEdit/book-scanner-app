@@ -684,6 +684,9 @@ Be factual and specific. If you cannot find information, say so.`
           
           onProgress?.(`✅ AI analysis complete: ${analysisResult.warnings.length} warnings generated`)
           
+          // Store no_warnings_reasoning for use in audit log if no warnings found
+          const noWarningsReasoning = analysisResult.noWarningsReasoning
+          
           timings.aiContentWarningGeneration = performance.now() - analysisStartTime
           onProgress?.(`⏱️ Analysis took ${Math.round(timings.aiContentWarningGeneration)}ms`)
           
@@ -866,6 +869,9 @@ Be factual and specific. If you cannot find information, say so.`
             let reanalysisResult: { warnings: any[] } | null = null
             let usedWebSearch = false
             
+            // Use AI's reasoning for why no warnings were found, if provided
+            const aiNoWarningsReasoning = noWarningsReasoning || ''
+            
             // VERIFICATION: If 0 warnings, perform web search as backup verification
             onProgress?.('🔍 Performing web search verification (0 warnings found)...')
             const webSearchStartTime = performance.now()
@@ -1032,12 +1038,26 @@ If you find any content warnings mentioned online or in reviews, list them brief
             const warningsFoundViaWebSearch = webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length > 0 && contentWarningsGenerated
             
             if (!warningsFoundViaWebSearch) {
+              // Build comprehensive reasoning that includes AI's explanation
+              let reasoning = 'AI analysis completed and found no content warnings.'
+              if (aiNoWarningsReasoning) {
+                reasoning += ` ${aiNoWarningsReasoning}`
+              }
+              if (webSearchContext) {
+                reasoning += ` ${webSearchContext}`
+              }
+              if (usedWebSearch) {
+                reasoning += ' Web search verification confirmed the book appears safe for general reading.'
+              } else if (!aiNoWarningsReasoning) {
+                reasoning += ' The book appears safe for general reading based on description analysis.'
+              }
+              
               await logAuditDecision({
                 bookId: bookId,
                 isbn: cleanIsbn,
                 decisionType: 'no_warnings',
                 warningsCount: 0,
-                aiReasoning: `AI analysis completed and found no content warnings. ${webSearchContext}${usedWebSearch ? 'Web search verification confirmed the book appears safe for general reading.' : 'The book appears safe for general reading based on description analysis.'}`,
+                aiReasoning: reasoning,
                 confidenceLevel: usedWebSearch ? 'high' : 'medium', // Higher confidence if web search verified
                 bookTitle: bookForAnalysis.title,
                 bookAuthor: bookForAnalysis.author,
