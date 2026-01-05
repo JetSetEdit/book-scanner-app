@@ -884,6 +884,35 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               const savedCount = insertedWarnings?.length || warningsToInsert.length
               onProgress?.(`✅ Saved ${savedCount} content warnings`)
               
+              // Calculate and store age rating based on Australian Classification Board methodology
+              try {
+                const { calculateAgeRating } = await import('@/lib/utils/age-rating')
+                const ageRating = calculateAgeRating(analysisResult.warnings)
+                
+                // Update book with age rating in categories array
+                const currentCategories = currentBook?.categories || []
+                const categoriesWithoutRating = currentCategories.filter((c: string) => !c.startsWith('CLASSIFICATION:'))
+                const updatedCategories = [...categoriesWithoutRating, `CLASSIFICATION:${ageRating.rating}`]
+                
+                const { error: updateError } = await supabaseAdmin
+                  .from('books')
+                  .update({ categories: updatedCategories })
+                  .eq('id', bookId)
+                
+                if (updateError) {
+                  console.error('Failed to update age rating:', updateError)
+                } else {
+                  console.log(`[Age Rating] Calculated ${ageRating.rating} for book ${bookId}: ${ageRating.ageRecommendation}`)
+                  // Update currentBook for return value
+                  if (currentBook) {
+                    currentBook.categories = updatedCategories
+                  }
+                }
+              } catch (ageRatingError) {
+                console.error('Error calculating age rating:', ageRatingError)
+                // Don't fail the scan if age rating calculation fails
+              }
+              
               // Log audit decision: warnings were generated
                 await logAuditDecision({
                   bookId: bookId,
