@@ -227,6 +227,12 @@ Instructions:
    - consent_ambiguity (dub-con): Unclear consent in dark romance
    - cnc: Consensual non-consent play
    - explicit_sexual_content: Explicit but consensual
+   - IMPORTANT: For dark romance, thriller, or psychological thriller genres, explicitly check for sexual content indicators:
+     * Explicit sexual scenes, detailed sexual content, steamy/spicy content
+     * Sexual violence, non-consensual sexual content, rape, sexual assault
+     * Dubious consent, power imbalances in sexual relationships
+     * If the book description mentions "dark", "thriller", "psychological thriller", "steamy", "spicy", "explicit", or similar terms, you MUST check for sexual content warnings even if not explicitly mentioned in the description
+     * For books known to contain graphic sexual content (e.g., "Verity" by Colleen Hoover), flag sexual content warnings based on genre indicators and book reputation
 
 4. Spoiler detection: Mark is_spoiler=true if the warning reveals:
    - Character deaths or major character outcomes
@@ -509,6 +515,85 @@ Instructions:
  * Replaces AI's severity claim with the actual computed severity
  * Handles cases where AI confuses "detail level" (graphic/moderate/vague) with "severity" (mild/moderate/severe)
  */
+function updateDescriptionForSeverity(
+  originalDescription: string | undefined,
+  computedSeverity: 'mild' | 'moderate' | 'severe'
+): string {
+  if (!originalDescription) {
+    // Generate basic description if none provided
+    const intensityMap = {
+      severe: 'Strong',
+      moderate: 'Moderate',
+      mild: 'Mild'
+    }
+    return `${intensityMap[computedSeverity]} themes of sensitive content.`
+  }
+
+  const intensityMap = {
+    severe: 'Strong',
+    moderate: 'Moderate',
+    mild: 'Mild'
+  }
+  const targetIntensity = intensityMap[computedSeverity]
+  
+  // Patterns to match intensity words at the start of descriptions
+  const intensityPatterns = [
+    /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+(themes?|content|depictions?|scenes?|violence|abuse|sexual|language|drug|use|of)/i,
+    /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+themes?\s+of/i,
+  ]
+
+  let updatedDescription = originalDescription
+  
+  // Try to replace intensity words at the start
+  for (const pattern of intensityPatterns) {
+    if (pattern.test(updatedDescription)) {
+      // Extract the content type after the intensity word
+      const match = updatedDescription.match(pattern)
+      if (match) {
+        const contentPart = updatedDescription.substring(match[0].length).trim()
+        // Capitalize first letter of content part
+        const capitalizedContent = contentPart.charAt(0).toUpperCase() + contentPart.slice(1)
+        updatedDescription = `${targetIntensity} ${contentPart}`
+        break
+      }
+    }
+  }
+
+  // If no pattern matched, try to replace common intensity words anywhere
+  const intensityReplacements: Record<string, string> = {
+    'mild': targetIntensity,
+    'moderate': targetIntensity,
+    'strong': targetIntensity,
+    'graphic': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
+    'explicit': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
+    'intense': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
+    'heavy': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
+    'light': computedSeverity === 'mild' ? 'Mild' : targetIntensity,
+    'subtle': computedSeverity === 'mild' ? 'Mild' : targetIntensity,
+  }
+
+  // Only replace if the description starts with an intensity word that doesn't match
+  const startsWithIntensity = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i.test(updatedDescription)
+  if (startsWithIntensity) {
+    // Check if it already matches
+    const currentIntensity = updatedDescription.match(/^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)/i)?.[0]
+    if (currentIntensity && currentIntensity.toLowerCase() !== targetIntensity.toLowerCase()) {
+      // Replace the first occurrence of the intensity word
+      updatedDescription = updatedDescription.replace(
+        new RegExp(`^${currentIntensity}`, 'i'),
+        targetIntensity
+      )
+    }
+  } else {
+    // If description doesn't start with intensity, prepend it
+    // Extract the main content (remove leading articles like "The", "A")
+    const content = updatedDescription.replace(/^(The|A|An)\s+/i, '').trim()
+    updatedDescription = `${targetIntensity} ${content.charAt(0).toLowerCase() + content.slice(1)}`
+  }
+
+  return updatedDescription
+}
+
 function updateReasoningForSeverity(
   originalReasoning: string | undefined,
   computedSeverity: 'mild' | 'moderate' | 'severe',
@@ -611,6 +696,12 @@ function processWarnings(
       }
     }
 
+    // Update description to match computed severity
+    const updatedDescription = updateDescriptionForSeverity(
+      w.description,
+      severity
+    )
+
     // Update reasoning to match computed severity
     const updatedReasoning = updateReasoningForSeverity(
       w.reasoning,
@@ -627,7 +718,7 @@ function processWarnings(
       taxonomy_version: TAXONOMY_VERSION,
       is_spoiler: w.is_spoiler === true || w.is_spoiler === 'true',
       other_note: w.other_note, // Preserve AI-provided other_note if available
-      description: w.description, // Preserve description for fallback logic
+      description: updatedDescription, // Use updated description that matches computed severity
       reasoning: updatedReasoning, // Use updated reasoning that matches computed severity
     })
 
@@ -918,8 +1009,12 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
           subcategory_id: verification.adjusted_subcategory_id || warning.subcategory_id
         }
 
-        // If severity was adjusted, update reasoning to match the new severity
+        // If severity was adjusted, update description and reasoning to match the new severity
         if (verification.adjusted_severity && verification.adjusted_severity !== warning.severity) {
+          adjusted.description = updateDescriptionForSeverity(
+            warning.description,
+            adjustedSeverity
+          )
           adjusted.reasoning = updateReasoningForSeverity(
             warning.reasoning,
             adjustedSeverity,
