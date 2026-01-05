@@ -536,59 +536,51 @@ function updateDescriptionForSeverity(
   }
   const targetIntensity = intensityMap[computedSeverity]
   
-  // Patterns to match intensity words at the start of descriptions
-  const intensityPatterns = [
-    /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+(themes?|content|depictions?|scenes?|violence|abuse|sexual|language|drug|use|of)/i,
-    /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+themes?\s+of/i,
-  ]
-
-  let updatedDescription = originalDescription
+  let updatedDescription = originalDescription.trim()
   
-  // Try to replace intensity words at the start
-  for (const pattern of intensityPatterns) {
-    if (pattern.test(updatedDescription)) {
-      // Extract the content type after the intensity word
-      const match = updatedDescription.match(pattern)
-      if (match) {
-        const contentPart = updatedDescription.substring(match[0].length).trim()
-        // Capitalize first letter of content part
-        const capitalizedContent = contentPart.charAt(0).toUpperCase() + contentPart.slice(1)
-        updatedDescription = `${targetIntensity} ${contentPart}`
-        break
+  // Pattern to match intensity word at the start
+  const intensityStartPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i
+  
+  if (intensityStartPattern.test(updatedDescription)) {
+    // Extract the current intensity word and everything after it
+    const match = updatedDescription.match(intensityStartPattern)
+    if (match) {
+      const currentIntensity = match[1]
+      const restOfDescription = updatedDescription.substring(match[0].length).trim()
+      
+      // Check if "themes" is missing (common AI error: "Moderate of..." instead of "Moderate themes of...")
+      const hasThemes = /^themes?\s+of/i.test(restOfDescription)
+      const hasDirectOf = /^of\s+/i.test(restOfDescription)
+      
+      // If we have "Moderate of..." (missing themes), add "themes"
+      if (hasDirectOf && !hasThemes) {
+        updatedDescription = `${targetIntensity} themes ${restOfDescription}`
+      } else if (hasThemes) {
+        // Already has "themes of", just replace intensity if needed
+        if (currentIntensity.toLowerCase() !== targetIntensity.toLowerCase()) {
+          updatedDescription = `${targetIntensity} ${restOfDescription}`
+        }
+        // If intensity already matches, keep as-is
+      } else {
+        // Has intensity word but no "themes" or "of" - check if it's a valid format
+        // Examples: "Moderate violence", "Strong content" - these are fine
+        // But if it starts with "of", we need to add "themes"
+        if (restOfDescription.startsWith('of ')) {
+          updatedDescription = `${targetIntensity} themes ${restOfDescription}`
+        } else if (currentIntensity.toLowerCase() !== targetIntensity.toLowerCase()) {
+          // Just replace intensity, keep rest
+          updatedDescription = `${targetIntensity} ${restOfDescription}`
+        }
       }
     }
-  }
-
-  // If no pattern matched, try to replace common intensity words anywhere
-  const intensityReplacements: Record<string, string> = {
-    'mild': targetIntensity,
-    'moderate': targetIntensity,
-    'strong': targetIntensity,
-    'graphic': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
-    'explicit': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
-    'intense': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
-    'heavy': computedSeverity === 'severe' ? 'Strong' : targetIntensity,
-    'light': computedSeverity === 'mild' ? 'Mild' : targetIntensity,
-    'subtle': computedSeverity === 'mild' ? 'Mild' : targetIntensity,
-  }
-
-  // Only replace if the description starts with an intensity word that doesn't match
-  const startsWithIntensity = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i.test(updatedDescription)
-  if (startsWithIntensity) {
-    // Check if it already matches
-    const currentIntensity = updatedDescription.match(/^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)/i)?.[0]
-    if (currentIntensity && currentIntensity.toLowerCase() !== targetIntensity.toLowerCase()) {
-      // Replace the first occurrence of the intensity word
-      updatedDescription = updatedDescription.replace(
-        new RegExp(`^${currentIntensity}`, 'i'),
-        targetIntensity
-      )
-    }
   } else {
-    // If description doesn't start with intensity, prepend it
-    // Extract the main content (remove leading articles like "The", "A")
+    // Description doesn't start with intensity word - prepend it with "themes of"
+    // Remove leading articles if present
     const content = updatedDescription.replace(/^(The|A|An)\s+/i, '').trim()
-    updatedDescription = `${targetIntensity} ${content.charAt(0).toLowerCase() + content.slice(1)}`
+    // Ensure first letter is lowercase after prepending
+    const firstChar = content.charAt(0)
+    const rest = content.slice(1)
+    updatedDescription = `${targetIntensity} themes of ${firstChar.toLowerCase()}${rest}`
   }
 
   return updatedDescription
