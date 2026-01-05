@@ -6,6 +6,7 @@ import { Search, X, BookOpen, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
 import Image from "next/image"
@@ -24,6 +25,15 @@ interface SearchResult {
   hasWarnings: boolean
 }
 
+interface SearchResponse {
+  books: SearchResult[]
+  total: number
+  query: string
+  isISBN?: boolean
+  isbnNotFound?: boolean
+  normalizedISBN?: string | null
+}
+
 interface SearchProps {
   className?: string
 }
@@ -35,6 +45,7 @@ export function SearchComponent({ className }: SearchProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [showResults, setShowResults] = useState(false)
+  const [searchMeta, setSearchMeta] = useState<{ isISBN?: boolean; isbnNotFound?: boolean; normalizedISBN?: string | null }>({})
   const [severityFilters, setSeverityFilters] = useState({
     mild: true,
     moderate: true,
@@ -74,8 +85,13 @@ export function SearchComponent({ className }: SearchProps) {
         
         const url = `/api/search?q=${encodeURIComponent(query)}${severityParams ? `&severity=${severityParams}` : ""}`
         const response = await fetch(url)
-        const data = await response.json()
+        const data: SearchResponse = await response.json()
         setResults(data.books || [])
+        setSearchMeta({
+          isISBN: data.isISBN,
+          isbnNotFound: data.isbnNotFound,
+          normalizedISBN: data.normalizedISBN,
+        })
         setShowResults(true)
       } catch (error) {
         console.error("Search error:", error)
@@ -123,7 +139,7 @@ export function SearchComponent({ className }: SearchProps) {
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Search books..."
+          placeholder="Search by title, author, ISBN, genre..."
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
@@ -208,11 +224,31 @@ export function SearchComponent({ className }: SearchProps) {
           )}
           
           {results.length === 0 && !isLoading && query.length >= 2 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              No books found matching &quot;{query}&quot;
-              {(!severityFilters.mild || !severityFilters.moderate || !severityFilters.severe) && (
-                <div className="mt-2 text-xs">
-                  Try adjusting your tolerance filters
+            <div className="p-4">
+              {searchMeta.isbnNotFound && searchMeta.normalizedISBN ? (
+                <div className="text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Book with ISBN <span className="font-mono font-medium text-foreground">{searchMeta.normalizedISBN}</span> not found
+                  </p>
+                  <Button
+                    onClick={() => {
+                      router.push(`/scan?isbn=${encodeURIComponent(searchMeta.normalizedISBN!)}`)
+                      handleResultClick()
+                    }}
+                    className="gap-2"
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    Scan this book
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center text-sm text-muted-foreground">
+                  No books found matching &quot;{query}&quot;
+                  {(!severityFilters.mild || !severityFilters.moderate || !severityFilters.severe) && (
+                    <div className="mt-2 text-xs">
+                      Try adjusting your tolerance filters
+                    </div>
+                  )}
                 </div>
               )}
             </div>

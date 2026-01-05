@@ -294,11 +294,19 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
     subcategoryLabel = null;
   }
 
+  // Generate a safe anchor ID from warning subcategory_id or id
+  const anchorId = warning.subcategory_id 
+    ? `warning-${warning.subcategory_id.replace(/[^a-zA-Z0-9]/g, '-')}`
+    : `warning-${warning.id}`
+
   return (
-    <div className={cn(
-      "group py-6 border-b border-border last:border-0 transition-colors",
-      isVerified ? "hover:border-amber-200 dark:hover:border-amber-800" : "hover:border-border"
-    )}>
+    <div 
+      id={anchorId}
+      className={cn(
+        "group py-6 border-b border-border last:border-0 transition-colors scroll-mt-20",
+        isVerified ? "hover:border-amber-200 dark:hover:border-amber-800" : "hover:border-border"
+      )}
+    >
       <div className="flex flex-col md:flex-row md:items-baseline gap-4 md:gap-8">
 
         {/* Left: Icon & Category */}

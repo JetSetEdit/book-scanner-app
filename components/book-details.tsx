@@ -474,10 +474,16 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 
                 if (worstWarnings.length === 0) return null
                 
-                // Build warning labels
+                // Build warning labels with anchor IDs
                 const warningLabels = worstWarnings.map((w: any) => {
                   const label = getSubcategoryLabel(w.subcategory_id)
-                  return label || w.description.split('.')[0].substring(0, 30).trim()
+                  const anchorId = w.subcategory_id 
+                    ? `warning-${w.subcategory_id.replace(/[^a-zA-Z0-9]/g, '-')}`
+                    : `warning-${w.id}`
+                  return {
+                    label: label || w.description.split('.')[0].substring(0, 30).trim(),
+                    anchorId
+                  }
                 })
                 
                 // Get top warnings for tags (up to 5)
@@ -486,19 +492,41 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 
                 if (topWarnings.length === 0) return null
                 
+                // Function to scroll to warning
+                const scrollToWarning = (anchorId: string) => {
+                  const element = document.getElementById(anchorId)
+                  if (element) {
+                    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    // Add a subtle highlight effect
+                    element.classList.add('ring-2', 'ring-primary', 'ring-offset-2')
+                    setTimeout(() => {
+                      element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2')
+                    }, 2000)
+                  }
+                }
+                
                 return (
                   <div className="mb-6 p-4 bg-muted/30 border border-border rounded-lg max-w-2xl mx-auto">
                     <p className="text-sm text-foreground leading-relaxed mb-3">
-                      <span className="font-semibold">Heads up:</span> Contains {severityLevel} content warnings.
+                      <span className="font-semibold">Heads up:</span> This book contains {severityLevel} content warnings.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {topWarnings.map((label, index) => (
+                      {topWarnings.map((warning, index) => (
                         <Badge 
                           key={index}
                           variant="secondary"
-                          className="text-xs font-medium"
+                          className="text-xs font-medium cursor-pointer hover:bg-secondary/80 transition-colors"
+                          onClick={() => scrollToWarning(warning.anchorId)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              scrollToWarning(warning.anchorId)
+                            }
+                          }}
                         >
-                          {label}
+                          {warning.label}
                         </Badge>
                       ))}
                     </div>

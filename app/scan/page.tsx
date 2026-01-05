@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -69,6 +70,8 @@ function formatStatusMessage(message: string): string {
 }
 
 export default function ScanTestPage() {
+  const searchParams = useSearchParams()
+  
   // Browser storage for last ISBN
   const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
   const [isbn, setIsbn] = useState("")
@@ -104,10 +107,29 @@ export default function ScanTestPage() {
   
   // Client-side only flag to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false)
+  const [hasAutoScanned, setHasAutoScanned] = useState(false)
   
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Check for ISBN in URL params and auto-start scan
+  useEffect(() => {
+    if (!isMounted || hasAutoScanned) return
+    
+    const isbnParam = searchParams.get('isbn')
+    if (isbnParam && isbnParam.trim() && !loading && !result) {
+      const normalizedIsbn = isbnParam.trim()
+      setIsbn(normalizedIsbn)
+      setHasAutoScanned(true)
+      // Small delay to ensure component is fully mounted
+      const timeoutId = setTimeout(() => {
+        performScan(normalizedIsbn)
+      }, 300)
+      return () => clearTimeout(timeoutId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, searchParams, hasAutoScanned]) // Run when component mounts with ISBN param
 
   // Note: We store lastIsbn for history, but don't auto-fill the input
   // Users can manually enter or scan a new ISBN each time
