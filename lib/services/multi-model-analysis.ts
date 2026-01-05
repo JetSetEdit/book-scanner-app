@@ -9,7 +9,7 @@ import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { WARNING_CATEGORIES, TAXONOMY_VERSION, MODEL_VERSION, getSubcategoryById } from '../config/taxonomy-v2'
 
-import { ContextModifier, EvidenceSpan, EnhancedContentWarning } from '../config/taxonomy-context'
+import { ContextModifier, EvidenceSpan, EnhancedContentWarning, SeveritySignals } from '../config/taxonomy-context'
 import { buildSeveritySignals, computeSeverityFromSignals } from '../utils/severity-computation'
 import { isActualSexualViolence } from '../utils/sexual-violence-evaluation'
 import { createClient } from '@supabase/supabase-js'
@@ -443,6 +443,62 @@ Instructions:
   }
 }
 
+/**
+ * Update reasoning text to match computed severity
+ * Replaces AI's severity claim with the actual computed severity
+ * Handles cases where AI confuses "detail level" (graphic/moderate/vague) with "severity" (mild/moderate/severe)
+ */
+function updateReasoningForSeverity(
+  originalReasoning: string | undefined,
+  computedSeverity: 'mild' | 'moderate' | 'severe',
+  signals: SeveritySignals
+): string {
+  if (!originalReasoning) {
+    // Generate basic reasoning if none provided
+    const severityText = computedSeverity.charAt(0).toUpperCase() + computedSeverity.slice(1)
+    return `${severityText} severity based on computed signals (frequency: ${signals.frequency.toFixed(1)}, centrality: ${signals.centrality.toFixed(1)}, proximity: ${signals.proximity.toFixed(1)}, explicitness: ${signals.explicitness.toFixed(1)}).`
+  }
+
+  const severityText = computedSeverity.charAt(0).toUpperCase() + computedSeverity.slice(1)
+  
+  // Pattern to match severity classification claims (not detail level)
+  const severityClassificationPatterns = [
+    /\b(mild|moderate|severe)\s+severity\s+classification\b/gi,
+    /\bjustifying\s+a\s+(mild|moderate|severe)\s+severity\s+classification\b/gi,
+    /\b(mild|moderate|severe)\s+severity\s+rating\b/gi,
+    /\b(mild|moderate|severe)\s+severity\b/gi,
+    /\bclassified\s+as\s+(mild|moderate|severe)\s+severity\b/gi,
+    /\bwarrants\s+(mild|moderate|severe)\s+severity\b/gi,
+  ]
+
+  let updatedReasoning = originalReasoning
+  
+  // Replace severity classification claims
+  for (const pattern of severityClassificationPatterns) {
+    updatedReasoning = updatedReasoning.replace(pattern, (match, claimedSeverity) => {
+      if (claimedSeverity.toLowerCase() !== computedSeverity.toLowerCase()) {
+        return match.replace(claimedSeverity, severityText)
+      }
+      return match
+    })
+  }
+
+  // Check if reasoning explicitly states the severity classification
+  const hasExplicitSeverityClaim = severityClassificationPatterns.some(pattern => pattern.test(originalReasoning))
+  
+  // If no explicit severity claim found, append it
+  if (!hasExplicitSeverityClaim) {
+    // Check if reasoning ends with a period or other punctuation
+    const trimmed = updatedReasoning.trim()
+    const endsWithPunctuation = /[.!?]$/.test(trimmed)
+    const separator = endsWithPunctuation ? ' ' : '. '
+    
+    updatedReasoning = `${trimmed}${separator}This content is classified as ${severityText.toLowerCase()} severity based on computed signals (frequency: ${signals.frequency.toFixed(1)}, centrality: ${signals.centrality.toFixed(1)}, proximity: ${signals.proximity.toFixed(1)}, explicitness: ${signals.explicitness.toFixed(1)}).`
+  }
+
+  return updatedReasoning
+}
+
 function processWarnings(
   rawWarnings: any[],
   source: 'openai' | 'gemini'
@@ -494,6 +550,13 @@ function processWarnings(
       }
     }
 
+    // Update reasoning to match computed severity
+    const updatedReasoning = updateReasoningForSeverity(
+      w.reasoning,
+      severity,
+      signals
+    )
+
     acc.push({
       subcategory_id: subcategoryId,
       severity,
@@ -504,7 +567,7 @@ function processWarnings(
       is_spoiler: w.is_spoiler === true || w.is_spoiler === 'true',
       other_note: w.other_note, // Preserve AI-provided other_note if available
       description: w.description, // Preserve description for fallback logic
-      reasoning: w.reasoning, // Preserve AI reasoning if available
+      reasoning: updatedReasoning, // Use updated reasoning that matches computed severity
     })
 
     return acc;
@@ -787,10 +850,27 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       if (verification.action === 'adjust') {
         metrics.adjusted++
         // Create adjusted warning
+        const adjustedSeverity = verification.adjusted_severity || warning.severity
         const adjusted: EnhancedContentWarning = {
           ...warning,
-          severity: verification.adjusted_severity || warning.severity,
+          severity: adjustedSeverity,
           subcategory_id: verification.adjusted_subcategory_id || warning.subcategory_id
+        }
+
+        // If severity was adjusted, update reasoning to match the new severity
+        if (verification.adjusted_severity && verification.adjusted_severity !== warning.severity) {
+          adjusted.reasoning = updateReasoningForSeverity(
+            warning.reasoning,
+            adjustedSeverity,
+            warning.severity_signals || buildSeveritySignals({
+              presence: undefined,
+              detail_level: undefined,
+              description: warning.description,
+              category_id: adjusted.subcategory_id.split('.')[0],
+              frequency_hint: undefined,
+              centrality_hint: undefined
+            })
+          )
         }
 
         // Safety check: If adjusted to other_* subcategory, ensure other_note is normalized

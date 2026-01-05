@@ -101,6 +101,13 @@ export default function ScanTestPage() {
   const [reportAuthor, setReportAuthor] = useState("")
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState("")
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+  
+  // Client-side only flag to prevent hydration mismatch
+  const [isMounted, setIsMounted] = useState(false)
+  
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   // Note: We store lastIsbn for history, but don't auto-fill the input
   // Users can manually enter or scan a new ISBN each time
@@ -205,8 +212,17 @@ export default function ScanTestPage() {
                   } else if (data.result) {
                     // Final result
                     result = data.result
+                    console.log('[Scan] Received result:', { 
+                      success: result?.success, 
+                      hasBook: !!result?.book,
+                      bookId: result?.book?.id 
+                    })
                   } else if (data.error) {
-                    throw new Error(data.error)
+                    console.error('[Scan] Error in stream:', data.error)
+                    const errorMsg = typeof data.error === 'string' 
+                      ? data.error 
+                      : data.error.error || data.error.message || 'Unknown error'
+                    throw new Error(errorMsg)
                   }
                 } catch (e) {
                   console.warn('Failed to parse stream data:', e, line)
@@ -223,8 +239,18 @@ export default function ScanTestPage() {
         }
 
         if (!result) {
+          console.error('[Scan] No result received. Buffer:', buffer.substring(0, 500))
+          console.error('[Scan] Status updates:', statusUpdates)
           throw new Error("No result received from scan - the scan may have completed but no result was returned")
         }
+        
+        console.log('[Scan] Result received:', {
+          success: result.success,
+          hasBook: !!result.book,
+          bookId: result.book?.id,
+          isNewBook: result.isNewBook,
+          contentWarningsGenerated: result.contentWarningsGenerated
+        })
 
         markStage('result-received')
         
@@ -238,13 +264,19 @@ export default function ScanTestPage() {
         
         // Transform result to match expected format
         const transformedResult = {
-          success: result.success,
+          success: result.success !== false, // Default to true if not explicitly false
           book: result.book,
           isNewBook: result.isNewBook || false,
           contentWarningsGenerated: result.contentWarningsGenerated || false,
           timings: result.timings,
           flags: result.flags
         }
+        
+        console.log('[Scan] Transformed result:', {
+          success: transformedResult.success,
+          hasBook: !!transformedResult.book,
+          bookId: transformedResult.book?.id
+        })
         
         setResult(transformedResult)
         setCandidates(null)
@@ -257,25 +289,42 @@ export default function ScanTestPage() {
         markStage('result-processed')
         
         // Save to scan history
-        if (result.book) {
-          addScan({
-            isbn: isbnToScan,
-            title: result.book.title || "Unknown",
-            author: result.book.author || undefined,
-            bookId: result.book.id || `scan-${isbnToScan}`,
-          })
+        if (result?.book) {
+          try {
+            addScan({
+              isbn: isbnToScan,
+              title: result.book.title || "Unknown",
+              author: result.book.author || undefined,
+              bookId: result.book.id || `scan-${isbnToScan}`,
+            })
+          } catch (historyError) {
+            console.warn('[Scan] Failed to save to history:', historyError)
+            // Don't throw - history save failure shouldn't break the scan
+          }
         }
         
         setLastIsbn(isbnToScan)
-        markStage('ui-updated')
-        const timingResult = endTiming()
-        if (timingResult) {
-          (transformedResult as any).timing = timingResult
+        
+        try {
+          markStage('ui-updated')
+          const timingResult = endTiming()
+          if (timingResult) {
+            (transformedResult as any).timing = timingResult
+          }
+        } catch (timingError) {
+          console.warn('[Scan] Timing error (non-critical):', timingError)
+          // Don't throw - timing is not critical
         }
         
         setLoading(false)
         return
     } catch (err) {
+      console.error('[Scan] Error caught in performScan:', err)
+      console.error('[Scan] Error details:', {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+        name: err instanceof Error ? err.name : typeof err
+      })
       setError(err instanceof Error ? err.message : "An unknown error occurred")
       // Reset selection state on error
       setSelectedCandidateId(null)
@@ -405,8 +454,8 @@ export default function ScanTestPage() {
             </p>
           </div>
 
-          {/* Scan History */}
-          {history.length > 0 && (
+          {/* Scan History - Only render after mount to prevent hydration mismatch */}
+          {isMounted && history.length > 0 && (
             <div className="mb-6 p-4 border rounded-lg bg-muted/30">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
