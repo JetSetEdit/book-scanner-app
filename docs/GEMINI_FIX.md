@@ -38,3 +38,4 @@ npx tsx --env-file=.env.local scripts/test-gemini-api-key.ts
 
 This will show all available models for your API key.
 
+

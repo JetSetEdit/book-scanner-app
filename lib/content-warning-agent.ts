@@ -1,3 +1,17 @@
+/**
+ * Content Warning Agent - Production Default
+ * 
+ * This is the PRODUCTION DEFAULT agent implementation using the old `run()` API.
+ * 
+ * Performance: 22-39% faster than the new Runner API pattern
+ * Consistency: More consistent execution times
+ * Status: Proven, reliable, used for all user-facing flows
+ * 
+ * For debugging/observability, see: lib/content-warning-agent-v2.ts (Runner + withTrace API)
+ * 
+ * Strategy: See docs/AGENT_PATTERN_STRATEGY.md
+ */
+
 import { Agent, run, tool, setDefaultOpenAIKey } from "@openai/agents";
 import { z } from "zod";
 import { 

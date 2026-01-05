@@ -39,6 +39,12 @@ export async function POST(req: NextRequest) {
                 const result = await processIsbnScan(isbn, onProgress, selectedCandidate, forceRefresh === true)
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
+                console.log(`[Scan API] Result structure:`, {
+                  hasSuccess: 'success' in result,
+                  hasBook: !!result.book,
+                  hasScan: !!result.scan,
+                  keys: Object.keys(result)
+                })
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '✅ Scan process completed' })}\n\n`))
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
             } catch (error) {

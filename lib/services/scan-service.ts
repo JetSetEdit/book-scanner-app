@@ -242,6 +242,7 @@ export async function processIsbnScan(
 
   let bookId: string
   let currentBook: Book | null = existingBook
+  let storedMetadataIssues: any = null
 
   if (!currentBook) {
     // Book doesn't exist, fetch from external API
@@ -490,7 +491,7 @@ export async function processIsbnScan(
       
       // Store metadata issues for later use in audit log
       if (Object.keys(metadataIssues).length > 0) {
-        (bookForAnalysis as any).metadataIssues = metadataIssues
+        storedMetadataIssues = metadataIssues
       }
 
       if (insertError) {
@@ -521,6 +522,11 @@ export async function processIsbnScan(
     if (!bookForAnalysis) {
       onProgress?.('❌ Error: No book data available for analysis')
       throw new Error('No book data available for analysis')
+    }
+    
+    // Attach stored metadata issues if available
+    if (storedMetadataIssues) {
+      (bookForAnalysis as any).metadataIssues = storedMetadataIssues
     }
     
     onProgress?.(`📚 Book for analysis: "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown'}`)
@@ -665,10 +671,10 @@ Be factual and specific. If you cannot find information, say so.`
       
       // ALWAYS run analysis - never skip
       onProgress?.('🤖 Starting AI content analysis with OpenAI (GPT-4o)...')
-        onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
-        onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
-        
-        try {
+      onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
+      onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
+      
+      try {
           const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
           onProgress?.('⏳ Calling analyzeBookWithMultiModel...')
           
@@ -1210,7 +1216,8 @@ If you find any content warnings mentioned online or in reviews, list them brief
 
   // SAFETY CHECK: Ensure audit log was created if analysis ran
   // This prevents books from being marked as "Unknown" when they were actually analyzed
-  if (bookId && bookForAnalysis && bookForAnalysis.title) {
+  const bookForSafetyCheck = currentBook || existingBook
+  if (bookId && bookForSafetyCheck && bookForSafetyCheck.title) {
     try {
       const { data: existingAuditLog } = await supabaseAdmin
         .from('ai_audit_logs')
@@ -1220,7 +1227,7 @@ If you find any content warnings mentioned online or in reviews, list them brief
         .limit(1)
       
       if (!existingAuditLog || existingAuditLog.length === 0) {
-        console.warn(`[Safety Check] No audit log found for book ${bookId} (${bookForAnalysis.title}) - creating one now`)
+        console.warn(`[Safety Check] No audit log found for book ${bookId} (${bookForSafetyCheck.title}) - creating one now`)
         onProgress?.('⚠️ Safety check: Creating missing audit log...')
         
         // Create audit log based on whether warnings were generated
@@ -1238,15 +1245,15 @@ If you find any content warnings mentioned online or in reviews, list them brief
             ? `AI analysis identified ${warningCount} content warning(s) for this book. Analysis completed successfully. (Audit log created via safety check)`
             : `AI analysis completed and found no content warnings. The book appears safe for general reading. (Audit log created via safety check)`,
           confidenceLevel: 'medium', // Lower confidence since this is a safety check
-          bookTitle: bookForAnalysis.title,
-          bookAuthor: bookForAnalysis.author,
-          descriptionLength: bookForAnalysis.description?.length || null,
-          hadThinMetadata: !bookForAnalysis.description || bookForAnalysis.description.length < 150,
+          bookTitle: bookForSafetyCheck.title,
+          bookAuthor: bookForSafetyCheck.author,
+          descriptionLength: bookForSafetyCheck.description?.length || null,
+          hadThinMetadata: !bookForSafetyCheck.description || bookForSafetyCheck.description.length < 150,
           usedWebSearch: usedWebSearch,
           modelVersion: MODEL_VERSION,
           taxonomyVersion: TAXONOMY_VERSION,
           pipelinePath: `${pipelinePath} -> safety_check`,
-          metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
+          metadataIssues: (bookForSafetyCheck as any).metadataIssues || undefined
         })
         
         onProgress?.('✅ Safety check: Created missing audit log')
