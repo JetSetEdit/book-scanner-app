@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -69,7 +69,7 @@ function formatStatusMessage(message: string): string {
   return cleaned
 }
 
-export default function ScanTestPage() {
+function ScanTestPageContent() {
   const searchParams = useSearchParams()
   
   // Browser storage for last ISBN
@@ -1051,5 +1051,23 @@ export default function ScanTestPage() {
       </Card>
     </div>
     </>
+  )
+}
+
+export default function ScanTestPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <ScanTestPageContent />
+    </Suspense>
   )
 }
