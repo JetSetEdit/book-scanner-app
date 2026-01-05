@@ -693,6 +693,13 @@ function processWarnings(
       w.description,
       severity
     )
+    
+    // Debug logging to verify function is working
+    if (w.description && w.description !== updatedDescription) {
+      console.log(`[updateDescriptionForSeverity] Updated: "${w.description}" → "${updatedDescription}" (severity: ${severity})`)
+    } else if (w.description && w.description.includes(' of ') && !w.description.includes('themes of')) {
+      console.warn(`[updateDescriptionForSeverity] WARNING: Description "${w.description}" should have been fixed but wasn't!`)
+    }
 
     // Update reasoning to match computed severity
     const updatedReasoning = updateReasoningForSeverity(

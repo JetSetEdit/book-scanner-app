@@ -839,9 +839,15 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                 
                 // Use AI-generated description (clinical, advisory language) instead of evidence excerpt
                 // The AI description is more detailed and trauma-aware, while evidence is just a quote
+                // NOTE: w.description should already be updated by updateDescriptionForSeverity() in processWarnings()
                 const description = w.description && w.description.trim().length > 20
                   ? w.description.trim()
                   : w.evidence[0]?.excerpt || `Content warning for ${w.subcategory_id}`
+                
+                // Debug logging to verify description is correct before database insert
+                if (description.includes(' of ') && !description.includes('themes of') && !description.includes('content of') && !description.includes('depictions of')) {
+                  console.error(`[scan-service] WARNING: Description "${description}" for ${w.subcategory_id} is missing "themes"!`)
+                }
 
                 return {
                   book_id: bookId,
