@@ -70,7 +70,7 @@ async function analyzeWithOpenAI(
   metadata: BookMetadata,
   onProgress?: ProgressCallback
 ): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
-  onProgress?.('Analyzing with OpenAI (GPT-4o)...')
+  onProgress?.('⏳ Checking for: sexual content, violence, trauma, relationships, mental health...')
 
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
@@ -800,7 +800,7 @@ async function verifyUniqueWarnings(
     return { verified: [], metrics }
   }
 
-  onProgress?.(`🔍 Verifying ${uniqueWarnings.length} unique warning(s) with ${verifierModel === 'openai' ? 'OpenAI' : 'Gemini'}...`)
+  onProgress?.(`⏳ Verifying ${uniqueWarnings.length} warning${uniqueWarnings.length === 1 ? '' : 's'} for accuracy...`)
 
   try {
     const taxonomyContext = buildTaxonomyContext()
@@ -1082,7 +1082,10 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       .map(([reason, count]) => `${reason}:${count}`)
       .join(', ')
     const dropSummary = dropReasonSummary ? ` (${dropReasonSummary})` : ''
-    onProgress?.(`✅ Verification complete: ${metrics.kept} kept, ${metrics.dropped} dropped${dropSummary}, ${metrics.adjusted} adjusted (${metrics.latency_ms}ms)`)
+    // Don't show technical verification details to users - just show completion
+    if (metrics.kept > 0) {
+      onProgress?.(`✓ Verification complete - ${metrics.kept} warning${metrics.kept === 1 ? '' : 's'} confirmed`)
+    }
 
     return { verified, metrics }
   } catch (error) {
@@ -1195,8 +1198,6 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
 }> {
-  onProgress?.('Starting AI content analysis with OpenAI...')
-
   // Run OpenAI analysis only (Gemini disabled)
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
@@ -1208,7 +1209,11 @@ export async function analyzeBookWithMultiModel(
   // Gemini disabled - return empty array
   const geminiWarnings: EnhancedContentWarning[] = []
 
-  onProgress?.('Processing results...')
+  if (openaiWarnings.length > 0) {
+    onProgress?.(`⏳ Found ${openaiWarnings.length} potential warning${openaiWarnings.length === 1 ? '' : 's'} - verifying details...`)
+  } else {
+    onProgress?.('⏳ Reviewing content carefully...')
+  }
 
   const { combined, analysis } = combineResults(openaiWarnings, geminiWarnings)
 
@@ -1249,7 +1254,7 @@ export async function analyzeBookWithMultiModel(
     })
   }
 
-  onProgress?.(`Analysis complete: ${finalWarnings.length} warnings found${verificationMetrics ? ` (${verificationMetrics.dropped} unique warnings dropped)` : ''}`)
+      // Final message will be shown by scan-service
 
   // Web Search Enrichment: If we got 0 warnings or very few warnings,
   // search for content warnings from community sources
@@ -1276,7 +1281,7 @@ export async function analyzeBookWithMultiModel(
        ))
 
     if (shouldEnrich) {
-      onProgress?.('🔍 Initial scan found few/no warnings - searching community sources for content warnings...')
+      onProgress?.('⏳ Initial scan found few warnings - searching community sources for additional information...')
       
       try {
         const { enrichWithWebSearch } = await import('./web-search-enrichment')
@@ -1287,7 +1292,7 @@ export async function analyzeBookWithMultiModel(
         )
 
         if (enrichmentResult.enrichedContext && enrichmentResult.foundContentWarnings) {
-          onProgress?.('📄 Enriching description with community-sourced content warnings...')
+          onProgress?.('⏳ Gathering additional information from community sources...')
           
           // Create enriched metadata with community-sourced context
           const enrichedMetadata: BookMetadata = {
@@ -1296,12 +1301,12 @@ export async function analyzeBookWithMultiModel(
           }
 
           // Run a second analysis with enriched description
-          onProgress?.('🔄 Re-analyzing with enriched context...')
+          onProgress?.('⏳ Re-analyzing with additional context...')
           const enrichedResult = await analyzeWithOpenAI(enrichedMetadata, onProgress)
           const enrichedWarnings = enrichedResult.warnings
 
           if (enrichedWarnings.length > finalWarnings.length) {
-            onProgress?.(`✅ Enrichment found ${enrichedWarnings.length - finalWarnings.length} additional warning(s)`)
+            onProgress?.(`✓ Found ${enrichedWarnings.length - finalWarnings.length} additional warning${enrichedWarnings.length - finalWarnings.length === 1 ? '' : 's'} from community sources`)
             
             // Combine original warnings with enriched warnings (deduplicate by subcategory_id)
             const existingSubcategoryIds = new Set(finalWarnings.map(w => w.subcategory_id))

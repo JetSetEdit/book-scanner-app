@@ -705,13 +705,12 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
       }
       
       // ALWAYS run analysis - never skip
-      onProgress?.('🤖 Starting AI content analysis with OpenAI (GPT-4o)...')
-      onProgress?.(`📖 Analyzing: "${bookForAnalysis.title}"`)
-      onProgress?.(`📝 Using description: ${descriptionForAnalysis.substring(0, 100)}...`)
+      onProgress?.(`✓ Found: "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'}`)
+      onProgress?.('⏳ Reading description and gathering information...')
+      onProgress?.('⏳ Analyzing content for warnings (typically takes 15-20 seconds)')
       
       try {
           const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
-          onProgress?.('⏳ Calling analyzeBookWithMultiModel...')
           
           const analysisResult = await analyzeBookWithMultiModel(
             {
@@ -723,16 +722,14 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
             onProgress
           )
           
-          onProgress?.(`✅ AI analysis complete: ${analysisResult.warnings.length} warnings generated`)
-          
           // Store no_warnings_reasoning for use in audit log if no warnings found
           const noWarningsReasoning = analysisResult.noWarningsReasoning
           
           timings.aiContentWarningGeneration = performance.now() - analysisStartTime
-          onProgress?.(`⏱️ Analysis took ${Math.round(timings.aiContentWarningGeneration)}ms`)
           
           if (analysisResult.warnings.length > 0) {
-            onProgress?.(`💾 Saving ${analysisResult.warnings.length} content warnings to database...`)
+            onProgress?.(`✓ Found ${analysisResult.warnings.length} warning${analysisResult.warnings.length === 1 ? '' : 's'} - finalizing results...`)
+            onProgress?.('⏳ Saving results...')
           
             // If forceRefresh is true, delete existing AI-generated warnings first
             if (forceRefresh && bookId) {
