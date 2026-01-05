@@ -945,6 +945,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'moderate'
       },
       {
+        id: 'deception_or_secrets',
+        userLabel: 'Deception / Secrets',
+        shortDescription: 'Deception, lying, or secret-keeping involving friends or family (e.g., hiding relationship status, lying to friends, keeping secrets from loved ones).',
+        defaultSeverityHint: 'mild'
+      },
+      {
         id: 'incest_taboo',
         userLabel: 'Incest / Pseudo-Incest',
         shortDescription: 'Incest, pseudo-incest (step-siblings), or blood relation sexual/romantic content.',

@@ -148,10 +148,28 @@ Instructions:
    - If you cannot identify specific content warnings from the description, return [] (empty array)
    - DO NOT quote the book description verbatim. Use Australian Classification Board terminology (e.g., "Strong themes of emotional abuse" instead of quoting a diary entry).
    - Use the Board's standardized advisory language. Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
-   - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field explaining why no warnings were identified. This should explain what content was reviewed (e.g., "romance themes", "lighthearted tone", "no violence or sensitive themes mentioned") and why it does not meet the threshold for content warnings according to Australian Classification Board standards.
+   - IMPORTANT: Pay special attention to RELATIONSHIP AND EMOTIONAL CONTENT that may be triggering:
+     * Deception, lying, or secret-keeping (e.g., "lying through their teeth", "haven't told anyone", "pretending to be together")
+     * Relationship breakdown, separation, or breakups (e.g., "broke up", "divorced", "separated")
+     * Emotional stress from relationship issues (e.g., "can't bear to", "pretending", "faking", "hiding feelings")
+     * Pressure to maintain appearances or keep secrets from friends/family
+     * These should be flagged as:
+       - "family_dynamics.deception_or_secrets" for deception/lying to friends or family
+       - "family_dynamics.divorce" for relationship breakdown/separation
+       - "family_dynamics.other_family_dynamics" for other family/social dynamics
+   - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field. 
+     * BEFORE returning empty, explicitly ask yourself: "Does this book contain grief, anxiety, panic attacks, or intense emotional distress?"
+     * If YES, these are CONTENT WARNINGS. Do not return empty. Create a warning for "mental_health" or "themes".
+     * If NO, and it is truly lighthearted (e.g., "Cozy Mystery", "RomCom" with no angst), then return empty.
+     * In your reasoning, explicitly state: "No content warnings found. Review of themes (grief, anxiety, violence) came back negative. Tone is lighthearted."
 
 2a. GENRE AWARENESS FOR ROMANCE BOOKS:
    - If the book appears to be a Romance novel (based on title, description, or categories like "Sports Romance", "Small Town Romance", "Contemporary Romance", "Romance", etc.), you MUST be especially thorough:
+   - **CRITICAL FIRST STEP**: If the description or categories identify this as a romance book (e.g., mentions "romance", "romantic novel", "romance book", or categories include "Romance"), you MUST create at least one warning for general relationship/romance content:
+     * Flag as "emotional_abuse_or_toxic_relationships.other_toxic_relationships" with mild severity
+     * Description: "Mild themes of romantic relationships and relationship dynamics."
+     * Reasoning: "This is a romance novel, which inherently involves romantic relationships, emotional content, and relationship dynamics that some readers may want to be aware of."
+     * This ensures readers are informed about romantic/relationship content, even if specific tropes or conflicts aren't explicitly mentioned in the description
    - Look for HEAT/SPICE LEVEL indicators in the description:
      * Explicit sexual content (detailed sexual scenes)
      * Moderate sexual content (fade-to-black or moderate detail)
@@ -166,11 +184,43 @@ Instructions:
      * Age gap relationships (especially significant age differences)
      * Stalking or obsessive behavior
      * Toxic relationship dynamics
+     * **Enemies-to-lovers (REQUIRED WARNING)**: If the description explicitly mentions "enemies to lovers", "enemies-to-lovers", "enemies to lovers dynamic", or describes characters who "put aside their dislike", "start as adversaries", or have "mutual dislike" that develops into romance, you MUST flag this as "emotional_abuse_or_toxic_relationships.other_toxic_relationships" with a description like "Mild themes of relationship conflict and adversarial dynamics (enemies-to-lovers trope)." This is triggering for readers sensitive to relationship conflict, tension, or adversarial dynamics.
+     * Second chance romance (past relationship trauma, breakups, reconciliation stress)
+   - Look for RELATIONSHIP STRESS AND DECEPTION themes:
+     * Deception or lying to friends/family (e.g., "lying through their teeth", "pretending to be together", "haven't told anyone")
+     * Secret keeping or hiding relationship status
+     * Relationship breakdown or separation (breakups, divorce, estrangement)
+     * Emotional stress from relationship issues (pretending, faking, hiding feelings)
+     * Pressure to maintain appearances or keep secrets
+     * These should be flagged as:
+       - "family_dynamics.deception_or_secrets" for deception/lying to friends or family
+       - "family_dynamics.divorce" for relationship breakdown/separation
+       - "family_dynamics.other_family_dynamics" for other family/social dynamics
+   - Look for MENTAL HEALTH AND EMOTIONAL TRAUMA (Critical for Contemporary Romance):
+     * Romance novels often explore heavy internal struggles alongside the love story. You MUST check for:
+     * Grief / Death of a parent, friend, or loved one (past or present)
+     * Anxiety, Panic Attacks, or "struggling to breathe/cope"
+     * Depression, "darkness", "numbness", or "brain fog"
+     * Burnout, feeling overwhelmed, or emotional collapse
+     * If these are present, flag them as "mental_health.mental_health_struggles" (or appropriate category) with "mild" or "moderate" severity depending on intensity.
+     * Example: "struggling to navigate life after her father's death" → Warning: "Themes of grief and loss"
+     * Example: "prone to panic attacks" → Warning: "Depiction of panic attacks/anxiety"
    - Assess EMOTIONAL INTENSITY:
      * High emotional intensity (angst, trauma, heavy themes)
      * Moderate emotional intensity (some conflict, but generally light)
      * Low emotional intensity (lighthearted, low conflict)
-   - IMPORTANT: If the description is vague or doesn't mention heat level, you should note in "no_warnings_reasoning" that "Analysis based on blurb only; community reviews may indicate different heat/spice levels or tropes not mentioned in the description."
+   - IMPORTANT: If the description explicitly mentions "enemies to lovers", "enemies-to-lovers", or similar phrases, you MUST create a warning. This is not optional - enemies-to-lovers is a content warning because it involves relationship conflict, adversarial dynamics, and emotional tension that can be triggering.
+   - IMPORTANT: If the description is vague or minimal (especially if it's just marketing copy like "bestselling author" or "highly anticipated"), you should:
+     * Still look for ANY romance tropes mentioned (even briefly) in the description
+     * If "enemies to lovers" or similar is mentioned, ALWAYS flag it - do not skip it because the description is "cozy" or "lighthearted"
+     * Flag common romance tropes that might be present even if not explicitly stated (e.g., if it's a romance book, enemies-to-lovers, second chance, etc. are common)
+     * Note in "no_warnings_reasoning" that "Analysis based on minimal blurb only; community reviews may indicate different heat/spice levels or tropes not mentioned in the description."
+     * If the description mentions ANY relationship tension, conflict, or adversarial dynamics, flag it as "emotional_abuse_or_toxic_relationships.other_toxic_relationships" or "family_dynamics.other_family_dynamics" with mild severity
+   - CRITICAL: For ANY romance book (identified by title, description, or categories containing "Romance"), you MUST flag general relationship/romance content:
+     * If the description identifies it as a "romance", "romantic novel", "romance book", or similar, flag it as "emotional_abuse_or_toxic_relationships.other_toxic_relationships" with mild severity and description like "Mild themes of romantic relationships and relationship dynamics."
+     * Romance books inherently involve relationship dynamics, emotional content, and romantic themes that some readers may want to be aware of, even if the description doesn't explicitly mention conflict or tension
+     * This ensures readers are informed that the book contains romantic/relationship content, regardless of whether specific tropes or conflicts are mentioned
+     * Only skip this if the book is clearly NOT a romance (e.g., non-fiction, thriller without romance subplot, etc.)
 
 3. For sexual content, carefully distinguish:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
@@ -375,7 +425,18 @@ Instructions:
 
 3. For sexual content, carefully distinguish sexual_violence from consent_ambiguity/cnc.
 
-4. Spoiler detection: Mark is_spoiler=true if the warning reveals:
+4. SPECIAL FOCUS: INTERNAL STRUGGLES (Romance/Contemporary)
+   - Do not overlook internal emotional content.
+   - Explicitly tag: Grief, Depression, Anxiety, Panic Attacks, Burnout.
+   - These are valid content warnings even if the rest of the book is "safe".
+   - Romance novels often explore heavy internal struggles alongside the love story. Check for:
+     * Grief / Death of a parent, friend, or loved one (past or present)
+     * Anxiety, Panic Attacks, or "struggling to breathe/cope"
+     * Depression, "darkness", "numbness", or "brain fog"
+     * Burnout, feeling overwhelmed, or emotional collapse
+   - If these are present, flag them as "mental_health.mental_health_struggles" (or appropriate category) with "mild" or "moderate" severity depending on intensity.
+
+5. Spoiler detection: Mark is_spoiler=true if the warning reveals:
    - Character deaths or major character outcomes
    - Relationship status changes (who ends up together, breakups, etc.)
    - Major plot twists or reveals
@@ -1074,6 +1135,80 @@ export async function analyzeBookWithMultiModel(
   }
 
   onProgress?.(`Analysis complete: ${finalWarnings.length} warnings found${verificationMetrics ? ` (${verificationMetrics.dropped} unique warnings dropped)` : ''}`)
+
+  // Web Search Enrichment: If we got 0 warnings or very few warnings,
+  // search for content warnings from community sources
+  // This helps catch mental health themes that may be missing from sanitized descriptions
+  if (finalWarnings.length <= 2) {
+    // Check if we only have generic romance warnings (which might indicate sanitized description)
+    const hasOnlyGenericWarnings = finalWarnings.length > 0 && 
+      finalWarnings.every(w => 
+        w.subcategory_id === 'emotional_abuse_or_toxic_relationships.other_toxic_relationships' ||
+        w.subcategory_id === 'substance_use_or_alcohol.alcohol'
+      )
+
+    // Trigger enrichment if:
+    // 1. We have 0 warnings (definitely need enrichment)
+    // 2. We only have generic warnings (likely sanitized)
+    // 3. We have 1-2 warnings but they're all relationship/alcohol (might be missing mental health)
+    const shouldEnrich = finalWarnings.length === 0 || 
+      hasOnlyGenericWarnings ||
+      (finalWarnings.length <= 2 && 
+       !finalWarnings.some(w => 
+         w.subcategory_id?.includes('mental_health') ||
+         w.subcategory_id?.includes('grief') ||
+         w.subcategory_id?.includes('death')
+       ))
+
+    if (shouldEnrich) {
+      onProgress?.('🔍 Initial scan found few/no warnings - searching community sources for content warnings...')
+      
+      try {
+        const { enrichWithWebSearch } = await import('./web-search-enrichment')
+        const enrichmentResult = await enrichWithWebSearch(
+          metadata,
+          finalWarnings.length,
+          onProgress
+        )
+
+        if (enrichmentResult.enrichedContext && enrichmentResult.foundContentWarnings) {
+          onProgress?.('📄 Enriching description with community-sourced content warnings...')
+          
+          // Create enriched metadata with community-sourced context
+          const enrichedMetadata: BookMetadata = {
+            ...metadata,
+            description: `${metadata.description}\n\nAdditional context from community sources:\n${enrichmentResult.enrichedContext}`
+          }
+
+          // Run a second analysis with enriched description
+          onProgress?.('🔄 Re-analyzing with enriched context...')
+          const enrichedResult = await analyzeWithOpenAI(enrichedMetadata, onProgress)
+          const enrichedWarnings = enrichedResult.warnings
+
+          if (enrichedWarnings.length > finalWarnings.length) {
+            onProgress?.(`✅ Enrichment found ${enrichedWarnings.length - finalWarnings.length} additional warning(s)`)
+            
+            // Combine original warnings with enriched warnings (deduplicate by subcategory_id)
+            const existingSubcategoryIds = new Set(finalWarnings.map(w => w.subcategory_id))
+            const newWarnings = enrichedWarnings.filter(w => !existingSubcategoryIds.has(w.subcategory_id))
+            
+            finalWarnings = [...finalWarnings, ...newWarnings]
+            
+            // Update noWarningsReasoning if we now have warnings
+            if (finalWarnings.length > 0 && openaiNoWarningsReasoning) {
+              // Clear noWarningsReasoning since we now have warnings
+            }
+          } else {
+            onProgress?.('ℹ️ Enrichment did not find additional warnings beyond initial scan')
+          }
+        }
+      } catch (error) {
+        console.error('[Web Search Enrichment] Error during enrichment:', error)
+        onProgress?.('⚠️ Web search enrichment failed, continuing with initial results')
+        // Continue with original warnings - don't fail the entire scan
+      }
+    }
+  }
 
   return {
     warnings: finalWarnings,

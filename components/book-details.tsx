@@ -15,6 +15,7 @@ import { ShareButton } from "@/components/ShareButton"
 import { BuyButton } from "@/components/BuyButton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
+import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -416,6 +417,95 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <div className="h-px bg-border flex-1"></div>
               </div>
               
+              {/* Heads Up Summary with Major Warnings */}
+              {(() => {
+                if (!warnings || warnings.length === 0) return null
+                
+                // Get user-friendly labels for subcategories
+                const getSubcategoryLabel = (subcategoryId: string | null | undefined): string => {
+                  if (!subcategoryId) return ''
+                  
+                  try {
+                    const parts = subcategoryId.split('.')
+                    if (parts.length === 2) {
+                      const sub = getSubcategoryById(parts[0], parts[1])
+                      if (sub) return sub.userLabel
+                    }
+                  } catch (e) {
+                    // Fallback to formatting the ID
+                  }
+                  
+                  // Fallback: format the subcategory ID nicely
+                  // Handle special cases like PTSD
+                  const formatted = subcategoryId
+                    .split('_')
+                    .map(word => {
+                      // Keep acronyms uppercase (PTSD, etc.)
+                      if (word.toUpperCase() === word && word.length <= 5) {
+                        return word.toUpperCase()
+                      }
+                      return word.charAt(0).toUpperCase() + word.slice(1)
+                    })
+                    .join(' ')
+                  
+                  // Fix common acronyms
+                  return formatted
+                    .replace(/\bPtsd\b/gi, 'PTSD')
+                    .replace(/\bPtsd\b/g, 'PTSD')
+                }
+                
+                // Get severe warnings first, then moderate
+                const severeWarnings = warnings.filter((w: any) => w.severity === 'severe')
+                const moderateWarnings = warnings.filter((w: any) => w.severity === 'moderate')
+                
+                // Get top worst warnings (prioritize severe, then by confidence)
+                const worstWarnings = [...severeWarnings, ...moderateWarnings]
+                  .sort((a: any, b: any) => {
+                    // First sort by severity (severe > moderate)
+                    if (a.severity !== b.severity) {
+                      return a.severity === 'severe' ? -1 : 1
+                    }
+                    // Then by confidence score
+                    const aScore = a.confidence_score || 0
+                    const bScore = b.confidence_score || 0
+                    return bScore - aScore
+                  })
+                  .slice(0, 5) // Get top 5 for the list
+                
+                if (worstWarnings.length === 0) return null
+                
+                // Build warning labels
+                const warningLabels = worstWarnings.map((w: any) => {
+                  const label = getSubcategoryLabel(w.subcategory_id)
+                  return label || w.description.split('.')[0].substring(0, 30).trim()
+                })
+                
+                // Get top warnings for tags (up to 5)
+                const topWarnings = warningLabels.slice(0, 5)
+                const severityLevel = severeWarnings.length > 0 ? 'severe' : 'moderate'
+                
+                if (topWarnings.length === 0) return null
+                
+                return (
+                  <div className="mb-6 p-4 bg-muted/30 border border-border rounded-lg max-w-2xl mx-auto">
+                    <p className="text-sm text-foreground leading-relaxed mb-3">
+                      <span className="font-semibold">Heads up:</span> Contains {severityLevel} content warnings.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {topWarnings.map((label, index) => (
+                        <Badge 
+                          key={index}
+                          variant="secondary"
+                          className="text-xs font-medium"
+                        >
+                          {label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+              
               {/* Classification Rating Summary */}
               {(() => {
                 const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
@@ -550,7 +640,9 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               </div>
             </div>
 
-            {/* Google Books Attribution (TOS Compliance) */}
+            {/* Source Attribution (TOS Compliance) */}
+            {/* Note: We display Google Books attribution by default as it's the primary source.
+                If we had source tracking in the book object, we could conditionally show Open Library attribution. */}
             <GoogleBooksAttribution isbn={book.isbn} className="mt-8" />
 
             {/* Dev-Only: Collapsible Audit History */}

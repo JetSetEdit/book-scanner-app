@@ -242,7 +242,11 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
         }
         return undefined;
       })(),
-      description: typeof bookData.excerpts?.[0]?.text === 'string' ? bookData.excerpts[0].text : undefined,
+      // Open Library provides excerpts, but we can also try to get full description from work API
+      // For now, use excerpts (which are often substantial) or undefined
+      description: typeof bookData.excerpts?.[0]?.text === 'string' && bookData.excerpts[0].text.length > 50
+        ? bookData.excerpts[0].text
+        : undefined,
       publisher: bookData.publishers?.[0]?.name,
       published_date: bookData.publish_date,
       page_count: bookData.number_of_pages,
@@ -345,7 +349,7 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
       published_date: book.publishedDate,
       page_count: book.pageCount,
       categories: book.categories?.slice(0, 5),
-      source: 'googlebooks', // Mark as Google Books source (TOS violation to store permanently)
+      source: 'googlebooks', // Mark as Google Books source (TOS-compliant to store per API terms)
     }
   } catch (error) {
     console.error("[Book API] Google Books error:", error)

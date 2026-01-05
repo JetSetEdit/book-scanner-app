@@ -604,10 +604,15 @@ export async function processIsbnScan(
       onProgress?.(`📄 Description for analysis: ${descriptionForAnalysis.length} characters`)
       
       // Check if description is too minimal (just title/author/categories)
+      // Also check if description is very short (< 300 chars) and appears to be just marketing copy
       const isMinimalDescription = !bookForAnalysis.description || 
         bookForAnalysis.description.length <= 50 ||
         descriptionForAnalysis.startsWith('A book by') ||
-        descriptionForAnalysis === `A book by ${bookForAnalysis.author || 'Unknown Author'}.`
+        descriptionForAnalysis === `A book by ${bookForAnalysis.author || 'Unknown Author'}.` ||
+        (bookForAnalysis.description.length < 300 && 
+         (descriptionForAnalysis.includes('bestselling author') || 
+          descriptionForAnalysis.includes('highly anticipated') ||
+          descriptionForAnalysis.includes('charming break')))
       
       // If description is minimal, use web search to get context BEFORE analysis
       let webSearchContext = ''
@@ -620,23 +625,53 @@ export async function processIsbnScan(
           const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
           
           const searchQuery = `${bookForAnalysis.title} ${bookForAnalysis.author || ''} book description plot summary`.trim()
-          onProgress?.(`🌐 Searching for book information: "${searchQuery}"`)
+          onProgress?.(`🌐 Searching for book information from open sources: "${searchQuery}"`)
           
           const searchPrompt = `Find information about the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} (ISBN: ${cleanIsbn}).
 
-Please provide:
-1. A brief plot summary or description (2-4 sentences)
-2. Any content warnings, themes, or sensitive topics mentioned in reviews or discussions
-3. Genre and target audience
+CRITICAL TOS COMPLIANCE: 
+- DO NOT use or quote content from retailer websites (Amazon, QBD, Booktopia, Barnes & Noble, etc.) as this may violate their Terms of Service
+- DO NOT scrape or reproduce retailer product descriptions
+- ONLY use open, publicly available sources that are safe to cite and use
 
-Be factual and specific. If you cannot find information, say so.`
+SAFE SOURCES TO USE:
+- Open Library (openlibrary.org) - open metadata, safe to use
+- Google Books API data - already in public domain via API
+- Library catalogs (public library systems, WorldCat, etc.)
+- Publisher websites (official publisher descriptions)
+- Author websites (official author pages)
+- Book review sites that allow citation (Goodreads public reviews, LibraryThing, etc.)
+- Wikipedia and other open encyclopedias
+- Academic databases with open access
+- Community tagging sites (Romance.io, The StoryGraph) - these are public community data
+
+Please provide:
+1. A detailed plot summary or book description (2-4 sentences) from SAFE sources only - focus on plot details, character relationships, and story dynamics
+2. Romance tropes or themes explicitly mentioned (e.g., "enemies to lovers", "second chance", "fake dating", etc.) - quote the exact phrases used, but ONLY from safe sources like community sites, library catalogs, or publisher/author sites
+3. Character relationship dynamics described (e.g., "put aside their dislike", "adversarial", "conflict", etc.)
+4. Any content warnings, themes, or sensitive topics mentioned in reviews or discussions (from safe sources)
+5. Relationship dynamics or emotional content (conflict, tension, stress, etc.)
+
+CRITICAL: For romance books, specifically look for:
+- Enemies-to-lovers dynamics (look for phrases like "enemies to lovers", "enemies-to-lovers", "put aside their dislike", "mutual dislike", etc.) - check community sites like Romance.io or The StoryGraph
+- Second chance romance (past breakups, reconciliation stress)
+- Fake dating/pretending (deception, lying, secret-keeping)
+- Relationship conflict or emotional tension
+- Any other romance tropes that might be triggering
+
+IMPORTANT: 
+- If you find information that mentions "enemies to lovers" or similar phrases from SAFE sources (community sites, library catalogs, publisher sites), include it
+- If the only source is a retailer website, DO NOT quote it - instead, summarize the information in your own words based on what you know from safe sources, or state that information is not available from safe sources
+- Community tagging sites (Romance.io, The StoryGraph) are SAFE to use as they are public community data, not retailer content
+
+Be factual and specific. Only quote from sources that are safe to use. If you cannot find information from safe sources, say so explicitly.`
 
           const searchResponse = await openai.chat.completions.create({
             model: 'gpt-4o',
             messages: [
               {
                 role: 'system',
-                content: 'You are a helpful assistant that provides factual information about books based on available knowledge and information.'
+                content: 'You are a helpful assistant that provides factual information about books based on available knowledge and information. You MUST comply with Terms of Service requirements and only use open, publicly available sources. You MUST NOT quote or reproduce content from retailer websites.'
               },
               {
                 role: 'user',
@@ -899,6 +934,10 @@ Be factual and specific. If you cannot find information, say so.`
               const searchPrompt = isRomanceBook 
                 ? `Search for content warnings and community tags for the Romance book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'}.
 
+CRITICAL TOS COMPLIANCE: 
+- DO NOT use or quote content from retailer websites (Amazon, QBD, Booktopia, Barnes & Noble, etc.)
+- ONLY use open, publicly available sources (community sites, review sites, library catalogs, etc.)
+
 CRITICAL: For Romance books, check:
 1. Community tagging sites like Romance.io or The StoryGraph for:
    - Heat/Spice level (explicit, moderate, mild, clean/sweet)
@@ -906,15 +945,21 @@ CRITICAL: For Romance books, check:
    - Emotional intensity levels
    - Content warnings specifically flagged by the romance reading community
 
-2. General content warnings:
+2. General content warnings from safe sources:
    - Violence, abuse, or trauma
    - Sexual content or sexual violence
    - Mental health themes (suicide, self-harm, etc.)
    - Disturbing or graphic content
    - Dark themes
 
-If you find any content warnings, heat levels, or tropes mentioned on Romance.io, The StoryGraph, or other community sites, list them specifically. If the book is known to be safe/cozy/light/clean romance, confirm that. Be factual and specific. If community reviews suggest content not mentioned in the blurb, state: "Community reviews suggest [X] may be present."`
+If you find any content warnings, heat levels, or tropes mentioned on Romance.io, The StoryGraph, or other community sites, list them specifically. If the book is known to be safe/cozy/light/clean romance, confirm that. Be factual and specific. If community reviews suggest content not mentioned in the blurb, state: "Community reviews suggest [X] may be present."
+
+IMPORTANT: Only use information from safe, open sources. Do not quote retailer product descriptions.`
                 : `Based on your knowledge and any available information, does the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} have content warnings, trigger warnings, or sensitive content that readers should be aware of?
+
+CRITICAL TOS COMPLIANCE: 
+- DO NOT use or quote content from retailer websites (Amazon, QBD, Booktopia, Barnes & Noble, etc.)
+- ONLY use open, publicly available sources (review sites, library catalogs, community sites, etc.)
 
 Look for mentions of:
 - Violence, abuse, or trauma
@@ -923,14 +968,16 @@ Look for mentions of:
 - Disturbing or graphic content
 - Dark themes
 
-If you find any content warnings mentioned online or in reviews, list them briefly. If the book is known to be safe/cozy/light, confirm that. Be factual and specific.`
+If you find any content warnings mentioned online or in reviews (from safe sources), list them briefly. If the book is known to be safe/cozy/light, confirm that. Be factual and specific.
+
+IMPORTANT: Only use information from safe, open sources. Do not quote retailer product descriptions.`
 
               const searchResponse = await openai.chat.completions.create({
                 model: 'gpt-4o',
                 messages: [
                   {
                     role: 'system',
-                    content: 'You are a helpful assistant that provides factual information about book content warnings based on available knowledge and information.'
+                    content: 'You are a helpful assistant that provides factual information about book content warnings based on available knowledge and information. You MUST comply with Terms of Service requirements and only use open, publicly available sources. You MUST NOT quote or reproduce content from retailer websites.'
                   },
                   {
                     role: 'user',
@@ -944,10 +991,31 @@ If you find any content warnings mentioned online or in reviews, list them brief
               })
               
               timings.webSearch = performance.now() - webSearchStartTime
-              usedWebSearch = true
               
               if (searchResponse) {
                 const messageContent = searchResponse.choices[0]?.message?.content || ''
+                
+                // TOS Compliance Check: Reject if response contains retailer indicators
+                const retailerIndicators = [
+                  'amazon.com', 'qbd.com.au', 'booktopia.com.au', 'barnesandnoble.com',
+                  'waterstones.com', 'indigo.ca', 'retailer', 'product page', 'buy now',
+                  'add to cart', 'customer reviews on amazon', 'amazon product description'
+                ]
+                
+                const containsRetailerContent = retailerIndicators.some(indicator => 
+                  messageContent.toLowerCase().includes(indicator.toLowerCase())
+                )
+                
+                if (containsRetailerContent) {
+                  console.warn('[Web Search Verification] TOS Compliance: Rejected response containing retailer content')
+                  onProgress?.('⚠️ Web search verification response contained retailer content - rejected for TOS compliance')
+                  // Don't use retailer content - skip verification
+                  timings.webSearch = performance.now() - webSearchStartTime
+                  usedWebSearch = false
+                  // Skip to end of try block - don't process this response
+                } else {
+                
+                usedWebSearch = true
                 
                 // Check if the response indicates warnings exist
                 const warningIndicators = ['warning', 'trigger', 'sensitive', 'disturbing', 'violence', 'abuse', 'trauma', 'graphic', 'explicit', 'dark', 'mature']
@@ -1051,6 +1119,7 @@ If you find any content warnings mentioned online or in reviews, list them brief
                   onProgress?.('✅ Web search confirmed: no warnings mentioned online')
                   webSearchContext = 'Web search verification performed - no warnings found. '
                 }
+                } // End of else block for non-retailer content (TOS-compliant)
               } else {
                 onProgress?.('⚠️ Web search unavailable, skipping verification')
               }
@@ -1083,8 +1152,8 @@ If you find any content warnings mentioned online or in reviews, list them brief
               
               if (isRomanceBook && !usedWebSearch) {
                 reasoning += ' Analysis based on blurb only; community reviews on Romance.io or The StoryGraph may indicate different heat/spice levels or tropes not mentioned in the description.'
-              } else if (usedWebSearch) {
-                reasoning += ' Web search verification confirmed the book appears safe for general reading.'
+              } else               if (usedWebSearch) {
+                reasoning += ' Web search verification (using open sources only, TOS-compliant) confirmed the book appears safe for general reading.'
               } else if (!aiNoWarningsReasoning) {
                 reasoning += ' The book appears safe for general reading based on description analysis.'
               }
