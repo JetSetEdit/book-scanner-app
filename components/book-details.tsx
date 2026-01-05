@@ -551,24 +551,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
                 
                 if (!classificationRating) {
-                  // Calculate from warnings if not stored
-                  if (warnings && warnings.length > 0) {
-                    const { calculateAgeRating } = require('@/lib/utils/age-rating')
-                    const ageRating = calculateAgeRating(warnings)
-                    return (
-                      <div className="mb-6 p-4 bg-primary/10 border-2 border-primary/30 rounded-lg max-w-2xl mx-auto">
-                        <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-lg font-bold text-foreground">Age Recommendation</h3>
-                          <span className="text-2xl font-bold text-primary">{ageRating.rating}</span>
-                        </div>
-                        <p className="text-sm font-semibold text-foreground mb-1">{ageRating.ageRecommendation}</p>
-                        <p className="text-xs text-muted-foreground">{ageRating.reasoning}</p>
-                        <p className="text-xs text-muted-foreground italic mt-2">
-                          Based on Australian Classification Board methodology. This is an indicative rating only.
-                        </p>
-                      </div>
-                    )
-                  }
+                  // Age rating will be calculated server-side during scan
+                  // If not present, it means the book hasn't been scanned with the new version yet
                   return null
                 }
                 
