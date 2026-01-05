@@ -538,6 +538,18 @@ function updateDescriptionForSeverity(
   
   let updatedDescription = originalDescription.trim()
   
+  // CRITICAL FIX: Handle the common AI error "Moderate of..." → "Moderate themes of..."
+  // This must be checked FIRST before any other processing
+  const missingThemesPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i
+  if (missingThemesPattern.test(updatedDescription)) {
+    const match = updatedDescription.match(missingThemesPattern)
+    if (match) {
+      const restAfterOf = updatedDescription.substring(match[0].length).trim()
+      updatedDescription = `${targetIntensity} themes of ${restAfterOf}`
+      return updatedDescription
+    }
+  }
+  
   // Pattern to match intensity word at the start
   const intensityStartPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i
   
@@ -581,6 +593,15 @@ function updateDescriptionForSeverity(
     const firstChar = content.charAt(0)
     const rest = content.slice(1)
     updatedDescription = `${targetIntensity} themes of ${firstChar.toLowerCase()}${rest}`
+  }
+
+  // FINAL SAFETY CHECK: If description still has " of " but no "themes of", fix it
+  if (updatedDescription.includes(' of ') && !updatedDescription.match(/themes?\s+of/i)) {
+    // Replace "Intensity of" with "Intensity themes of"
+    updatedDescription = updatedDescription.replace(
+      /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i,
+      `${targetIntensity} themes of `
+    )
   }
 
   return updatedDescription
