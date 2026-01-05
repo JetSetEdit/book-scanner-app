@@ -163,8 +163,9 @@ Instructions:
      * If NO, and it is truly lighthearted (e.g., "Cozy Mystery", "RomCom" with no angst), then return empty.
      * In your reasoning, explicitly state: "No content warnings found. Review of themes (grief, anxiety, violence) came back negative. Tone is lighthearted."
 
-2a. GENRE AWARENESS FOR ROMANCE BOOKS:
-   - If the book appears to be a Romance novel (based on title, description, or categories like "Sports Romance", "Small Town Romance", "Contemporary Romance", "Romance", etc.), you MUST be especially thorough:
+2a. GENRE AWARENESS FOR ROMANCE AND FANTASY/YA WITH ROMANCE:
+   - **CRITICAL**: Fantasy/YA books with romance subplots (e.g., "Fourth Wing", "A Court of Thorns and Roses", "Throne of Glass") often contain explicit sexual content despite being marketed as YA. You MUST check for sexual content in these books.
+   - If the book appears to be a Romance novel OR Fantasy/YA with romance (based on title, description, or categories like "Sports Romance", "Small Town Romance", "Contemporary Romance", "Romance", "Fantasy Romance", "YA Romance", "New Adult", "NA"), you MUST be especially thorough:
    - **CRITICAL FIRST STEP**: If the description or categories identify this as a romance book (e.g., mentions "romance", "romantic novel", "romance book", or categories include "Romance"), you MUST create at least one warning for general relationship/romance content:
      * Flag as "emotional_abuse_or_toxic_relationships.other_toxic_relationships" with mild severity
      * Description: "Mild themes of romantic relationships and relationship dynamics."
@@ -227,12 +228,16 @@ Instructions:
    - consent_ambiguity (dub-con): Unclear consent in dark romance
    - cnc: Consensual non-consent play
    - explicit_sexual_content: Explicit but consensual
-   - IMPORTANT: For dark romance, thriller, or psychological thriller genres, explicitly check for sexual content indicators:
+   - intense_romance_or_spice: Detailed romantic/sexual content that may be inappropriate for younger readers
+   - IMPORTANT: For ALL books with romance elements (not just "dark romance"), explicitly check for sexual content indicators:
+     * Fantasy/YA with romance subplots (e.g., "Fourth Wing", "A Court of Thorns and Roses") - these often contain explicit sexual content despite being marketed as YA
      * Explicit sexual scenes, detailed sexual content, steamy/spicy content
      * Sexual violence, non-consensual sexual content, rape, sexual assault
      * Dubious consent, power imbalances in sexual relationships
-     * If the book description mentions "dark", "thriller", "psychological thriller", "steamy", "spicy", "explicit", or similar terms, you MUST check for sexual content warnings even if not explicitly mentioned in the description
-     * For books known to contain graphic sexual content (e.g., "Verity" by Colleen Hoover), flag sexual content warnings based on genre indicators and book reputation
+     * If the book description mentions ANY of these, flag sexual content: "dark", "thriller", "psychological thriller", "steamy", "spicy", "explicit", "romance", "romantic", "fantasy romance", "YA romance", "new adult", "NA", "mature", "adult themes"
+     * For fantasy/YA books with romance subplots, you MUST check for sexual content even if the description doesn't explicitly mention it - these books are often known for containing explicit content despite YA marketing
+     * For books known to contain graphic sexual content (e.g., "Verity" by Colleen Hoover, "Fourth Wing" by Rebecca Yarros, "A Court of Thorns and Roses" by Sarah J. Maas), flag sexual content warnings based on genre indicators and book reputation
+     * CRITICAL: If a book is fantasy/YA but has a significant romance subplot, check community sources (if available) or flag based on genre patterns - fantasy romance and YA romance often contain explicit sexual content
 
 4. Spoiler detection: Mark is_spoiler=true if the warning reveals:
    - Character deaths or major character outcomes

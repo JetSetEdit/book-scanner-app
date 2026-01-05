@@ -534,32 +534,46 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 )
               })()}
               
-              {/* Classification Rating Summary */}
+              {/* Age Rating - Prominent Display for Parents */}
               {(() => {
                 const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
                 const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
                 
-                if (!classificationRating) return null
-                
-                // Map rating to impact level (per Australian Classification Board)
-                const impactLevels: Record<string, string> = {
-                  'G': 'very mild',
-                  'PG': 'mild',
-                  'M': 'moderate',
-                  'MA15+': 'strong',
-                  'R18+': 'high',
-                  'RC': 'very high'
+                if (!classificationRating) {
+                  // Calculate from warnings if not stored
+                  if (warnings && warnings.length > 0) {
+                    const { calculateAgeRating } = require('@/lib/utils/age-rating')
+                    const ageRating = calculateAgeRating(warnings)
+                    return (
+                      <div className="mb-6 p-4 bg-primary/10 border-2 border-primary/30 rounded-lg max-w-2xl mx-auto">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-lg font-bold text-foreground">Age Recommendation</h3>
+                          <span className="text-2xl font-bold text-primary">{ageRating.rating}</span>
+                        </div>
+                        <p className="text-sm font-semibold text-foreground mb-1">{ageRating.ageRecommendation}</p>
+                        <p className="text-xs text-muted-foreground">{ageRating.reasoning}</p>
+                        <p className="text-xs text-muted-foreground italic mt-2">
+                          Based on Australian Classification Board methodology. This is an indicative rating only.
+                        </p>
+                      </div>
+                    )
+                  }
+                  return null
                 }
-                const impactLevel = impactLevels[classificationRating] || 'moderate'
                 
-                // Generate explanation based on warnings using official methodology
-                // The Board assesses 6 classifiable elements: themes, violence, sex, language, drug use, nudity
-                const severeWarnings = warnings.filter((w: any) => w.severity === 'severe')
-                const moderateWarnings = warnings.filter((w: any) => w.severity === 'moderate')
-                const mildWarnings = warnings.filter((w: any) => w.severity === 'mild')
+                // Calculate age recommendation from rating
+                const ageRecommendations: Record<string, string> = {
+                  'G': 'Suitable for all ages',
+                  'PG': 'Recommended for ages 8+',
+                  'M': 'Recommended for ages 13+',
+                  'MA15+': 'Recommended for ages 15+',
+                  'R18+': 'Recommended for ages 18+',
+                  'RC': 'Not recommended - contains extreme content'
+                }
+                const ageRecommendation = ageRecommendations[classificationRating] || 'See content warnings below'
                 
-                // Map our categories to classifiable elements
-                const classifiableElements: Record<string, string> = {
+                // Get key elements for display
+                const elementMap: Record<string, string> = {
                   'violence': 'violence',
                   'sexual_content': 'sex',
                   'language': 'language',
@@ -567,70 +581,36 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   'mental_health': 'themes',
                   'abuse': 'themes',
                   'emotional_abuse_or_toxic_relationships': 'themes',
-                  'other': 'themes'
+                  'death_or_grief': 'themes',
+                  'family_dynamics': 'themes'
                 }
                 
-                // Get top classifiable elements (consumer advice style)
                 const elementCounts: Record<string, number> = {}
-                warnings.forEach((w: any) => {
+                warnings?.forEach((w: any) => {
                   const cat = w.category_id || w.category || 'other'
-                  const element = classifiableElements[cat] || 'themes'
+                  const element = elementMap[cat] || 'themes'
                   elementCounts[element] = (elementCounts[element] || 0) + 1
                 })
                 
                 const topElements = Object.entries(elementCounts)
                   .sort(([, a], [, b]) => b - a)
                   .slice(0, 3)
-                  .map(([element]) => element)
+                  .map(([element]) => element.charAt(0).toUpperCase() + element.slice(1))
                 
-                // Build explanation using official terminology from Publications Guidelines
-                // Reference: Guidelines for the Classification of Publications 2005 (F2008C00129)
-                let explanation = `Based on our analysis, we suggest this book is equivalent to an Australian Classification rating of ${classificationRating} `
-                
-                // Determine impact descriptor based on highest severity
-                // Per Publications Guidelines p.124-129: impact assessed through emphasis, tone, frequency, context, and detail
-                let impactDescriptor = ''
-                if (severeWarnings.length > 0) {
-                  impactDescriptor = 'strong'
-                } else if (moderateWarnings.length > 0) {
-                  impactDescriptor = 'moderate'
-                } else if (mildWarnings.length > 0) {
-                  impactDescriptor = 'mild'
-                } else {
-                  impactDescriptor = 'very mild'
-                }
-                
-                // Build consumer advice style explanation
-                const reasons: string[] = []
-                
-                if (topElements.length > 0) {
-                  // Format like official consumer advice: "Strong violence and themes"
-                  const elementList = topElements.map(e => e.charAt(0).toUpperCase() + e.slice(1)).join(' and ')
-                  reasons.push(`${impactDescriptor.charAt(0).toUpperCase() + impactDescriptor.slice(1)} ${elementList}`)
-                }
-                
-                // Add context about impact level
-                if (impactLevel !== impactDescriptor) {
-                  reasons.push(`content with ${impactLevel} impact`)
-                }
-                
-                if (reasons.length > 0) {
-                  explanation += `because of ${reasons.join(' and ')}.`
-                } else {
-                  explanation += `based on the overall impact of classifiable elements (themes, violence, sex, language, drug use, nudity).`
-                }
-                
-                // Add note about methodology per official Publications Guidelines
-                // Per Guidelines p.124-129: impact assessed through emphasis, tone, frequency, context, detail, and cumulative effect
-                explanation += ` The rating reflects the ${impactLevel} impact level of content, assessed through emphasis, tone, frequency, context, detail, and cumulative effect, following the methodology in the Guidelines for the Classification of Publications.`
+                const elementsText = topElements.length > 0 ? topElements.join(', ') : 'various themes'
                 
                 return (
-                  <div className="mb-6 p-4 bg-muted/30 border border-border rounded-lg max-w-2xl mx-auto">
-                    <p className="text-sm text-foreground text-center leading-relaxed">
-                      {explanation}
+                  <div className="mb-6 p-4 bg-primary/10 border-2 border-primary/30 rounded-lg max-w-2xl mx-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-lg font-bold text-foreground">Age Recommendation</h3>
+                      <span className="text-2xl font-bold text-primary">{classificationRating}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-foreground mb-1">{ageRecommendation}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Based on analysis of {elementsText}. This rating follows Australian Classification Board methodology, assessing the six classifiable elements (themes, violence, sex, language, drug use, nudity) based on impact factors including emphasis, tone, frequency, context, detail, and cumulative effect.
                     </p>
-                    <p className="text-xs text-muted-foreground italic mt-2 text-center">
-                      This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating. Our analysis follows the official methodology from the Guidelines for the Classification of Publications 2005 (F2008C00129), assessing the six classifiable elements (themes, violence, sex, language, drug use, nudity) based on impact factors including emphasis, tone, frequency, context, detail, and cumulative effect.
+                    <p className="text-xs text-muted-foreground italic mt-2">
+                      This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.
                     </p>
                   </div>
                 )
