@@ -43,17 +43,6 @@ function isDevMode(): boolean {
 }
 
 export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues }: BookDetailsProps) {
-  // Calculate age rating if not stored (for client-side rendering)
-  const [ageRating, setAgeRating] = React.useState<any>(null)
-  
-  React.useEffect(() => {
-    const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
-    if (!classificationTag && warnings && warnings.length > 0) {
-      import('@/lib/utils/age-rating').then(module => {
-        setAgeRating(module.calculateAgeRating(warnings))
-      }).catch(console.error)
-    }
-  }, [book.categories, warnings])
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
