@@ -1,13 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIsbnScan } from '@/lib/services/scan-service';
+import { getClientIP, checkRateLimit, incrementRateLimit } from '@/lib/utils/rate-limiter';
 
 export const runtime = 'nodejs';
+
+// Rate limit configuration
+const SCANS_PER_DAY = parseInt(process.env.SCAN_RATE_LIMIT || '5', 10);
 
 // Helper to simulate SSE stream for progress updates
 // Since scanBook takes a callback, we can't easily stream it over HTTP without changing scanBook
 // For now, we will just return the final result, but we could refactor scanBook to support streaming
 export async function POST(req: NextRequest) {
     try {
+        // Check rate limit before processing
+        const clientIP = getClientIP(req);
+        const rateLimit = checkRateLimit(clientIP, SCANS_PER_DAY);
+        
+        if (!rateLimit.allowed) {
+            const resetDate = new Date(rateLimit.resetAt);
+            const resetTime = resetDate.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+            });
+            
+            // For streaming response, we need to send error through stream
+            const encoder = new TextEncoder();
+            const stream = new TransformStream();
+            const writer = stream.writable.getWriter();
+            
+            (async () => {
+                try {
+                    await writer.write(encoder.encode(`data: ${JSON.stringify({ 
+                        status: `⚠️ Rate limit exceeded` 
+                    })}\n\n`))
+                    await writer.write(encoder.encode(`data: ${JSON.stringify({ 
+                        error: {
+                            error: 'Rate limit exceeded',
+                            message: `You've reached the daily scan limit of ${SCANS_PER_DAY} scans. Limit resets at ${resetTime}.`,
+                            rateLimit: {
+                                limit: SCANS_PER_DAY,
+                                remaining: 0,
+                                resetAt: rateLimit.resetAt
+                            }
+                        }
+                    })}\n\n`))
+                } finally {
+                    await writer.close()
+                }
+            })()
+            
+            return new NextResponse(stream.readable, {
+                status: 429,
+                headers: {
+                    'Content-Type': 'text/event-stream',
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-RateLimit-Limit': SCANS_PER_DAY.toString(),
+                    'X-RateLimit-Remaining': '0',
+                    'X-RateLimit-Reset': rateLimit.resetAt.toString(),
+                    'Retry-After': Math.ceil((rateLimit.resetAt - Date.now()) / 1000).toString()
+                }
+            });
+        }
+
         const body = await req.json();
         const { isbn, forceRefresh, selectedCandidate } = body;
 
@@ -38,6 +94,11 @@ export async function POST(req: NextRequest) {
 
                 const result = await processIsbnScan(isbn, onProgress, selectedCandidate, forceRefresh === true)
 
+                // Increment rate limit only after successful scan
+                if (result.success) {
+                  incrementRateLimit(clientIP)
+                }
+
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
                 console.log(`[Scan API] Result structure:`, {
                   hasSuccess: 'success' in result,
@@ -45,8 +106,20 @@ export async function POST(req: NextRequest) {
                   hasScan: !!result.scan,
                   keys: Object.keys(result)
                 })
+                
+                // Include rate limit info in response
+                const updatedRateLimit = checkRateLimit(clientIP, SCANS_PER_DAY)
+                const responseResult = {
+                  ...result,
+                  rateLimit: {
+                    limit: SCANS_PER_DAY,
+                    remaining: updatedRateLimit.remaining,
+                    resetAt: updatedRateLimit.resetAt
+                  }
+                }
+                
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '✅ Scan process completed' })}\n\n`))
-                await writer.write(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
+                await writer.write(encoder.encode(`data: ${JSON.stringify({ result: responseResult })}\n\n`))
             } catch (error) {
                 console.error('[Scan API] Scan failed:', error)
                 console.error('[Scan API] Error stack:', error instanceof Error ? error.stack : 'No stack trace')

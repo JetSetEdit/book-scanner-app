@@ -8,6 +8,7 @@
  */
 
 import { EnhancedContentWarning } from '../config/taxonomy-context'
+import { getEscalationWeight, getRatingFromEscalation } from '../config/age-escalation-weights'
 
 export type ClassificationRating = 'G' | 'PG' | 'M' | 'MA15+' | 'R18+' | 'RC'
 
@@ -82,9 +83,21 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   })
 
   // Determine rating based on severity and content type
+  // NEW: Use escalation weights for more nuanced rating assignment
   let rating: ClassificationRating
   let ageRecommendation: string
   let reasoning: string
+
+  // Calculate escalation score from SEVERE warnings
+  let maxEscalationScore = 0
+  if (severeWarnings.length > 0) {
+    maxEscalationScore = Math.max(
+      ...severeWarnings.map(w => {
+        const categoryId = w.subcategory_id?.split('.')[0] || 'other'
+        return getEscalationWeight(categoryId, w.subcategory_id)
+      })
+    )
+  }
 
   // RC (Refused Classification) - extreme content
   if (hasExtremeContent && severeWarnings.length >= 3) {
@@ -92,23 +105,31 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     ageRecommendation = 'Not recommended - contains extreme content'
     reasoning = 'Contains extreme content with multiple severe warnings. This content may not be suitable for any age group.'
   }
-  // R18+ - high impact (explicit sexual content, graphic violence, or multiple severe warnings)
-  else if (hasSexualViolence || (hasExplicitSexualContent && severeWarnings.length >= 2) || (hasGraphicViolence && severeWarnings.length >= 2)) {
+  // R18+ - high impact (explicit sexual content, graphic violence, sexual violence, or high escalation)
+  else if (hasSexualViolence || (hasExplicitSexualContent && severeWarnings.length >= 2) || (hasGraphicViolence && severeWarnings.length >= 2) || maxEscalationScore >= 0.7) {
     rating = 'R18+'
     ageRecommendation = 'Recommended for ages 18+'
-    reasoning = 'Contains explicit sexual content, sexual violence, or graphic violence with strong impact. Recommended for mature audiences only.'
+    if (maxEscalationScore >= 0.7) {
+      reasoning = `Contains high-impact content (escalation score: ${maxEscalationScore.toFixed(2)}) requiring mature audiences. Recommended for ages 18 and above.`
+    } else {
+      reasoning = 'Contains explicit sexual content, sexual violence, or graphic violence with strong impact. Recommended for mature audiences only.'
+    }
   }
-  // MA15+ - strong impact (severe warnings present)
-  else if (severeWarnings.length > 0) {
+  // MA15+ - strong impact (severe warnings with medium+ escalation, or legacy logic)
+  else if (severeWarnings.length > 0 && maxEscalationScore >= 0.3) {
     rating = 'MA15+'
     ageRecommendation = 'Recommended for ages 15+'
     reasoning = `Contains ${severeWarnings.length} severe warning${severeWarnings.length === 1 ? '' : 's'} with strong impact. Recommended for ages 15 and above.`
   }
-  // M - moderate impact (moderate warnings, or combination of mild warnings)
-  else if (moderateWarnings.length > 0 || (mildWarnings.length >= 3 && hasExplicitSexualContent)) {
+  // M - moderate impact (moderate warnings, or SEVERE with low escalation, or combination of mild warnings)
+  else if (moderateWarnings.length > 0 || (severeWarnings.length > 0 && maxEscalationScore < 0.3) || (mildWarnings.length >= 3 && hasExplicitSexualContent)) {
     rating = 'M'
     ageRecommendation = 'Recommended for ages 13+'
-    reasoning = `Contains ${moderateWarnings.length || mildWarnings.length} moderate warning${(moderateWarnings.length || mildWarnings.length) === 1 ? '' : 's'} with moderate impact. Recommended for ages 13 and above.`
+    if (severeWarnings.length > 0 && maxEscalationScore < 0.3) {
+      reasoning = `Contains ${severeWarnings.length} severe warning${severeWarnings.length === 1 ? '' : 's'} with moderate impact. Recommended for ages 13 and above.`
+    } else {
+      reasoning = `Contains ${moderateWarnings.length || mildWarnings.length} moderate warning${(moderateWarnings.length || mildWarnings.length) === 1 ? '' : 's'} with moderate impact. Recommended for ages 13 and above.`
+    }
   }
   // PG - mild impact (mild warnings only)
   else if (mildWarnings.length > 0) {

@@ -60,7 +60,7 @@ export function RecentScans() {
     return null // Don't show section if no scans
   }
 
-  // Filter to only show scans with book data (covers)
+  // API now handles filtering and deduplication, but double-check for safety
   const scansWithBooks = scans.filter(scan => scan.book && scan.book.coverUrl)
 
   if (scansWithBooks.length === 0) {
@@ -86,7 +86,7 @@ export function RecentScans() {
 
               return (
                 <Link
-                  key={scan.id}
+                  key={scan.isbn} // Use ISBN as key since we deduplicate by ISBN
                   href={`/book/${scan.isbn}`}
                   className="flex-shrink-0 group"
                 >

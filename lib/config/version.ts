@@ -5,15 +5,33 @@
  * Update this when deploying new versions.
  */
 
-export const APP_VERSION = "1.01.24"
-export const APP_VERSION_LABEL = "Public Beta 1.01"
+export const APP_VERSION = "1.01.25"
+export const APP_VERSION_LABEL = "Public Beta"
 export const APP_BUILD_DATE = "2026-01-06" // YYYY-MM-DD - Update on each deployment
+
+// Build ID from git commit hash (set at build time)
+// Falls back to "dev" if not in git repo or during development
+function getBuildId(): string {
+  // Try to get from environment variable first (set at build time)
+  if (process.env.NEXT_PUBLIC_BUILD_ID) {
+    return process.env.NEXT_PUBLIC_BUILD_ID
+  }
+  
+  // Fallback for development
+  if (process.env.NODE_ENV === 'development') {
+    return 'dev'
+  }
+  
+  return 'unknown'
+}
+
+export const APP_BUILD_ID = getBuildId()
 
 // Version history
 export const VERSION_HISTORY = [
   {
     version: "1.01.0",
-    label: "Public Beta 1.01",
+    label: "Public Beta",
     date: "2025-12-31",
     changes: [
       "Added spoiler blur feature for content warnings",

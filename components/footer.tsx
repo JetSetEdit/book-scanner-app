@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE } from "@/lib/config/version"
+import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE, APP_BUILD_ID } from "@/lib/config/version"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 
@@ -45,7 +45,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
-            Subtext provides transparent content analysis: every AI-generated warning includes source citations and reasoning so you can verify how it was determined. When authors provide their own content notes, we prioritize those above all else. While no system is perfect, we've built multiple verification layers and clear reasoning trails to ensure accuracy. Severity ratings are subjective—they vary by individual sensitivity and the nature of the content. Subtext is a tool for information, not a substitute for your own judgment.
+            Subtext provides transparent content analysis: every AI-generated warning includes detailed reasoning so you can understand how it was determined. Source citations and author notes coming soon. While no system is perfect, we've built multiple verification layers and clear reasoning trails to ensure accuracy. Severity ratings are subjective—they vary by individual sensitivity and the nature of the content. Subtext is a tool for information, not a substitute for your own judgment.
           </p>
           
           {/* Beta Disclaimer - Contextualized for Comfort Read */}
@@ -90,7 +90,7 @@ export function Footer() {
               </Link>
             </div>
             <div className="text-xs text-muted-foreground/60">
-              {APP_VERSION_LABEL} (v{APP_VERSION}) • Updated {APP_BUILD_DATE}
+              {APP_VERSION_LABEL} (v{APP_VERSION}) • Build {APP_BUILD_ID} • Updated {APP_BUILD_DATE}
             </div>
           </div>
         </div>

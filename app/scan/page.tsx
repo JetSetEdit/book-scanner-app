@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera, Flag } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera, Flag, Clock } from "lucide-react"
 import Link from "next/link"
 import { useLocalStorage } from "@/hooks/use-browser-storage"
 import { useScanHistory } from "@/hooks/use-scan-history"
@@ -105,6 +105,13 @@ function ScanTestPageContent() {
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState("")
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   
+  // Rate limit tracking
+  const [rateLimit, setRateLimit] = useState<{
+    limit: number
+    remaining: number
+    resetAt: number
+  } | null>(null)
+  
   // Client-side only flag to prevent hydration mismatch
   const [isMounted, setIsMounted] = useState(false)
   const [hasAutoScanned, setHasAutoScanned] = useState(false)
@@ -174,6 +181,61 @@ function ScanTestPageContent() {
             selectedCandidate: selectedCandidate || undefined
           }),
         })
+
+        // Handle rate limit (429) - can come as streaming response
+        if (response.status === 429) {
+          // Try to read error from stream
+          try {
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            if (reader) {
+              const { done, value } = await reader.read()
+              if (!done && value) {
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n')
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    try {
+                      const data = JSON.parse(line.slice(6))
+                      if (data.error) {
+                        const rateLimitInfo = data.error.rateLimit || {
+                          limit: 5,
+                          remaining: 0,
+                          resetAt: Date.now() + 24 * 60 * 60 * 1000
+                        }
+                        setRateLimit(rateLimitInfo)
+                        throw new Error(data.error.message || data.error.error || 'Rate limit exceeded')
+                      }
+                    } catch (e) {
+                      // Ignore parse errors
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Fall through to default error handling
+          }
+          
+          // Fallback error if stream parsing failed
+          const errorText = await response.text().catch(() => 'Rate limit exceeded')
+          let errorData
+          try {
+            errorData = JSON.parse(errorText)
+          } catch {
+            errorData = { 
+              error: 'Rate limit exceeded',
+              message: `You've reached the daily scan limit. Please try again tomorrow.`
+            }
+          }
+          setRateLimit({
+            limit: SCANS_PER_DAY,
+            remaining: 0,
+            resetAt: Date.now() + 24 * 60 * 60 * 1000
+          })
+          throw new Error(errorData.message || errorData.error || 'Rate limit exceeded')
+        }
 
         if (!response.ok) {
           const errorText = await response.text()
@@ -284,6 +346,11 @@ function ScanTestPageContent() {
           return
         }
         
+        // Update rate limit from result if available
+        if (result.rateLimit) {
+          setRateLimit(result.rateLimit)
+        }
+
         // Transform result to match expected format
         const transformedResult = {
           success: result.success !== false, // Default to true if not explicitly false
@@ -514,6 +581,46 @@ function ScanTestPageContent() {
             </div>
           )}
 
+          {/* Rate Limit Status */}
+          {rateLimit && (
+            <div className={cn(
+              "mb-6 p-4 border rounded-lg",
+              rateLimit.remaining === 0 
+                ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500 text-yellow-700" 
+                : "bg-muted/30 border-border"
+            )}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {rateLimit.remaining === 0 ? (
+                      <>Daily scan limit reached</>
+                    ) : (
+                      <>{rateLimit.remaining} of {rateLimit.limit} scans remaining today</>
+                    )}
+                  </span>
+                </div>
+                {rateLimit.remaining === 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    Resets {new Date(rateLimit.resetAt).toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </span>
+                )}
+              </div>
+              {rateLimit.remaining > 0 && (
+                <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
+                  <div
+                    className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${(rateLimit.remaining / rateLimit.limit) * 100}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Unified Interface: Scanner + Manual Entry */}
           <div className="space-y-6 mb-6">
             {/* Barcode Scanner */}
@@ -560,12 +667,17 @@ function ScanTestPageContent() {
                   onChange={(e) => setIsbn(e.target.value)}
                   className="flex-1"
                   autoFocus={!showScanner}
+                  disabled={rateLimit?.remaining === 0}
                 />
-                <Button type="submit" disabled={loading || !isbn}>
+                <Button type="submit" disabled={loading || !isbn.trim() || rateLimit?.remaining === 0}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Scanning
+                    </>
+                  ) : rateLimit?.remaining === 0 ? (
+                    <>
+                      Limit Reached
                     </>
                   ) : (
                     <>

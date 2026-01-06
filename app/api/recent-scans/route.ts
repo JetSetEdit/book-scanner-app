@@ -7,7 +7,7 @@ export const revalidate = 30 // Revalidate every 30 seconds
 export async function GET() {
   try {
     // Fetch recent scans with book information
-    // Limit to last 10 scans, ordered by most recent
+    // Get more scans than needed to account for duplicates and missing covers
     const { data: scans, error } = await supabaseAdmin
       .from('scans')
       .select(`
@@ -22,7 +22,7 @@ export async function GET() {
         )
       `)
       .order('created_at', { ascending: false })
-      .limit(10)
+      .limit(50) // Get more to filter duplicates and missing covers
 
     if (error) {
       console.error('Error fetching recent scans:', error)
@@ -33,7 +33,7 @@ export async function GET() {
     }
 
     // Format the response
-    const recentScans = (scans || []).map((scan: any) => ({
+    const formattedScans = (scans || []).map((scan: any) => ({
       id: scan.id,
       isbn: scan.isbn,
       createdAt: scan.created_at,
@@ -44,6 +44,24 @@ export async function GET() {
         coverUrl: scan.book.cover_url,
       } : null,
     }))
+
+    // Filter out scans without covers
+    const scansWithCovers = formattedScans.filter(
+      scan => scan.book && scan.book.coverUrl
+    )
+
+    // Deduplicate by ISBN - keep only the most recent scan per ISBN
+    const seenISBNs = new Set<string>()
+    const uniqueScans = scansWithCovers.filter(scan => {
+      if (seenISBNs.has(scan.isbn)) {
+        return false // Skip duplicate ISBN
+      }
+      seenISBNs.add(scan.isbn)
+      return true
+    })
+
+    // Limit to 10 most recent unique scans
+    const recentScans = uniqueScans.slice(0, 10)
 
     return NextResponse.json({ scans: recentScans })
   } catch (error) {

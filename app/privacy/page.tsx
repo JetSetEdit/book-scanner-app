@@ -45,8 +45,8 @@ export default function PrivacyPage() {
             <p>We may collect information that you voluntarily provide when using the Service, including:</p>
             <ul className="list-disc pl-6 mt-4 space-y-2">
               <li>ISBNs or barcodes you scan or enter</li>
-              <li>Feedback on content warnings (helpful/not helpful)</li>
-              <li>Reports or corrections you submit about book information</li>
+              <li>Community feedback on content warnings (coming soon)</li>
+              <li>Reports or corrections about book information (coming soon)</li>
             </ul>
 
             <h3 className="font-serif text-xl text-foreground mt-6 mb-3">2.2 Automatically Collected Information</h3>
@@ -54,9 +54,14 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 mt-4 space-y-2">
               <li>Device information (browser type, operating system, device identifiers)</li>
               <li>Usage data (pages visited, features used, time spent)</li>
-              <li>IP address and general location information</li>
+              <li>IP address and general location information (used for rate limiting and security)</li>
               <li>Cookies and similar tracking technologies</li>
             </ul>
+            <p className="mt-4">
+              <strong className="text-foreground">Rate Limiting:</strong> We collect and temporarily store IP addresses 
+              to enforce rate limits (5 scans per IP per day). IP addresses are stored in memory and reset daily. 
+              This helps ensure fair usage and manage API costs.
+            </p>
 
             <h3 className="font-serif text-xl text-foreground mt-6 mb-3">2.3 Local Storage</h3>
             <p>
@@ -125,7 +130,11 @@ export default function PrivacyPage() {
               <li><strong className="text-foreground">Google Books API:</strong> Used to fetch book metadata and descriptions. 
                 Your use is subject to <a href="https://developers.google.com/books/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google's Terms of Service</a>.</li>
               <li><strong className="text-foreground">Open Library:</strong> Used as an alternative source for book information.</li>
-              <li><strong className="text-foreground">Analytics Services:</strong> We may use analytics services to understand 
+              <li><strong className="text-foreground">Google Custom Search API:</strong> Used to enrich book descriptions when 
+                publicly available descriptions are limited. Subject to <a href="https://developers.google.com/custom-search/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google's Terms of Service</a>.</li>
+              <li><strong className="text-foreground">OpenAI API:</strong> Used for AI-powered content analysis and warning generation.</li>
+              <li><strong className="text-foreground">Google Gemini API:</strong> Used for multi-model content analysis to improve accuracy.</li>
+              <li><strong className="text-foreground">Analytics Services:</strong> We may use analytics services (e.g., Vercel Analytics) to understand 
                 how the Service is used. These services may collect and process your information according to their own privacy policies.</li>
             </ul>
             <p className="mt-4">

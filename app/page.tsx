@@ -1,4 +1,4 @@
-import { Shield, Users, ScanBarcode, Search } from "lucide-react"
+import { Shield, Users, ScanBarcode, Search, Brain } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
@@ -50,33 +50,41 @@ export default function HomePage() {
       <div className="border-t border-border/50 bg-card/60">
         <div className="container mx-auto px-4 py-24">
           <div className="grid md:grid-cols-3 gap-12">
+            {/* What We Have: Content Warnings */}
             <div className="space-y-4">
               <div className="h-12 w-12 rounded-full bg-amber-100/50 dark:bg-amber-900/30 flex items-center justify-center text-amber-700 dark:text-amber-400">
                 <Shield className="h-6 w-6" />
               </div>
               <h3 className="font-serif text-2xl font-bold text-foreground">Content Warnings</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Detailed, AI-generated alerts for sensitive topics. We verify against author notes and community feedback for maximum accuracy.
+                Detailed, AI-generated alerts for sensitive topics with severity ratings and detailed reasoning. Know what to expect before you read.
               </p>
             </div>
 
+            {/* What We Have: Age Ratings & Analysis */}
             <div className="space-y-4">
               <div className="h-12 w-12 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
-                <Search className="h-6 w-6" />
+                <Brain className="h-6 w-6" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground">Deep Analysis</h3>
+              <h3 className="font-serif text-2xl font-bold text-foreground">Age Ratings & Analysis</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Beyond just warnings. Understand the themes, tone, and emotional weight of a book before you commit to reading it.
+                Australian Classification Board-based age ratings plus deep thematic analysis. Understand the themes, tone, and emotional weight of every book.
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="h-12 w-12 rounded-full bg-emerald-100/50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
+            {/* Coming Soon: Community Features */}
+            <div className="space-y-4 relative">
+              <div className="absolute -top-2 -right-2">
+                <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border">
+                  Coming Soon
+                </span>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-emerald-100/50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 opacity-60">
                 <Users className="h-6 w-6" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground">Community Verified</h3>
+              <h3 className="font-serif text-2xl font-bold text-foreground text-muted-foreground">Community Verified</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Real readers contribute to our database, ensuring that our AI's analysis is grounded in actual reading experiences.
+                Help us improve accuracy by rating warnings and sharing your reading experiences. Author notes and community feedback coming soon.
               </p>
             </div>
           </div>

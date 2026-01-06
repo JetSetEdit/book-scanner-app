@@ -51,16 +51,7 @@ function updateVersionFile(newVersion: string, buildDate: string) {
     `export const APP_VERSION = "${newVersion}"`
   )
   
-  // Update APP_VERSION_LABEL (extract beta number from version)
-  // Format: 1.01.0 -> "Public Beta 1.01" (major.minor format)
-  const versionParts = newVersion.split('.')
-  const major = versionParts[0] || '1'
-  const minor = versionParts[1] || '01'
-  const versionLabel = `Public Beta ${major}.${minor}`
-  content = content.replace(
-    /export const APP_VERSION_LABEL = "Public Beta [\d.]+"/,
-    `export const APP_VERSION_LABEL = "${versionLabel}"`
-  )
+  // APP_VERSION_LABEL is static "Public Beta" - no need to update
   
   // Update APP_BUILD_DATE
   content = content.replace(

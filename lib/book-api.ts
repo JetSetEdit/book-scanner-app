@@ -363,8 +363,10 @@ async function validateImageUrl(url: string): Promise<boolean> {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
+    // Use GET instead of HEAD to actually download and verify the image
+    // This catches tiny placeholder GIFs that HEAD requests might miss
     const response = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       signal: controller.signal,
       headers: {
         'User-Agent': 'Book-Scanner-App/1.0'
@@ -379,25 +381,48 @@ async function validateImageUrl(url: string): Promise<boolean> {
     }
 
     const contentType = response.headers.get('content-type');
-    const contentLength = response.headers.get('content-length');
 
     // Check if it's an image
     if (contentType && !contentType.startsWith('image/')) {
       return false;
     }
 
-    // Check for tiny images (likely tracking pixels or empty placeholders)
-    // < 1000 bytes is suspicious for a book cover
-    if (contentLength) {
-      const size = parseInt(contentLength);
-      if (size < 1000) return false;
+    // Download first 10KB to check actual size and format
+    const buffer = await response.arrayBuffer();
+    const actualSize = buffer.byteLength;
 
-      // Block specific Google Books "Image Not Available" placeholder size
-      // We observed this exact size (15567 bytes) for multiple placeholder images
-      if (size === 15567) return false;
+    // Reject tiny images (likely placeholders)
+    // Open Library returns 40-byte transparent GIFs for missing covers
+    if (actualSize < 1000) {
+      return false;
     }
 
-    // If no content-length header, assume it's valid (some servers don't send it)
+    // Check for known placeholder sizes
+    if (actualSize === 15567) {
+      return false; // Google Books placeholder
+    }
+
+    // Verify it's actually a valid image by checking magic bytes
+    const bytes = new Uint8Array(buffer.slice(0, 4));
+    const magicBytes = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+
+    // Valid image formats: JPEG (FF D8 FF), PNG (89 50 4E 47), GIF (47 49 46 38), WebP (52 49 46 46)
+    const isValidImage = 
+      magicBytes.startsWith('ffd8ff') || // JPEG
+      magicBytes.startsWith('89504e47') || // PNG
+      magicBytes.startsWith('47494638') || // GIF
+      magicBytes.startsWith('52494646'); // WebP
+
+    if (!isValidImage) {
+      // Check if it's HTML/XML (error page)
+      const textDecoder = new TextDecoder();
+      const textPreview = textDecoder.decode(buffer.slice(0, 100));
+      if (textPreview.trim().startsWith('<!DOCTYPE') || textPreview.trim().startsWith('<html') || textPreview.trim().startsWith('<?xml')) {
+        return false;
+      }
+      return false;
+    }
+
     return true;
   } catch (error) {
     // If validation fails (CORS, timeout, etc.), return false
