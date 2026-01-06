@@ -4,6 +4,7 @@ import Link from "next/link"
 import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE, APP_BUILD_ID } from "@/lib/config/version"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
+import { FeedbackDialog } from "@/components/feedback-dialog"
 
 export function Footer() {
   const pathname = usePathname()
@@ -88,6 +89,8 @@ export function Footer() {
               <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
                 Privacy Policy
               </Link>
+              <span className="text-muted-foreground/40">•</span>
+              <FeedbackDialog />
             </div>
             <div className="text-xs text-muted-foreground/60">
               {APP_VERSION_LABEL} (v{APP_VERSION}) • Build {APP_BUILD_ID} • Updated {APP_BUILD_DATE}

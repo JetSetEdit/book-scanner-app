@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
 import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
+import { RateLimitFeedbackDialog } from "@/components/rate-limit-feedback-dialog"
 
 // Helper function to format status messages for display
 function formatStatusMessage(message: string): string {
@@ -589,7 +590,7 @@ function ScanTestPageContent() {
                 ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500 text-yellow-700" 
                 : "bg-muted/30 border-border"
             )}>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   <span className="text-sm font-medium">
@@ -618,6 +619,9 @@ function ScanTestPageContent() {
                   />
                 </div>
               )}
+              <div className="mt-3 flex justify-end">
+                <RateLimitFeedbackDialog rateLimitRemaining={rateLimit.remaining} />
+              </div>
             </div>
           )}
 
