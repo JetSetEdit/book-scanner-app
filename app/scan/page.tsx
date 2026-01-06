@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -72,6 +72,7 @@ function formatStatusMessage(message: string): string {
 
 function ScanTestPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   
   // Browser storage for last ISBN
   const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
@@ -171,6 +172,9 @@ function ScanTestPageContent() {
       // Use the scan endpoint with multi-model analysis
         setStatusUpdates(prev => [...prev, "Starting scan with multi-model analysis (GPT-4o + Gemini)..."])
         
+        // Get user's timezone
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+        
         const response = await fetch("/api/scan", {
           method: "POST",
           headers: {
@@ -178,8 +182,9 @@ function ScanTestPageContent() {
           },
           body: JSON.stringify({ 
             isbn: isbnToScan, 
-            forceRefresh: true,
-            selectedCandidate: selectedCandidate || undefined
+            forceRefresh: false, // Don't force refresh - use existing book if available
+            selectedCandidate: selectedCandidate || undefined,
+            timezone: userTimezone
           }),
         })
 
@@ -406,6 +411,15 @@ function ScanTestPageContent() {
           // Don't throw - timing is not critical
         }
         
+        // Auto-redirect to book page if book already exists
+        if (transformedResult.success && transformedResult.book && !transformedResult.isNewBook) {
+          console.log('[Scan] Book already exists, redirecting to book page:', isbnToScan)
+          // Redirect immediately - no need to wait
+          router.push(`/book/${isbnToScan}`)
+          setLoading(false)
+          return
+        }
+        
         setLoading(false)
         return
     } catch (err) {
@@ -606,7 +620,8 @@ function ScanTestPageContent() {
                     Resets {new Date(rateLimit.resetAt).toLocaleTimeString('en-US', { 
                       hour: 'numeric', 
                       minute: '2-digit',
-                      hour12: true 
+                      hour12: true,
+                      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
                     })}
                   </span>
                 )}

@@ -109,8 +109,8 @@ export const AGE_ESCALATION_WEIGHTS: EscalationWeight[] = [
   {
     category: 'sexual_content',
     subcategory: 'intense_romance_or_spice',
-    weight: 0.5,
-    reasoning: 'Mature romantic themes, typically MA15+'
+    weight: 0.58,
+    reasoning: 'Mature romantic themes with spice, typically MA15+ (presentation multiplier handles on-page vs off-page differences)'
   },
   {
     category: 'sexual_content',

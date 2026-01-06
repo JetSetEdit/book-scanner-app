@@ -534,6 +534,46 @@ export async function processIsbnScan(
   } else {
     bookId = currentBook.id
     onProgress?.('Book found in local database.');
+    
+    // Early return if book exists (no re-analysis needed, unless forceRefresh)
+    if (!forceRefresh && bookId) {
+      console.log('[Scan Service] Book already exists, returning early without re-analysis')
+      onProgress?.('✅ Book already exists - redirecting to book page')
+      
+      // Fetch full book data for return
+      const { data: fullBook } = await supabaseAdmin
+        .from('books')
+        .select('*')
+        .eq('id', bookId)
+        .single()
+      
+      // Check if book has warnings (for contentWarningsGenerated flag)
+      const { data: existingWarnings } = await supabaseAdmin
+        .from('content_warnings')
+        .select('id')
+        .eq('book_id', bookId)
+        .limit(1)
+      
+      const hasWarnings = existingWarnings && existingWarnings.length > 0
+      
+      timings.total = performance.now() - overallStartTime
+      
+      return {
+        success: true,
+        status: 'complete',
+        book: fullBook || currentBook,
+        scan: { id: 'existing', isbn: cleanIsbn },
+        isNewBook: false,
+        contentWarningsGenerated: hasWarnings,
+        authorContextInvestigated: false,
+        timings,
+        flags: {
+          usedWebSearch: false,
+          isThinMetadata: false,
+          pipelinePath: 'existing_book'
+        }
+      }
+    }
   }
 
   // At this point, we have a bookId and currentBook (unless something went wrong)

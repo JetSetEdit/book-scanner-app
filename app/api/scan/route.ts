@@ -12,17 +12,29 @@ const SCANS_PER_DAY = parseInt(process.env.SCAN_RATE_LIMIT || '5', 10);
 // For now, we will just return the final result, but we could refactor scanBook to support streaming
 export async function POST(req: NextRequest) {
     try {
+        // Parse request body once
+        const body = await req.json();
+        const { isbn, forceRefresh, selectedCandidate, timezone } = body;
+        
         // Check rate limit before processing
         const clientIP = getClientIP(req);
-        const rateLimit = checkRateLimit(clientIP, SCANS_PER_DAY);
+        const rateLimit = checkRateLimit(clientIP, SCANS_PER_DAY, timezone);
         
         if (!rateLimit.allowed) {
+            // Format reset time in user's timezone if provided, otherwise use UTC
             const resetDate = new Date(rateLimit.resetAt);
-            const resetTime = resetDate.toLocaleTimeString('en-US', { 
-                hour: 'numeric', 
-                minute: '2-digit',
-                hour12: true 
-            });
+            const resetTime = timezone
+                ? resetDate.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: timezone
+                  })
+                : resetDate.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                  });
             
             // For streaming response, we need to send error through stream
             const encoder = new TextEncoder();
@@ -64,9 +76,6 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        const body = await req.json();
-        const { isbn, forceRefresh, selectedCandidate } = body;
-
         if (!isbn) {
             return NextResponse.json({ error: 'ISBN is required' }, { status: 400 });
         }
@@ -96,7 +105,7 @@ export async function POST(req: NextRequest) {
 
                 // Increment rate limit only after successful scan
                 if (result.success) {
-                  incrementRateLimit(clientIP)
+                  incrementRateLimit(clientIP, timezone)
                 }
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
@@ -108,7 +117,7 @@ export async function POST(req: NextRequest) {
                 })
                 
                 // Include rate limit info in response
-                const updatedRateLimit = checkRateLimit(clientIP, SCANS_PER_DAY)
+                const updatedRateLimit = checkRateLimit(clientIP, SCANS_PER_DAY, timezone)
                 const responseResult = {
                   ...result,
                   rateLimit: {

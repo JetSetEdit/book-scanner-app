@@ -56,14 +56,19 @@ async function testBook(isbn: string) {
   console.log(`   Title: ${book.title}`)
   console.log(`   Author: ${book.author}`)
 
-  // Get warnings
+  // Get warnings with severity_signals
   const { data: warnings, error: warningsError } = await supabaseAdmin
     .from('content_warnings')
-    .select('subcategory_id, severity, description, category, category_id')
+    .select('subcategory_id, severity, description, category, category_id, severity_signals, context_modifiers, evidence, taxonomy_version, is_spoiler, reasoning')
     .eq('book_id', book.id)
 
-  if (warningsError || !warnings) {
-    console.error(`   ❌ Error fetching warnings`)
+  if (warningsError) {
+    console.error(`   ❌ Error fetching warnings:`, warningsError)
+    return null
+  }
+  
+  if (!warnings || warnings.length === 0) {
+    console.log(`   ⚠️  No warnings found for this book`)
     return null
   }
 
@@ -74,23 +79,23 @@ async function testBook(isbn: string) {
 
   console.log(`   Current Rating: ${currentRating}`)
 
-  // Convert to EnhancedContentWarning format
+  // Convert to EnhancedContentWarning format with actual severity_signals
   const enhancedWarnings: EnhancedContentWarning[] = warnings.map(w => ({
     subcategory_id: w.subcategory_id || undefined,
     severity: w.severity as 'mild' | 'moderate' | 'severe',
-    modifiers: [],
-    evidence: [],
-    severity_signals: {
+    modifiers: (w.context_modifiers || []) as any[],
+    evidence: (w.evidence || []) as any[],
+    severity_signals: (w.severity_signals as any) || {
       frequency: 0.5,
       explicitness: 0.5,
       proximity: 0.5,
       centrality: 0.5,
       intensity_markers: []
     },
-    taxonomy_version: '2.5.0',
-    is_spoiler: false,
+    taxonomy_version: w.taxonomy_version || '2.5.0',
+    is_spoiler: w.is_spoiler || false,
     description: w.description,
-    reasoning: undefined
+    reasoning: w.reasoning || undefined
   }))
 
   // Calculate new rating
@@ -126,9 +131,11 @@ async function main() {
   console.log('='.repeat(80))
 
   const testBooks = [
-    '9780593336823', // The Love Hypothesis (0 SEVERE, should be M)
-    '9780062678416', // The Woman in the Window (1 SEVERE mental health, should be MA15+)
-    '9781619634442', // A Court of Thorns and Roses (if available)
+    '9780439023481', // The Hunger Games
+    '9781619634442', // A Court of Thorns and Roses (ACOTAR)
+    '9781649374042', // Fourth Wing
+    '9780593336823', // The Love Hypothesis
+    '9780062678416', // The Woman in the Window
   ]
 
   const results: Array<{ isbn: string; title: string; currentRating: string; newRating: string; changed: boolean }> = []
