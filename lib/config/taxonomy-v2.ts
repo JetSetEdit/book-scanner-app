@@ -16,7 +16,7 @@
  */
 
 export const TAXONOMY_VERSION = "2.5.0";
-export const MODEL_VERSION = "gpt-5.2-pro-2025-12-11";
+export const MODEL_VERSION = "gpt-4o-2024-11-20";
 
 export interface WarningSubcategory {
   id: string;
