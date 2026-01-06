@@ -693,10 +693,27 @@ export async function processIsbnScan(
       
       // Check if description is too minimal (just title/author/categories)
       // Also check if description is very short (< 300 chars) and appears to be just marketing copy
+      // OR if it appears to be a narrative excerpt (opening line) rather than a plot summary
+      const description = bookForAnalysis.description || ''
+      const isNarrativeExcerpt = description.length > 0 && description.length < 500 && (
+        // First-person narrative indicators
+        description.match(/^[A-Z][^.!?]*[.!?]\s*[A-Z]/) && (
+          description.includes(' he ') || description.includes(' she ') || description.includes(' they ') ||
+          description.includes(' his ') || description.includes(' her ') || description.includes(' their ') ||
+          description.includes(' I ') || description.includes(' we ')
+        ) ||
+        // Scene-setting without plot summary indicators
+        (description.includes(' apartment ') || description.includes(' room ') || description.includes(' door ') || 
+         description.includes(' window ') || description.includes(' balcony ')) &&
+        !description.toLowerCase().includes('story') && !description.toLowerCase().includes('follows') &&
+        !description.toLowerCase().includes('tells') && !description.toLowerCase().includes('explores')
+      )
+      
       const isMinimalDescription = !bookForAnalysis.description || 
         bookForAnalysis.description.length <= 50 ||
         descriptionForAnalysis.startsWith('A book by') ||
         descriptionForAnalysis === `A book by ${bookForAnalysis.author || 'Unknown Author'}.` ||
+        isNarrativeExcerpt ||
         (bookForAnalysis.description.length < 300 && 
          (descriptionForAnalysis.includes('bestselling author') || 
           descriptionForAnalysis.includes('highly anticipated') ||

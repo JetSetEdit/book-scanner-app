@@ -145,13 +145,15 @@ Instructions:
      * BAD: "A character dies in Chapter 12..." (mentions specific plot events - spoiler)
    - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
 
-2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
+2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description OR from web search context provided.
    - DO NOT make assumptions based on genre, categories, or book title alone
    - DO NOT use phrases like "often includes", "typically features", "usually contains"
    - DO NOT infer warnings from genre labels (e.g., "dark romance", "thriller")
-   - ONLY include warnings if you can point to specific content mentioned in the description
-   - If the description is too short or generic (e.g., "A book by [Author]"), return an empty warnings array
-   - If you cannot identify specific content warnings from the description, return [] (empty array)
+   - **HOWEVER**: If web search context or additional context mentions specific content warnings, themes, or trigger warnings (e.g., "known for graphic self-harm", "extensive trigger warnings", "contains sexual violence"), you MUST include those warnings based on that evidence
+   - If the description includes "Additional context from web search" with content warnings mentioned, use that as evidence
+   - ONLY include warnings if you can point to specific content mentioned in the description OR web search context
+   - If the description is too short or generic (e.g., "A book by [Author]") AND no web search context is available, return an empty warnings array
+   - If you cannot identify specific content warnings from the description or web search context, return [] (empty array)
    - DO NOT quote the book description verbatim. Use Australian Classification Board terminology (e.g., "Strong themes of emotional abuse" instead of quoting a diary entry).
    - Use the Board's standardized advisory language. Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
    - IMPORTANT: Pay special attention to RELATIONSHIP AND EMOTIONAL CONTENT that may be triggering:
