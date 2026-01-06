@@ -1259,6 +1259,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
             const warningsFoundViaWebSearch = webSearchFoundWarnings && reanalysisResult && reanalysisResult.warnings.length > 0 && contentWarningsGenerated
             
             if (!warningsFoundViaWebSearch) {
+              analysisCompleted = true
               // Build comprehensive reasoning that includes AI's explanation
               let reasoning = 'AI analysis completed and found no content warnings.'
               if (aiNoWarningsReasoning) {
