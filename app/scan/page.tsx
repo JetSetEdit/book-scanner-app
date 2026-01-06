@@ -170,7 +170,7 @@ function ScanTestPageContent() {
       markStage('api-request-sent')
       
       // Use the scan endpoint with multi-model analysis
-        setStatusUpdates(prev => [...prev, "Starting scan with multi-model analysis (GPT-4o + Gemini)..."])
+        setStatusUpdates(prev => [...prev, "Starting scan with AI analysis..."])
         
         // Get user's timezone
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone

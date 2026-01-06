@@ -260,12 +260,16 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               const warningSummary = getContentWarningSummary(book.content_warnings)
               const hasWarnings = warningSummary.severe > 0 || warningSummary.moderate > 0 || warningSummary.mild > 0
               
-              // Check if book has been analyzed (has audit log)
+              // Check if book has been analyzed
+              // Analysis is complete if:
+              // 1. There's an audit log with 'warnings_generated' or 'no_warnings', OR
+              // 2. There are AI-generated warnings (even without audit log - indicates analysis was done)
               const auditLogs = (book.ai_audit_logs as any[]) || []
-              const hasAnalysis = auditLogs.length > 0
-              const isAnalyzed = hasAnalysis && auditLogs.some(log => 
+              const hasAuditLog = auditLogs.length > 0 && auditLogs.some(log => 
                 log.decision_type === 'warnings_generated' || log.decision_type === 'no_warnings'
               )
+              const hasAiWarnings = (book.content_warnings as any[])?.some((w: any) => w.source === 'ai_generated') || false
+              const isAnalyzed = hasAuditLog || hasAiWarnings
 
               return (
                 <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full relative">

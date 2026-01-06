@@ -39,8 +39,12 @@ export default async function BookPage({ params }: BookPageProps) {
     .limit(1)
 
   // Determine analysis status
-  // Analysis is complete if there's an audit log with 'warnings_generated' or 'no_warnings'
-  const hasAnalysisCompleted = auditLogs && auditLogs.length > 0
+  // Analysis is complete if:
+  // 1. There's an audit log with 'warnings_generated' or 'no_warnings', OR
+  // 2. There are AI-generated warnings (even without audit log - indicates analysis was done)
+  const hasAuditLog = auditLogs && auditLogs.length > 0
+  const hasAiWarnings = warnings && warnings.some((w: any) => w.source === 'ai_generated')
+  const hasAnalysisCompleted = hasAuditLog || hasAiWarnings
   const analysisStatus: 'complete' | 'unknown' = hasAnalysisCompleted ? 'complete' : 'unknown'
   const metadataIssues = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any).metadata_issues : null
 

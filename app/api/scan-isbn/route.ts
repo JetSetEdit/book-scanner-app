@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateISBN } from '@/lib/isbn-validation'
 import { processIsbnScan } from '@/lib/services/scan-service'
+import { MODEL_VERSION } from '@/lib/config/taxonomy-v2'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
           }
 
           try {
-            const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh, model || "gpt-4o")
+            const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh, model || MODEL_VERSION)
             
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
           } catch (error) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Standard JSON response
-      const result = await processIsbnScan(isbn, undefined, selectedCandidate, false, model || "gpt-4o")
+      const result = await processIsbnScan(isbn, undefined, selectedCandidate, false, model || MODEL_VERSION)
       
       
       return NextResponse.json(result)
