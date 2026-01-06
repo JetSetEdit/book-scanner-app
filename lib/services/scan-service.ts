@@ -599,6 +599,8 @@ export async function processIsbnScan(
   onProgress?.('📖 Step 6: Fetching book description for analysis...')
   
   let contentWarningsGenerated = false
+  let analysisCompleted = false
+  let analysisError: Error | null = null
   const analysisStartTime = performance.now()
   
   try {
@@ -970,6 +972,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               contentWarningsGenerated = true
               const savedCount = insertedWarnings?.length || warningsToInsert.length
               onProgress?.(`✅ Saved ${savedCount} content warnings`)
+              analysisCompleted = true
               
               // Calculate and store age rating based on Australian Classification Board methodology
               try {
@@ -1337,6 +1340,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           // DO NOT create an audit log for "no_warnings" - analysis failed!
           // The book should show as "Unknown" (not analyzed) not "Comfort Read" (analyzed and safe)
           
+          analysisError = analysisError as Error
           throw analysisError; // Re-throw to be caught by outer catch
         }
       } else {
@@ -1345,11 +1349,13 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           hasBook: !!bookForAnalysis, 
           hasTitle: !!bookForAnalysis?.title 
         })
+        analysisError = new Error('Book title missing - cannot run analysis')
       }
   } catch (error) {
     console.error('Content warning analysis failed:', error)
     console.error('Error details:', error instanceof Error ? error.stack : error)
-    onProgress?.(`⚠️ Warning: Content analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    analysisError = error instanceof Error ? error : new Error('Unknown error')
+    onProgress?.(`❌ Content analysis failed: ${analysisError.message}`)
     timings.aiContentWarningGeneration = performance.now() - analysisStartTime
     
     // Log for manual handling
@@ -1360,17 +1366,23 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           isbn: cleanIsbn,
           reason: 'analysis_failed',
           status: 'pending',
-          error_message: error instanceof Error ? error.message : 'Unknown error',
+          error_message: analysisError.message,
           metadata: {
             book_id: bookId,
             book_title: currentBook?.title,
             attempted_at: new Date().toISOString(),
             source: 'scan_service',
-            error_type: error instanceof Error ? error.constructor.name : 'Unknown'
+            error_type: analysisError.constructor.name,
+            model: modelToUse || MODEL_VERSION
           }
         })
     } catch (logError) {
       console.error('Failed to log manual handling scan:', logError)
+    }
+  } finally {
+    // Mark analysis as completed if we got here without throwing
+    if (!analysisError) {
+      analysisCompleted = true
     }
   }
 
@@ -1401,7 +1413,19 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
     scan = { id: 'temp-scan-id', isbn: cleanIsbn, book_id: bookId }
   }
 
-  onProgress?.('Scan completed successfully.');
+  // Only mark as successful if analysis completed OR book already had warnings
+  const hasExistingWarnings = bookId ? (await supabaseAdmin
+    .from('content_warnings')
+    .select('id', { count: 'exact', head: true })
+    .eq('book_id', bookId)).count || 0 > 0 : false
+  
+  if (analysisCompleted || hasExistingWarnings) {
+    onProgress?.('✅ Scan completed successfully.')
+  } else if (analysisError) {
+    onProgress?.(`⚠️ Scan completed but analysis failed: ${analysisError.message}`)
+  } else {
+    onProgress?.('⚠️ Scan completed but analysis did not run.')
+  }
 
   // SAFETY CHECK: Ensure audit log was created if analysis ran
   // This prevents books from being marked as "Unknown" when they were actually analyzed
@@ -1456,13 +1480,18 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
   // Calculate total time before returning
   timings.total = performance.now() - overallStartTime
 
+  // Only return success if analysis completed successfully OR book already exists with warnings
+  const scanSuccess = analysisCompleted || hasExistingWarnings || !bookId
+  
   return {
-    success: true,
+    success: scanSuccess,
+    status: scanSuccess ? (contentWarningsGenerated ? 'success' : 'success') : 'error',
     book: currentBook || { id: bookId, isbn: cleanIsbn, review_status: 'pending' },
     scan: scan,
     isNewBook: !existingBook,
     contentWarningsGenerated,
     authorContextInvestigated,
+    message: analysisError ? `Analysis failed: ${analysisError.message}` : undefined,
     timings,
     flags: {
       usedWebSearch,
