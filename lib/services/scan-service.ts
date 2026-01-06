@@ -752,10 +752,11 @@ SAFE SOURCES TO USE:
 
 Please provide:
 1. A detailed plot summary or book description (2-4 sentences) from SAFE sources only - focus on plot details, character relationships, and story dynamics
-2. Romance tropes or themes explicitly mentioned (e.g., "enemies to lovers", "second chance", "fake dating", etc.) - quote the exact phrases used, but ONLY from safe sources like community sites, library catalogs, or publisher/author sites
-3. Character relationship dynamics described (e.g., "put aside their dislike", "adversarial", "conflict", etc.)
-4. Any content warnings, themes, or sensitive topics mentioned in reviews or discussions (from safe sources)
-5. Relationship dynamics or emotional content (conflict, tension, stress, etc.)
+2. **CRITICAL: Content warnings, trigger warnings, or sensitive topics** - This is especially important for literary fiction, trauma narratives, and books known for graphic content. Check The StoryGraph, Goodreads reviews, and community discussions for trigger warnings. Include ALL major content warnings mentioned (self-harm, abuse, sexual violence, trauma, etc.)
+3. Romance tropes or themes explicitly mentioned (e.g., "enemies to lovers", "second chance", "fake dating", etc.) - quote the exact phrases used, but ONLY from safe sources like community sites, library catalogs, or publisher/author sites
+4. Character relationship dynamics described (e.g., "put aside their dislike", "adversarial", "conflict", etc.)
+5. Any themes, sensitive topics, or controversial content mentioned in reviews or discussions (from safe sources)
+6. Relationship dynamics or emotional content (conflict, tension, stress, etc.)
 
 CRITICAL: For romance books, specifically look for:
 - Enemies-to-lovers dynamics (look for phrases like "enemies to lovers", "enemies-to-lovers", "put aside their dislike", "mutual dislike", etc.) - check community sites like Romance.io or The StoryGraph
