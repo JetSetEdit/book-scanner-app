@@ -202,23 +202,32 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
       // This preserves the gradient that was computed from signals
       const severityScore = getRawSeverityScore(w)
       
-      // Calculate impact
-      const impact = severityScore * escalationWeight * presentationMult
+      // Calculate impact - ensure all values are numbers
+      const safeSeverityScore = typeof severityScore === 'number' && !isNaN(severityScore) ? severityScore : 0.5
+      const safeEscalationWeight = typeof escalationWeight === 'number' && !isNaN(escalationWeight) ? escalationWeight : 0.4
+      const safePresentationMult = typeof presentationMult === 'number' && !isNaN(presentationMult) ? presentationMult : 1.0
+      
+      const impact = safeSeverityScore * safeEscalationWeight * safePresentationMult
       
       return {
         warning: w,
-        impact,
+        impact: typeof impact === 'number' && !isNaN(impact) ? impact : 0,
         categoryId,
         subcategoryId,
-        escalationWeight,
-        presentationMult,
-        severityScore
+        escalationWeight: safeEscalationWeight,
+        presentationMult: safePresentationMult,
+        severityScore: safeSeverityScore
       }
     })
 
   // Get max impact and top contributing warning
-  const maxImpact = warningImpacts.length > 0 
-    ? Math.max(...warningImpacts.map(w => w.impact), 0)
+  // Ensure all impacts are valid numbers
+  const validImpacts = warningImpacts
+    .map(w => typeof w.impact === 'number' && !isNaN(w.impact) ? w.impact : 0)
+    .filter(impact => impact >= 0)
+  
+  const maxImpact = validImpacts.length > 0 
+    ? Math.max(...validImpacts, 0)
     : 0
   const topWarning = warningImpacts.find(w => w.impact === maxImpact)
 
