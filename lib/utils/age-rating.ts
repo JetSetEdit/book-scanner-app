@@ -9,6 +9,7 @@
 
 import { EnhancedContentWarning } from '../config/taxonomy-context'
 import { getEscalationWeight, getRatingFromEscalation } from '../config/age-escalation-weights'
+import { getCategoryFromSubcategory } from './get-category-from-subcategory'
 
 export type ClassificationRating = 'G' | 'PG' | 'M' | 'MA15+' | 'R18+' | 'RC'
 
@@ -17,6 +18,62 @@ interface AgeRatingResult {
   ageRecommendation: string
   reasoning: string
   keyElements: string[]
+}
+
+/**
+ * Recompute raw numeric severity score (0-1) from severity_signals
+ * This recovers the gradient that was lost when bucketing to mild/moderate/severe
+ * 
+ * @param warning The content warning with severity_signals
+ * @returns Raw numeric severity score (0-1)
+ */
+function getRawSeverityScore(warning: EnhancedContentWarning): number {
+  const signals = warning.severity_signals
+  if (!signals) {
+    // Fallback to bucket if signals missing
+    return warning.severity === 'severe' ? 0.85 : 
+           warning.severity === 'moderate' ? 0.55 : 0.35
+  }
+  
+  // Recompute using same formula as computeSeverityFromSignals
+  const baseScore = (signals.frequency * 0.3) + (signals.explicitness * 0.4)
+  const proximityMultiplier = 1 + (signals.proximity * 0.2)
+  const centralityMultiplier = 1 + (signals.centrality * 0.2)
+  const intensityBonus = Math.min(signals.intensity_markers.length * 0.1, 0.3)
+  
+  const finalScore = (baseScore * proximityMultiplier * centralityMultiplier) + intensityBonus
+  return Math.min(finalScore, 1.0)
+}
+
+/**
+ * Check if a warning represents explicit on-page sexual content
+ * This is an internal semantic flag derived from severity_signals, not a taxonomy change
+ * 
+ * @param warning The content warning with severity_signals
+ * @returns true if the warning represents explicit on-page sexual content
+ */
+function isExplicitOnPageSexualContent(warning: EnhancedContentWarning): boolean {
+  const categoryId = getCategoryFromSubcategory(warning.subcategory_id)
+  
+  // Only applies to sexual content
+  if (categoryId !== 'sexual_content') {
+    return false
+  }
+  
+  const signals = warning.severity_signals
+  if (!signals) {
+    // Fallback: if subcategory is explicit_sexual_content, assume explicit
+    return warning.subcategory_id?.includes('explicit_sexual_content') || false
+  }
+  
+  // Explicit on-page sexual content:
+  // - proximity >= 0.9 (on-page, not off-page or referenced)
+  // - explicitness >= 0.6 (explicit acts, not just tension)
+  // - frequency >= 0.35 (recurring, not one-off; lower threshold for literary fiction
+  //   where scenes may be spaced out but still central to narrative)
+  return signals.proximity >= 0.9 && 
+         signals.explicitness >= 0.6 &&
+         signals.frequency >= 0.35
 }
 
 /**
@@ -77,7 +134,14 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   const hasSexualViolence = warnings.some(w => 
     w.subcategory_id?.includes('sexual_violence')
   )
-  // Split explicit sexual content and intense romance/spice into separate checks
+  
+  // Check for explicit on-page sexual content using internal semantic flag
+  // This is derived from severity_signals, not just subcategory name
+  const hasExplicitOnPageSexualContent = warnings.some(w => 
+    isExplicitOnPageSexualContent(w)
+  )
+  
+  // Legacy checks for backward compatibility (but prefer explicit flag)
   const hasExplicitSexualContent = warnings.some(w => 
     w.subcategory_id?.includes('explicit_sexual_content')
   )
@@ -123,19 +187,20 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   // Calculate impact score for each warning (moderate+severe)
   const warningImpacts = warnings
     .filter(w => w.severity === 'severe' || w.severity === 'moderate')
-    .map(w => {
-      const categoryId = w.subcategory_id?.split('.')[0] || 'other'
-      const subcategoryId = w.subcategory_id
-      
-      // Get escalation weight
-      const escalationWeight = getEscalationWeight(categoryId, subcategoryId)
+      .map(w => {
+        // Get category from subcategory using taxonomy lookup
+        const categoryId = getCategoryFromSubcategory(w.subcategory_id)
+        const subcategoryId = w.subcategory_id
+        
+        // Get escalation weight
+        const escalationWeight = getEscalationWeight(categoryId, subcategoryId)
       
       // Get presentation multiplier
       const presentationMult = getPresentationMultiplier(w)
       
-      // Convert severity to numeric (mild=0.3, moderate=0.6, severe=1.0)
-      const severityScore = w.severity === 'severe' ? 1.0 : 
-                           w.severity === 'moderate' ? 0.6 : 0.3
+      // Use raw numeric severity score (0-1) instead of bucket
+      // This preserves the gradient that was computed from signals
+      const severityScore = getRawSeverityScore(w)
       
       // Calculate impact
       const impact = severityScore * escalationWeight * presentationMult
@@ -157,27 +222,37 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     : 0
   const topWarning = warningImpacts.find(w => w.impact === maxImpact)
 
+  // Pre-compute MA15+ fallback conditions
+  const highRiskCategories = ['violence', 'sexual_content', 'abuse']
+  const hasHighRiskSevere = severeWarnings.some(w => {
+    const cat = getCategoryFromSubcategory(w.subcategory_id)
+    return highRiskCategories.includes(cat)
+  })
+
   // RC (Refused Classification) - extreme content
   if (hasExtremeContent && severeWarnings.length >= 3) {
     rating = 'RC'
     ageRecommendation = 'Not recommended - contains extreme content'
     reasoning = 'Contains extreme content with multiple severe warnings. This content may not be suitable for any age group.'
   }
-  // R18+ - high impact (impact >= 0.7 or sexual violence, or explicit sexual content with impact >= 0.5)
-  else if (hasSexualViolence || maxImpact >= 0.7 || 
-           (hasExplicitSexualContent && maxImpact >= 0.5)) {
+  // R18+ - explicit on-page sexual content OR high impact OR sexual violence
+  // NEW: Use explicit flag instead of threshold hacks
+  else if (hasSexualViolence || hasExplicitOnPageSexualContent || maxImpact >= 0.7) {
     rating = 'R18+'
     ageRecommendation = 'Recommended for ages 18+'
     if (hasSexualViolence) {
-      reasoning = 'Contains sexual violence with strong impact. Recommended for mature audiences only.'
-    } else if (hasExplicitSexualContent) {
-      reasoning = 'Contains explicit sexual content with strong impact. Recommended for mature audiences only.'
+      reasoning = 'Contains sexual violence. Recommended for mature audiences only.'
+    } else if (hasExplicitOnPageSexualContent) {
+      reasoning = 'Contains explicit on-page sexual content. Recommended for mature audiences only.'
     } else {
       reasoning = `Contains high-impact content (impact score: ${maxImpact.toFixed(2)}) requiring mature audiences. Recommended for ages 18 and above.`
     }
   }
-  // MA15+ - strong impact (impact >= 0.3 or severe warnings with lower impact)
-  else if (maxImpact >= 0.3 || severeWarnings.length > 0) {
+  // MA15+ - strong impact (impact >= 0.3 or severe warnings with meaningful impact)
+  // Constrain fallback: require at least 0.2 impact for severe warnings, or high-risk categories
+  else if (maxImpact >= 0.3 || 
+      (hasHighRiskSevere && maxImpact >= 0.15) ||
+      (severeWarnings.length > 0 && maxImpact >= 0.2)) {
     rating = 'MA15+'
     ageRecommendation = 'Recommended for ages 15+'
     if (severeWarnings.length > 0) {
@@ -213,12 +288,29 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   }
 
   // Add explainable reasoning with top contributing warning
-  if (topWarning) {
-    const category = topWarning.categoryId
-    const subcategory = topWarning.subcategoryId?.split('.')[1] || 'general'
-    const severity = topWarning.warning.severity
-    const proximity = topWarning.warning.severity_signals?.proximity ?? 0.5
-    const explicitness = topWarning.warning.severity_signals?.explicitness ?? 0.5
+  // PRIORITY: If rating was triggered by explicit flag, use that warning (not impact leader)
+  let driverWarning = topWarning
+  
+  if (rating === 'R18+' && hasExplicitOnPageSexualContent) {
+    // Find the explicit sexual content warning that triggered R18+
+    const explicitWarning = warningImpacts.find(w => {
+      const cat = w.categoryId
+      const subcat = w.subcategoryId || ''
+      return cat === 'sexual_content' && 
+             (subcat.includes('explicit_sexual_content') || 
+              isExplicitOnPageSexualContent(w.warning))
+    })
+    if (explicitWarning) {
+      driverWarning = explicitWarning
+    }
+  }
+  
+  if (driverWarning) {
+    const category = driverWarning.categoryId
+    const subcategory = driverWarning.subcategoryId?.split('.')[1] || 'general'
+    const severity = driverWarning.warning.severity
+    const proximity = driverWarning.warning.severity_signals?.proximity ?? 0.5
+    const explicitness = driverWarning.warning.severity_signals?.explicitness ?? 0.5
     
     const presence = proximity >= 0.9 ? 'on-page' : 
                      proximity >= 0.6 ? 'flashback' : 

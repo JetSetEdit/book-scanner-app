@@ -191,10 +191,22 @@ export function getEscalationWeight(
   // Try to find exact match (category + subcategory)
   if (subcategoryId) {
     const subcategory = subcategoryId.split('.')[1] || subcategoryId
+    
+    // First try exact match
     const exactMatch = AGE_ESCALATION_WEIGHTS.find(
       w => w.category === categoryId && w.subcategory === subcategory
     )
     if (exactMatch) return exactMatch.weight
+    
+    // Try partial match for known aliases (e.g., "intense_romance" matches "intense_romance_or_spice")
+    if (categoryId === 'sexual_content') {
+      if (subcategory === 'intense_romance' || subcategory.includes('intense_romance')) {
+        const spiceMatch = AGE_ESCALATION_WEIGHTS.find(
+          w => w.category === 'sexual_content' && w.subcategory === 'intense_romance_or_spice'
+        )
+        if (spiceMatch) return spiceMatch.weight
+      }
+    }
   }
 
   // Fall back to category-only match

@@ -90,8 +90,8 @@ export function RecentScans() {
                   href={`/book/${scan.isbn}`}
                   className="flex-shrink-0 group"
                 >
-                  <div className="relative w-32 md:w-40">
-                    <div className="aspect-[2/3] rounded-lg overflow-hidden border-2 border-border/50 group-hover:border-primary transition-colors shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-200">
+                  <div className="relative w-32 md:w-40 overflow-visible">
+                    <div className="aspect-[2/3] rounded-lg overflow-hidden border-2 border-border/50 group-hover:border-primary transition-colors shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-200 origin-center">
                       {scan.book?.coverUrl ? (
                         <img
                           src={scan.book.coverUrl}

@@ -787,7 +787,8 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               description: descriptionForAnalysis,
               isbn: cleanIsbn
             },
-            onProgress
+            onProgress,
+            model
           )
           
           // Store no_warnings_reasoning for use in audit log if no warnings found
@@ -1145,7 +1146,8 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                       description: enhancedDescription,
                       isbn: cleanIsbn
                     },
-                    onProgress
+                    onProgress,
+                    model
                   )
                   
                   if (reanalysisResult.warnings.length > 0) {

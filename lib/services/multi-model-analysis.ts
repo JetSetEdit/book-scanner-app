@@ -68,9 +68,15 @@ Context Modifiers (add nuance):
 
 async function analyzeWithOpenAI(
   metadata: BookMetadata,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  model?: string
 ): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
-  onProgress?.('⏳ Checking for: sexual content, violence, trauma, relationships, mental health...')
+  // Generate dynamic category list from taxonomy
+  const categoryLabels = WARNING_CATEGORIES
+    .map(cat => cat.userLabel.toLowerCase())
+    .slice(0, 5) // Show top 5 categories
+    .join(', ')
+  onProgress?.(`⏳ Checking for: ${categoryLabels}...`)
 
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
@@ -223,12 +229,35 @@ Instructions:
      * This ensures readers are informed that the book contains romantic/relationship content, regardless of whether specific tropes or conflicts are mentioned
      * Only skip this if the book is clearly NOT a romance (e.g., non-fiction, thriller without romance subplot, etc.)
 
-3. For sexual content, carefully distinguish:
+3. For sexual content, carefully distinguish using this decision rubric:
+
+   **DECISION RUBRIC: explicit_sexual_content vs intense_romance**
+   
+   Use explicit_sexual_content when ANY of the following are true:
+   A. On-page sex acts are depicted (penetrative sex, oral sex, masturbation, manual sex acts - acts described as occurring, not just implied afterward)
+   B. Anatomical/graphic description (genital/anatomical detail, explicit physical actions, explicit bodily reactions, "camera is in the room" style narration)
+   C. Extended on-page sex scene (a full scene where the primary content is sex, with sequential actions - not a single vague line, but a depicted encounter)
+   D. Repeated explicit scenes (multiple on-page sex scenes across the book, even if each one isn't hyper-graphic)
+   
+   Rule of thumb: If a reader could reasonably say "there's a sex scene on-page," label it explicit_sexual_content.
+   
+   Use intense_romance when ALL of the following are true:
+   A. No explicit sex acts are depicted on-page ("fade-to-black", "cutaway", or implied sex; after-the-fact references like "they slept together" without depiction)
+   B. The content is primarily sexual tension, foreplay without explicit acts, heavy making out, "steamy" scenes that stop short of sex depiction
+   C. Description is non-anatomical (euphemistic, indirect, emotional-focus rather than act-focus, no step-by-step depiction)
+   
+   Rule of thumb: If it's "hot" but the acts are not shown, label it intense_romance.
+   
+   Extra guardrails:
+   - Do NOT use explicit_sexual_content for: flirting, yearning, attraction, innuendo alone; "open door" vibes without depicted acts; discussion of sex without depiction
+   - Do NOT undercall NA romantasy: If the book is New Adult romantasy/romance and evidence indicates on-page sex, default to explicit_sexual_content unless it is clearly fade-to-black
+   - For books known to contain graphic sexual content (e.g., "Verity" by Colleen Hoover, "Fourth Wing" by Rebecca Yarros, "A Court of Thorns and Roses" by Sarah J. Maas), if there are indicators of on-page sex scenes, use explicit_sexual_content
+   
+   Other sexual content categories:
    - sexual_violence: Requires strong signals (force, threat, non-consent, victim framing)
    - consent_ambiguity (dub-con): Unclear consent in dark romance
    - cnc: Consensual non-consent play
-   - explicit_sexual_content: Explicit but consensual
-   - intense_romance_or_spice: Detailed romantic/sexual content that may be inappropriate for younger readers
+   
    - IMPORTANT: For ALL books with romance elements (not just "dark romance"), explicitly check for sexual content indicators:
      * Fantasy/YA with romance subplots (e.g., "Fourth Wing", "A Court of Thorns and Roses") - these often contain explicit sexual content despite being marketed as YA
      * Explicit sexual scenes, detailed sexual content, steamy/spicy content
@@ -272,8 +301,12 @@ Instructions:
 }`
 
   try {
+    const modelName = model || MODEL_VERSION
+    // GPT-5 models only support temperature=1 (default), so omit it for GPT-5
+    const isGpt5 = modelName.includes('gpt-5') || modelName.includes('o1') || modelName.includes('o3')
+    
     const response = await openai.chat.completions.create({
-      model: MODEL_VERSION,
+      model: modelName,
       messages: [
         {
           role: 'system',
@@ -331,7 +364,7 @@ DESCRIPTION FORMAT (Australian Classification Board style):
         }
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.3,
+      ...(isGpt5 ? {} : { temperature: 0.3 }),
     })
 
     const content = response.choices[0].message.content
@@ -702,6 +735,29 @@ function processWarnings(
 
     // Validate sexual violence if applicable
     let subcategoryId = w.subcategory_id
+    
+    // Signal-based backstop: Upgrade intense_romance to explicit_sexual_content if signals indicate on-page explicit content
+    // This prevents "on-page, explicit" content from being mislabeled as mere spice
+    // Uses same thresholds as explicit flag in age-rating.ts for consistency
+    if (subcategoryId === 'sexual_content.intense_romance' || 
+        subcategoryId?.includes('intense_romance')) {
+      const explicitness = signals.explicitness ?? 0.5
+      const proximity = signals.proximity ?? 0.5
+      const frequency = signals.frequency ?? 0.5
+      
+      // If explicitness >= 0.6 AND proximity >= 0.9 (on-page) AND frequency >= 0.35, upgrade to explicit_sexual_content
+      // This matches the explicit flag logic in age-rating.ts
+      if (explicitness >= 0.6 && proximity >= 0.9 && frequency >= 0.35) {
+        subcategoryId = 'sexual_content.explicit_sexual_content'
+        // Update description to reflect the upgrade if it's too vague
+        if (w.description && !w.description.toLowerCase().includes('explicit') && 
+            !w.description.toLowerCase().includes('graphic')) {
+          w.description = w.description.replace(/intense romance|spice|steamy/gi, 'explicit sexual content')
+        }
+      }
+    }
+
+    // Validate sexual violence if applicable
     if (subcategoryId?.includes('sexual')) {
       const violenceCheck = isActualSexualViolence({
         subcategory_id: subcategoryId,
@@ -872,6 +928,9 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
     // Add timeout wrapper (10 seconds max for verification)
     const verificationPromise = (async () => {
       if (verifierModel === 'openai') {
+        // GPT-5 models only support temperature=1 (default), so omit it for GPT-5
+        const isGpt5 = MODEL_VERSION.includes('gpt-5') || MODEL_VERSION.includes('o1') || MODEL_VERSION.includes('o3')
+        
         const response = await openai.chat.completions.create({
           model: MODEL_VERSION,
           messages: [
@@ -885,7 +944,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             }
           ],
           response_format: { type: 'json_object' },
-          temperature: 0.3, // Slightly higher temperature for more balanced verification
+          ...(isGpt5 ? {} : { temperature: 0.3 }), // Slightly higher temperature for more balanced verification
           max_tokens: 2000
         })
 
@@ -1183,7 +1242,8 @@ function combineResults(
 
 export async function analyzeBookWithMultiModel(
   metadata: BookMetadata,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  model?: string
 ): Promise<{
   warnings: EnhancedContentWarning[]
   noWarningsReasoning?: string
@@ -1207,7 +1267,7 @@ export async function analyzeBookWithMultiModel(
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
   // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
-  const openaiResult = await analyzeWithOpenAI(metadata, onProgress)
+  const openaiResult = await analyzeWithOpenAI(metadata, onProgress, model)
   const openaiWarnings = openaiResult.warnings
   const openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
 
