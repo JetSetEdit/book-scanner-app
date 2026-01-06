@@ -61,6 +61,7 @@ interface ContentWarningsListProps {
   warnings: ContentWarning[]
   isAuthorApproved?: boolean
   analysisStatus?: 'complete' | 'unknown'
+  isbn?: string // ISBN for analysis requests
 }
 
 const categoryLabels: Record<string, string> = {
@@ -105,7 +106,7 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown' }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn }: ContentWarningsListProps) {
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
   const [requestSent, setRequestSent] = useState(false)
@@ -124,9 +125,59 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
     w.description.toLowerCase().includes('depression')
   );
 
-  const handleRequestAnalysis = () => {
+  const handleRequestAnalysis = async () => {
+    if (requestSent) return
+    
     setRequestSent(true)
-    toast.success("Analysis requested! We've added this to our priority queue.")
+    
+    try {
+      // Get ISBN from prop, or fallback to URL
+      let bookIsbn = isbn
+      if (!bookIsbn && typeof window !== 'undefined') {
+        const currentUrl = window.location.pathname
+        const isbnMatch = currentUrl.match(/\/book\/([^\/]+)/)
+        bookIsbn = isbnMatch ? isbnMatch[1] : null
+      }
+      
+      if (!bookIsbn) {
+        toast.error("Unable to determine book ISBN. Please try scanning the book again.")
+        setRequestSent(false)
+        return
+      }
+
+      const response = await fetch('/api/request-analysis', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          isbn: bookIsbn,
+          pageUrl: typeof window !== 'undefined' ? window.location.href : undefined,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (data.alreadyAnalyzed) {
+          toast.info("This book has already been analyzed. Refreshing page...")
+          // Refresh the page to show updated analysis
+          setTimeout(() => {
+            if (typeof window !== 'undefined') {
+              window.location.reload()
+            }
+          }, 1500)
+        } else {
+          throw new Error(data.error || 'Failed to submit analysis request')
+        }
+      } else {
+        toast.success(data.message || "Analysis requested! We've added this to our priority queue.")
+      }
+    } catch (error) {
+      console.error('Error requesting analysis:', error)
+      toast.error(error instanceof Error ? error.message : "Failed to submit analysis request. Please try again.")
+      setRequestSent(false)
+    }
   }
 
   // Handle empty warnings - distinguish between "Safe" (analyzed, no warnings) and "Unknown" (not analyzed)

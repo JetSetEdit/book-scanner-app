@@ -609,6 +609,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 warnings={warnings}
                 isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
                 analysisStatus={analysisStatus}
+                isbn={book.isbn}
               />
 
               {/* Feedback / Report Section */}

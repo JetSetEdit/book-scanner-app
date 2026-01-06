@@ -192,8 +192,10 @@ export async function processIsbnScan(
   onProgress?: ProgressCallback,
   selectedCandidate?: BookCandidate,
   forceRefresh: boolean = false,
-  model: string = "gpt-4o"
+  model?: string
 ): Promise<ScanResult> {
+  // Use provided model or default to MODEL_VERSION
+  const modelToUse = model || MODEL_VERSION
   const overallStartTime = performance.now()
   console.log('Processing ISBN scan:', isbn)
   onProgress?.('Validating ISBN and checking local database...');
@@ -535,43 +537,59 @@ export async function processIsbnScan(
     bookId = currentBook.id
     onProgress?.('Book found in local database.');
     
-    // Early return if book exists (no re-analysis needed, unless forceRefresh)
+    // Early return if book exists AND has been analyzed (has audit log)
+    // If book exists but has no audit log, we should still run analysis
     if (!forceRefresh && bookId) {
-      console.log('[Scan Service] Book already exists, returning early without re-analysis')
-      onProgress?.('✅ Book already exists - redirecting to book page')
-      
-      // Fetch full book data for return
-      const { data: fullBook } = await supabaseAdmin
-        .from('books')
-        .select('*')
-        .eq('id', bookId)
-        .single()
-      
-      // Check if book has warnings (for contentWarningsGenerated flag)
-      const { data: existingWarnings } = await supabaseAdmin
-        .from('content_warnings')
+      // Check if book has been analyzed (has audit log)
+      const { data: existingAuditLog } = await supabaseAdmin
+        .from('ai_audit_logs')
         .select('id')
         .eq('book_id', bookId)
+        .in('decision_type', ['warnings_generated', 'no_warnings'])
         .limit(1)
       
-      const hasWarnings = existingWarnings && existingWarnings.length > 0
-      
-      timings.total = performance.now() - overallStartTime
-      
-      return {
-        success: true,
-        status: 'complete',
-        book: fullBook || currentBook,
-        scan: { id: 'existing', isbn: cleanIsbn },
-        isNewBook: false,
-        contentWarningsGenerated: hasWarnings,
-        authorContextInvestigated: false,
-        timings,
-        flags: {
-          usedWebSearch: false,
-          isThinMetadata: false,
-          pipelinePath: 'existing_book'
+      // Only return early if book has been analyzed (has audit log)
+      if (existingAuditLog && existingAuditLog.length > 0) {
+        console.log('[Scan Service] Book already exists and has been analyzed, returning early without re-analysis')
+        onProgress?.('✅ Book already exists - redirecting to book page')
+        
+        // Fetch full book data for return
+        const { data: fullBook } = await supabaseAdmin
+          .from('books')
+          .select('*')
+          .eq('id', bookId)
+          .single()
+        
+        // Check if book has warnings (for contentWarningsGenerated flag)
+        const { data: existingWarnings } = await supabaseAdmin
+          .from('content_warnings')
+          .select('id')
+          .eq('book_id', bookId)
+          .limit(1)
+        
+        const hasWarnings = existingWarnings && existingWarnings.length > 0
+        
+        timings.total = performance.now() - overallStartTime
+        
+        return {
+          success: true,
+          status: 'complete',
+          book: fullBook || currentBook,
+          scan: { id: 'existing', isbn: cleanIsbn },
+          isNewBook: false,
+          contentWarningsGenerated: hasWarnings,
+          authorContextInvestigated: false,
+          timings,
+          flags: {
+            usedWebSearch: false,
+            isThinMetadata: false,
+            pipelinePath: 'existing_book'
+          }
         }
+      } else {
+        // Book exists but hasn't been analyzed - continue with analysis
+        console.log('[Scan Service] Book exists but has no audit log - running analysis')
+        onProgress?.('📖 Book found but not yet analyzed - running analysis...')
       }
     }
   }
@@ -735,7 +753,7 @@ IMPORTANT:
 Be factual and specific. Only quote from sources that are safe to use. If you cannot find information from safe sources, say so explicitly.`
 
           const searchResponse = await openai.chat.completions.create({
-            model: 'gpt-4o',
+            model: modelToUse,
             messages: [
               {
                 role: 'system',
@@ -788,7 +806,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               isbn: cleanIsbn
             },
             onProgress,
-            model
+            modelToUse
           )
           
           // Store no_warnings_reasoning for use in audit log if no warnings found
@@ -1074,7 +1092,7 @@ If you find any content warnings mentioned online or in reviews (from safe sourc
 IMPORTANT: Only use information from safe, open sources. Do not quote retailer product descriptions.`
 
               const searchResponse = await openai.chat.completions.create({
-                model: 'gpt-4o',
+                model: modelToUse,
                 messages: [
                   {
                     role: 'system',
@@ -1147,7 +1165,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                       isbn: cleanIsbn
                     },
                     onProgress,
-                    model
+                    modelToUse
                   )
                   
                   if (reanalysisResult.warnings.length > 0) {
