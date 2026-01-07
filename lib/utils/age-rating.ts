@@ -151,10 +151,21 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   const hasGraphicViolence = warnings.some(w => 
     w.subcategory_id?.includes('graphic_violence')
   )
-  const hasExtremeContent = warnings.some(w => 
-    w.subcategory_id?.includes('extreme') || 
-    (w.severity_signals?.explicitness >= 0.8 && w.severity === 'severe')
+  // RC should only trigger for truly extreme content, not just graphic violence in YA/dystopian fiction
+  // Check for multiple extreme indicators OR truly extreme content types
+  const extremeContentTypes = ['extreme_violence', 'extreme_gore', 'extreme_sexual_violence', 'torture_porn', 'snuff']
+  const hasExtremeContentType = warnings.some(w => 
+    extremeContentTypes.some(extremeType => w.subcategory_id?.includes(extremeType))
   )
+  
+  // Count warnings with very high explicitness (>= 0.9) - not just 0.8
+  const veryHighExplicitnessCount = warnings.filter(w => 
+    w.severity === 'severe' && (w.severity_signals?.explicitness ?? 0) >= 0.9
+  ).length
+  
+  // RC requires: (extreme content type) OR (multiple very high explicitness warnings AND high impact)
+  const hasExtremeContent = hasExtremeContentType || 
+    (veryHighExplicitnessCount >= 3 && maxImpact >= 0.8)
 
   // Map categories to classifiable elements
   const elementMap: Record<string, string> = {
@@ -239,10 +250,14 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   })
 
   // RC (Refused Classification) - extreme content
-  if (hasExtremeContent && severeWarnings.length >= 3) {
+  // RC should be very rare - only for truly extreme content that would be refused classification
+  // Not just graphic violence in YA/dystopian fiction (which can be MA15+ or R18+)
+  if (hasExtremeContent) {
     rating = 'RC'
     ageRecommendation = 'Not recommended - contains extreme content'
-    reasoning = 'Contains extreme content with multiple severe warnings. This content may not be suitable for any age group.'
+    reasoning = hasExtremeContentType 
+      ? 'Contains extreme content types that may not be suitable for any age group.'
+      : 'Contains multiple very high-impact extreme warnings. This content may not be suitable for any age group.'
   }
   // R18+ - explicit on-page sexual content OR high impact OR sexual violence
   // NEW: Use explicit flag instead of threshold hacks
