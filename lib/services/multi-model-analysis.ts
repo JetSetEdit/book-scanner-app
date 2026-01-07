@@ -747,7 +747,7 @@ function processWarnings(
     }
 
     // Build severity signals
-    const signals = buildSeveritySignals({
+    let signals = buildSeveritySignals({
       presence: w.presence,
       detail_level: w.detail_level,
       description: w.description,
