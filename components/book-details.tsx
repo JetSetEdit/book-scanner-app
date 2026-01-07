@@ -30,6 +30,7 @@ interface BookDetailsProps {
     descriptionReason?: string
     bookInfoIssues?: string[]
   } | null
+  noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
 }
 
 // Check if we're in dev mode (localhost or dev environment)
