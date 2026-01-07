@@ -657,12 +657,21 @@ function updateDescriptionForSeverity(
 function updateReasoningForSeverity(
   originalReasoning: string | undefined,
   computedSeverity: 'mild' | 'moderate' | 'severe',
-  signals: SeveritySignals
+  signals: SeveritySignals | undefined
 ): string {
+  // Safety check: if signals is undefined, provide default values
+  const safeSignals = signals || {
+    frequency: 0.5,
+    explicitness: 0.5,
+    proximity: 0.5,
+    centrality: 0.5,
+    intensity_markers: []
+  }
+  
   if (!originalReasoning) {
     // Generate basic reasoning if none provided
     const severityText = computedSeverity.charAt(0).toUpperCase() + computedSeverity.slice(1)
-    return `${severityText} severity based on computed signals (frequency: ${signals.frequency.toFixed(1)}, centrality: ${signals.centrality.toFixed(1)}, proximity: ${signals.proximity.toFixed(1)}, explicitness: ${signals.explicitness.toFixed(1)}).`
+    return `${severityText} severity based on computed signals (frequency: ${safeSignals.frequency.toFixed(1)}, centrality: ${safeSignals.centrality.toFixed(1)}, proximity: ${safeSignals.proximity.toFixed(1)}, explicitness: ${safeSignals.explicitness.toFixed(1)}).`
   }
 
   const severityText = computedSeverity.charAt(0).toUpperCase() + computedSeverity.slice(1)
@@ -699,7 +708,7 @@ function updateReasoningForSeverity(
     const endsWithPunctuation = /[.!?]$/.test(trimmed)
     const separator = endsWithPunctuation ? ' ' : '. '
     
-    updatedReasoning = `${trimmed}${separator}This content is classified as ${severityText.toLowerCase()} severity based on computed signals (frequency: ${signals.frequency.toFixed(1)}, centrality: ${signals.centrality.toFixed(1)}, proximity: ${signals.proximity.toFixed(1)}, explicitness: ${signals.explicitness.toFixed(1)}).`
+    updatedReasoning = `${trimmed}${separator}This content is classified as ${severityText.toLowerCase()} severity based on computed signals (frequency: ${safeSignals.frequency.toFixed(1)}, centrality: ${safeSignals.centrality.toFixed(1)}, proximity: ${safeSignals.proximity.toFixed(1)}, explicitness: ${safeSignals.explicitness.toFixed(1)}).`
   }
 
   return updatedReasoning
