@@ -786,6 +786,9 @@ IMPORTANT:
 
 Be factual and specific. Only quote from sources that are safe to use. If you cannot find information from safe sources, say so explicitly.`
 
+          // GPT-5 models require max_completion_tokens instead of max_tokens
+          const isGpt5 = modelToUse.includes('gpt-5') || modelToUse.includes('o1') || modelToUse.includes('o3')
+          
           const searchResponse = await openai.chat.completions.create({
             model: modelToUse,
             messages: [
@@ -798,7 +801,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                 content: searchPrompt
               }
             ],
-            max_tokens: 500
+            ...(isGpt5 ? { max_completion_tokens: 500 } : { max_tokens: 500 })
           }).catch(err => {
             console.error('Web search for minimal description failed:', err)
             return null
