@@ -154,7 +154,7 @@ export function checkRateLimit(ip: string, limit: number = 5, timezone?: string)
     }
   }
   
-  // Check if limit exceeded
+  // Check if limit exceeded (count is "credits used")
   const remaining = Math.max(0, limit - entry.count)
   const allowed = entry.count < limit
   
@@ -162,6 +162,32 @@ export function checkRateLimit(ip: string, limit: number = 5, timezone?: string)
     allowed,
     remaining,
     resetAt: entry.resetAt
+  }
+}
+
+/**
+ * Check whether a request costing N credits is allowed.
+ * This is useful when certain actions (e.g., Deep scan) should cost more.
+ */
+export function checkRateLimitWithCost(
+  ip: string,
+  limit: number = 5,
+  timezone?: string,
+  cost: number = 1
+): {
+  allowed: boolean
+  remaining: number
+  resetAt: number
+  cost: number
+  required: number
+} {
+  const normalizedCost = Number.isFinite(cost) && cost > 0 ? Math.floor(cost) : 1
+  const status = checkRateLimit(ip, limit, timezone)
+  return {
+    ...status,
+    allowed: status.remaining >= normalizedCost,
+    cost: normalizedCost,
+    required: normalizedCost,
   }
 }
 
@@ -193,6 +219,33 @@ export function incrementRateLimit(ip: string, timezone?: string): void {
   } else {
     // Increment existing
     entry.count++
+  }
+}
+
+/**
+ * Increment by N credits (default 1).
+ */
+export function incrementRateLimitBy(ip: string, timezone?: string, cost: number = 1): void {
+  const normalizedCost = Number.isFinite(cost) && cost > 0 ? Math.floor(cost) : 1
+
+  const now = Date.now()
+  const resetAt = timezone
+    ? getMidnightInTimezone(timezone)
+    : (() => {
+        const tomorrow = new Date()
+        tomorrow.setUTCHours(24, 0, 0, 0) // Reset at midnight UTC
+        return tomorrow.getTime()
+      })()
+
+  const entry = rateLimitStore.get(ip)
+
+  if (!entry || entry.resetAt < now) {
+    rateLimitStore.set(ip, {
+      count: normalizedCost,
+      resetAt,
+    })
+  } else {
+    entry.count += normalizedCost
   }
 }
 

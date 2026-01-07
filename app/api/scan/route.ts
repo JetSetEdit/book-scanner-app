@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIsbnScan } from '@/lib/services/scan-service';
-import { getClientIP, checkRateLimit, incrementRateLimit } from '@/lib/utils/rate-limiter';
+import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy } from '@/lib/utils/rate-limiter';
 
 export const runtime = 'nodejs';
 
 // Rate limit configuration
-const SCANS_PER_DAY = parseInt(process.env.SCAN_RATE_LIMIT || '5', 10);
+const SCAN_CREDITS_PER_DAY = parseInt(process.env.SCAN_RATE_LIMIT || '5', 10);
+const DEEP_SCAN_COST = parseInt(process.env.DEEP_SCAN_COST || '2', 10);
+const QUICK_SCAN_COST = parseInt(process.env.QUICK_SCAN_COST || '1', 10);
 
 // Helper to simulate SSE stream for progress updates
 // Since scanBook takes a callback, we can't easily stream it over HTTP without changing scanBook
@@ -18,10 +20,15 @@ export async function POST(req: NextRequest) {
 
         const normalizedScanMode: 'quick' | 'deep' =
           scanMode === 'quick' || scanMode === 'deep' ? scanMode : 'deep'
+
+        const scanCost =
+          normalizedScanMode === 'deep'
+            ? (Number.isFinite(DEEP_SCAN_COST) && DEEP_SCAN_COST > 0 ? DEEP_SCAN_COST : 2)
+            : (Number.isFinite(QUICK_SCAN_COST) && QUICK_SCAN_COST > 0 ? QUICK_SCAN_COST : 1)
         
         // Check rate limit before processing
         const clientIP = getClientIP(req);
-        const rateLimit = checkRateLimit(clientIP, SCANS_PER_DAY, timezone);
+        const rateLimit = checkRateLimitWithCost(clientIP, SCAN_CREDITS_PER_DAY, timezone, scanCost);
         
         if (!rateLimit.allowed) {
             // Format reset time in user's timezone if provided, otherwise use UTC
@@ -52,11 +59,12 @@ export async function POST(req: NextRequest) {
                     await writer.write(encoder.encode(`data: ${JSON.stringify({ 
                         error: {
                             error: 'Rate limit exceeded',
-                            message: `You've reached the daily scan limit of ${SCANS_PER_DAY} scans. Limit resets at ${resetTime}.`,
+                            message: `You don't have enough scan credits for a ${normalizedScanMode} scan (cost: ${scanCost}). You have ${rateLimit.remaining} remaining. Credits reset at ${resetTime}.`,
                             rateLimit: {
-                                limit: SCANS_PER_DAY,
+                                limit: SCAN_CREDITS_PER_DAY,
                                 remaining: 0,
-                                resetAt: rateLimit.resetAt
+                                resetAt: rateLimit.resetAt,
+                                cost: scanCost
                             }
                         }
                     })}\n\n`))
@@ -71,7 +79,7 @@ export async function POST(req: NextRequest) {
                     'Content-Type': 'text/event-stream',
                     'Cache-Control': 'no-cache',
                     'Connection': 'keep-alive',
-                    'X-RateLimit-Limit': SCANS_PER_DAY.toString(),
+                    'X-RateLimit-Limit': SCAN_CREDITS_PER_DAY.toString(),
                     'X-RateLimit-Remaining': '0',
                     'X-RateLimit-Reset': rateLimit.resetAt.toString(),
                     'Retry-After': Math.ceil((rateLimit.resetAt - Date.now()) / 1000).toString()
@@ -116,7 +124,7 @@ export async function POST(req: NextRequest) {
 
                 // Increment rate limit only after successful scan
                 if (result.success) {
-                  incrementRateLimit(clientIP, timezone)
+                  incrementRateLimitBy(clientIP, timezone, scanCost)
                 }
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
@@ -128,13 +136,14 @@ export async function POST(req: NextRequest) {
                 })
                 
                 // Include rate limit info in response
-                const updatedRateLimit = checkRateLimit(clientIP, SCANS_PER_DAY, timezone)
+                const updatedRateLimit = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
                 const responseResult = {
                   ...result,
                   rateLimit: {
-                    limit: SCANS_PER_DAY,
+                    limit: SCAN_CREDITS_PER_DAY,
                     remaining: updatedRateLimit.remaining,
-                    resetAt: updatedRateLimit.resetAt
+                    resetAt: updatedRateLimit.resetAt,
+                    cost: scanCost
                   }
                 }
                 

@@ -90,6 +90,7 @@ function ScanTestPageContent() {
 
   // Scan mode (Quick vs Deep). Default to Quick for browsing.
   const [scanMode, setScanMode] = useState<'quick' | 'deep'>('quick')
+  const DEEP_SCAN_COST = 2
   
   // Update showScanner when preference changes
   useEffect(() => {
@@ -581,7 +582,7 @@ function ScanTestPageContent() {
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground ml-6">
-                Quick mode uses a single model and caps warnings; it conditionally enriches thin metadata to avoid false “G” results. Uncheck for Deep (90–120s) verification.
+              Quick mode uses a single model and caps warnings; it conditionally enriches thin metadata to avoid false “G” results. Uncheck for Deep (90–120s) verification (costs {DEEP_SCAN_COST} scan credits).
               </p>
             </div>
           </div>
@@ -639,7 +640,7 @@ function ScanTestPageContent() {
                     {rateLimit.remaining === 0 ? (
                       <>Daily scan limit reached</>
                     ) : (
-                      <>{rateLimit.remaining} of {rateLimit.limit} scans remaining today</>
+                      <>{rateLimit.remaining} of {rateLimit.limit} scan credits remaining today</>
                     )}
                   </span>
                 </div>
