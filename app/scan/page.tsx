@@ -6,17 +6,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera, Flag, Clock } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera, Flag, Clock, ChevronDown } from "lucide-react"
 import Link from "next/link"
 import { useLocalStorage } from "@/hooks/use-browser-storage"
 import { useScanHistory } from "@/hooks/use-scan-history"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { startTiming, markStage, endTiming, formatTiming } from "@/lib/utils/timing"
 import { BarcodeScanner } from "@/components/barcode-scanner"
 import { AccessibleAudioPlayer } from "@/components/accessible-audio-player"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
 import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
 import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
@@ -75,6 +77,7 @@ function formatStatusMessage(message: string): string {
 function ScanTestPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const isMobile = useIsMobile()
   
   // Browser storage for last ISBN
   const [lastIsbn, setLastIsbn] = useLocalStorage<string>("last-scanned-isbn", "")
@@ -86,16 +89,58 @@ function ScanTestPageContent() {
   // User preferences
   const { preferences, updatePreference } = useUserPreferences()
   
-  // Show scanner based on user preference
-  const [showScanner, setShowScanner] = useState(preferences.showCameraScanner ?? false)
+  const AUTO_CAMERA_OPT_OUT_KEY = "scan_auto_camera_opt_out_v1"
+  const DEFAULT_SCAN_CREDITS_PER_DAY = 5
+
+  // Camera scanner state (mobile-first: auto-open when supported)
+  const [showScanner, setShowScanner] = useState(false)
+  const [cameraTrouble, setCameraTrouble] = useState(false)
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false)
+  const [didInitCamera, setDidInitCamera] = useState(false)
+
+  // Client-side only flag to prevent hydration mismatch
+  const [isMounted, setIsMounted] = useState(false)
+  const [hasAutoScanned, setHasAutoScanned] = useState(false)
 
   // Scan mode (Quick vs Deep). Default to Quick for browsing.
   const [scanMode, setScanMode] = useState<'quick' | 'deep'>('quick')
   const DEEP_SCAN_COST = 2
   
-  // Update showScanner when preference changes
+  // Initialize camera visibility:
+  // - If user explicitly enabled "show camera by default", always open
+  // - Otherwise, auto-open on mobile when supported unless user opted out after closing
   useEffect(() => {
-    setShowScanner(preferences.showCameraScanner ?? false)
+    if (!isMounted || didInitCamera) return
+
+    const canUseCamera =
+      typeof navigator !== "undefined" &&
+      !!navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function"
+
+    const optedOut = (() => {
+      try {
+        return window.localStorage.getItem(AUTO_CAMERA_OPT_OUT_KEY) === "true"
+      } catch {
+        return false
+      }
+    })()
+
+    if (preferences.showCameraScanner) {
+      setShowScanner(true)
+    } else if (isMobile && canUseCamera && !optedOut) {
+      setShowScanner(true)
+    }
+
+    setDidInitCamera(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMounted, didInitCamera, isMobile, preferences.showCameraScanner])
+
+  // If the user turns on the preference, open the scanner immediately.
+  useEffect(() => {
+    if (preferences.showCameraScanner) {
+      setShowScanner(true)
+      setCameraTrouble(false)
+    }
   }, [preferences.showCameraScanner])
   
   const [loading, setLoading] = useState(false)
@@ -120,13 +165,12 @@ function ScanTestPageContent() {
     resetAt: number
   } | null>(null)
   
-  // Client-side only flag to prevent hydration mismatch
-  const [isMounted, setIsMounted] = useState(false)
-  const [hasAutoScanned, setHasAutoScanned] = useState(false)
-  
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // NOTE: We intentionally do NOT clear `error` when opening the scanner.
+  // Users may need to see camera permission / failure messages even after closing the scanner.
 
   // Check for ISBN in URL params and auto-start scan
   useEffect(() => {
@@ -243,7 +287,7 @@ function ScanTestPageContent() {
             }
           }
           setRateLimit({
-            limit: SCANS_PER_DAY,
+            limit: DEFAULT_SCAN_CREDITS_PER_DAY,
             remaining: 0,
             resetAt: Date.now() + 24 * 60 * 60 * 1000
           })
@@ -478,6 +522,21 @@ function ScanTestPageContent() {
 
   const handleScannerError = (errorMsg: string) => {
     setError(errorMsg)
+    setCameraTrouble(true)
+    setShowTroubleshoot(true)
+  }
+
+  const closeScanner = () => {
+    setShowScanner(false)
+
+    // If the user didn't explicitly opt-in via preference, treat closing as an opt-out for auto-open.
+    if (!preferences.showCameraScanner) {
+      try {
+        window.localStorage.setItem(AUTO_CAMERA_OPT_OUT_KEY, "true")
+      } catch {
+        // ignore
+      }
+    }
   }
 
   const handleReportBook = async () => {
@@ -544,31 +603,10 @@ function ScanTestPageContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Scanner Preference Toggle */}
+          {/* Scan Settings */}
           <div className="mb-6 p-4 border rounded-lg bg-muted/30 space-y-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="show-camera-scanner"
-                checked={showScanner}
-                onCheckedChange={(checked) => {
-                  const newValue = checked === true
-                  setShowScanner(newValue)
-                  updatePreference('showCameraScanner', newValue)
-                }}
-              />
-              <Label
-                htmlFor="show-camera-scanner"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Show camera scanner by default
-              </Label>
-            </div>
-            <p className="text-xs text-muted-foreground ml-6">
-              When enabled, the camera scanner will be shown when you visit this page. You can always toggle it on/off.
-            </p>
-
             {/* Quick vs Deep scan toggle */}
-            <div className="pt-4 border-t border-border/50 space-y-2">
+            <div className="space-y-2">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="quick-scan"
@@ -586,6 +624,56 @@ function ScanTestPageContent() {
                 Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Uncheck for Deep (90–120s) verification (costs {DEEP_SCAN_COST} scan credits).
               </p>
             </div>
+
+            {/* Troubleshoot Camera (collapsed by default) */}
+            <Collapsible open={showTroubleshoot} onOpenChange={setShowTroubleshoot}>
+              <div className="pt-4 border-t border-border/50">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="px-0 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronDown className={cn("h-4 w-4 mr-2 transition-transform", showTroubleshoot && "rotate-180")} />
+                    Troubleshoot camera
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="pt-2 space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="show-camera-scanner"
+                    checked={preferences.showCameraScanner ?? false}
+                    onCheckedChange={(checked) => {
+                      const newValue = checked === true
+                      updatePreference('showCameraScanner', newValue)
+                      if (newValue) {
+                        try {
+                          window.localStorage.removeItem(AUTO_CAMERA_OPT_OUT_KEY)
+                        } catch {
+                          // ignore
+                        }
+                      }
+                    }}
+                  />
+                  <Label
+                    htmlFor="show-camera-scanner"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Show camera scanner by default
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-6">
+                  If camera scanning is unreliable, you can keep manual ISBN entry as your default. If permission prompts get stuck, try refreshing or checking your browser’s camera permissions.
+                </p>
+                {cameraTrouble && (
+                  <p className="text-xs text-amber-700 dark:text-amber-400 ml-6">
+                    Camera trouble detected. Try using manual entry, or re-open the scanner to re-request permission.
+                  </p>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           {/* Scan History - Only render after mount to prevent hydration mismatch */}
@@ -678,7 +766,7 @@ function ScanTestPageContent() {
                 <BarcodeScanner
                   onScanSuccess={handleBarcodeScan}
                   onError={handleScannerError}
-                  onClose={() => setShowScanner(false)}
+                  onClose={closeScanner}
                 />
               </div>
             )}
@@ -702,7 +790,14 @@ function ScanTestPageContent() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowScanner(true)}
+                  onClick={() => {
+                    try {
+                      window.localStorage.removeItem(AUTO_CAMERA_OPT_OUT_KEY)
+                    } catch {
+                      // ignore
+                    }
+                    setShowScanner(true)
+                  }}
                   className="mb-4"
                 >
                   <Camera className="h-4 w-4 mr-2" />
@@ -1119,7 +1214,7 @@ function ScanTestPageContent() {
                             <div>Total: <strong>{result.timing.duration.toFixed(0)}ms</strong></div>
                             {Object.entries(result.timing.stages).map(([stage, duration]) => (
                               <div key={stage} className="ml-2 text-muted-foreground">
-                                {stage}: {duration.toFixed(0)}ms
+                                {stage}: {Number(duration).toFixed(0)}ms
                               </div>
                             ))}
                           </div>
