@@ -598,7 +598,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2">
-                    <Info className="h-3 w-3 mr-1" /> {warning.reasoning ? 'Reasoning' : 'Source'}
+                    <Info className="h-3 w-3 mr-1" /> {warning.reasoning ? 'Why?' : 'Details'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
