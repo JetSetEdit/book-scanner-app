@@ -238,7 +238,7 @@ function ScanTestPageContent() {
           } catch {
             errorData = { 
               error: 'Rate limit exceeded',
-              message: `You've reached the daily scan limit. Please try again tomorrow.`
+              message: `You've reached your daily scan credit limit. Please try again tomorrow.`
             }
           }
           setRateLimit({
@@ -638,7 +638,7 @@ function ScanTestPageContent() {
                   <Clock className="h-4 w-4" />
                   <span className="text-sm font-medium">
                     {rateLimit.remaining === 0 ? (
-                      <>Daily scan limit reached</>
+                      <>Daily scan credit limit reached</>
                     ) : (
                       <>{rateLimit.remaining} of {rateLimit.limit} scan credits remaining today</>
                     )}

@@ -96,7 +96,7 @@ export function RateLimitFeedbackDialog({ rateLimitRemaining }: RateLimitFeedbac
           <DialogTitle>Rate Limit Feedback</DialogTitle>
           <DialogDescription>
             {rateLimitRemaining === 0 
-              ? "You've reached the daily scan limit. Request higher access or provide feedback about the limit."
+              ? "You've reached your daily scan credit limit. Request higher access or provide feedback about the limit."
               : "Have feedback about our rate limits? Let us know!"}
           </DialogDescription>
         </DialogHeader>
