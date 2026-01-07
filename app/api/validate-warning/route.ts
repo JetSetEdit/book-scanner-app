@@ -3,21 +3,39 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const { warningId, isHelpful } = await request.json()
+    const { warningId, isHelpful, deviceId } = await request.json()
 
-    if (!warningId || typeof isHelpful !== 'boolean') {
+    if (!warningId || typeof isHelpful !== 'boolean' || !deviceId || typeof deviceId !== 'string') {
       return NextResponse.json({ error: 'Invalid request data' }, { status: 400 })
     }
 
-    // For now, just return success since we don't have user authentication
-    // In a real implementation, this would:
-    // 1. Check if user is authenticated
-    // 2. Insert/update validation in warning_validations table
-    // 3. Update helpful_count/not_helpful_count in content_warnings table
+    const trimmedDeviceId = deviceId.trim()
+    if (trimmedDeviceId.length < 8 || trimmedDeviceId.length > 128) {
+      return NextResponse.json({ error: 'Invalid deviceId' }, { status: 400 })
+    }
 
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Validation recorded (demo mode - no persistence)' 
+    const { data, error } = await supabaseAdmin.rpc('apply_anonymous_warning_vote', {
+      p_warning_id: warningId,
+      p_device_id: trimmedDeviceId,
+      p_is_helpful: isHelpful,
+    })
+
+    if (error) {
+      console.error('Error applying anonymous warning vote:', error)
+      return NextResponse.json({ error: 'Failed to record validation' }, { status: 500 })
+    }
+
+    // Supabase RPC returns an array of rows for RETURNS TABLE
+    const row = Array.isArray(data) ? data[0] : data
+    if (!row) {
+      return NextResponse.json({ error: 'No response from vote handler' }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      helpful_count: row.helpful_count,
+      not_helpful_count: row.not_helpful_count,
+      user_vote: row.user_vote, // boolean | null
     })
   } catch (error) {
     console.error('Error validating warning:', error)

@@ -3,13 +3,53 @@
 import { Button } from "@/components/ui/button"
 import { ThumbsUp, ThumbsDown } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 interface ThumbsButtonsProps {
   warningId: string
   helpfulCount: number
   notHelpfulCount: number
   userValidation?: boolean | null
+}
+
+const DEVICE_ID_KEY = "subtext_device_id"
+const VOTES_KEY = "subtext_warning_votes_v1"
+
+function getOrCreateDeviceId(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const existing = window.localStorage.getItem(DEVICE_ID_KEY)
+    if (existing && existing.trim().length > 0) return existing.trim()
+    const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`
+    window.localStorage.setItem(DEVICE_ID_KEY, id)
+    return id
+  } catch {
+    return null
+  }
+}
+
+type StoredVote = Record<string, boolean>
+
+function readStoredVotes(): StoredVote {
+  if (typeof window === "undefined") return {}
+  try {
+    const raw = window.localStorage.getItem(VOTES_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== "object") return {}
+    return parsed as StoredVote
+  } catch {
+    return {}
+  }
+}
+
+function writeStoredVotes(votes: StoredVote) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(VOTES_KEY, JSON.stringify(votes))
+  } catch {
+    // ignore
+  }
 }
 
 export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userValidation }: ThumbsButtonsProps) {
@@ -20,19 +60,58 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
     helpful: helpfulCount,
     notHelpful: notHelpfulCount
   })
-  const [localUserValidation, setLocalUserValidation] = useState(userValidation)
+  const [localUserValidation, setLocalUserValidation] = useState<boolean | null | undefined>(userValidation)
+
+  const deviceId = useMemo(() => getOrCreateDeviceId(), [])
+
+  // Hydrate per-warning vote state from localStorage (no-auth persistence)
+  useEffect(() => {
+    const votes = readStoredVotes()
+    if (warningId in votes) {
+      setLocalUserValidation(votes[warningId])
+    } else {
+      setLocalUserValidation(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [warningId])
+  
+  // If server counts change on refresh, keep local counts in sync
+  useEffect(() => {
+    setLocalCounts({ helpful: helpfulCount, notHelpful: notHelpfulCount })
+  }, [helpfulCount, notHelpfulCount])
   
   const handleValidate = async (isHelpful: boolean) => {
+    const prevVote = localUserValidation ?? null
     try {
       console.log(`👍 Thumbs button clicked: ${warningId}, isHelpful: ${isHelpful}`)
       
-      // Optimistic update - update UI immediately
-      if (isHelpful) {
-        setLocalCounts(prev => ({ ...prev, helpful: prev.helpful + 1 }))
-        setLocalUserValidation(true)
+      if (!deviceId) {
+        alert("Unable to record feedback in this browser.")
+        return
+      }
+
+      // Optimistic update for toggle-off + switch
+      if (prevVote === isHelpful) {
+        // toggle off
+        setLocalCounts(prev => ({
+          helpful: prev.helpful - (isHelpful ? 1 : 0),
+          notHelpful: prev.notHelpful - (!isHelpful ? 1 : 0),
+        }))
+        setLocalUserValidation(null)
+      } else if (prevVote === null) {
+        // new vote
+        setLocalCounts(prev => ({
+          helpful: prev.helpful + (isHelpful ? 1 : 0),
+          notHelpful: prev.notHelpful + (!isHelpful ? 1 : 0),
+        }))
+        setLocalUserValidation(isHelpful)
       } else {
-        setLocalCounts(prev => ({ ...prev, notHelpful: prev.notHelpful + 1 }))
-        setLocalUserValidation(false)
+        // switch vote
+        setLocalCounts(prev => ({
+          helpful: prev.helpful + (isHelpful ? 1 : -1),
+          notHelpful: prev.notHelpful + (!isHelpful ? 1 : -1),
+        }))
+        setLocalUserValidation(isHelpful)
       }
       
       // Add a timeout to prevent hanging
@@ -44,7 +123,7 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
         fetch('/api/validate-warning', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ warningId, isHelpful })
+          body: JSON.stringify({ warningId, isHelpful, deviceId })
         }).then(res => res.json()),
         timeoutPromise
       ])
@@ -54,27 +133,34 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
       if (result && typeof result === 'object' && 'error' in result) {
         console.error("❌ Validation error:", result.error)
         // Revert optimistic update on error
-        if (isHelpful) {
-          setLocalCounts(prev => ({ ...prev, helpful: prev.helpful - 1 }))
-        } else {
-          setLocalCounts(prev => ({ ...prev, notHelpful: prev.notHelpful - 1 }))
-        }
-        setLocalUserValidation(userValidation) // Reset to original state
+        setLocalCounts({ helpful: helpfulCount, notHelpful: notHelpfulCount })
+        setLocalUserValidation(prevVote)
         alert(`Error: ${result.error}`)
       } else {
+        // Reconcile with server and persist per-device vote state locally
+        const serverHelpful = typeof result.helpful_count === "number" ? result.helpful_count : localCounts.helpful
+        const serverNotHelpful = typeof result.not_helpful_count === "number" ? result.not_helpful_count : localCounts.notHelpful
+        const serverVote = result.user_vote === true ? true : result.user_vote === false ? false : null
+
+        setLocalCounts({ helpful: serverHelpful, notHelpful: serverNotHelpful })
+        setLocalUserValidation(serverVote)
+
+        const votes = readStoredVotes()
+        if (serverVote === null) {
+          delete votes[warningId]
+        } else {
+          votes[warningId] = serverVote
+        }
+        writeStoredVotes(votes)
+
         console.log("✅ Validation successful! Refreshing page...")
-        // Use router.refresh() to trigger server-side revalidation
         router.refresh()
       }
     } catch (error) {
       console.error("❌ Unexpected error:", error)
       // Revert optimistic update on error
-      if (isHelpful) {
-        setLocalCounts(prev => ({ ...prev, helpful: prev.helpful - 1 }))
-      } else {
-        setLocalCounts(prev => ({ ...prev, notHelpful: prev.notHelpful - 1 }))
-      }
-      setLocalUserValidation(userValidation) // Reset to original state
+      setLocalCounts({ helpful: helpfulCount, notHelpful: notHelpfulCount })
+      setLocalUserValidation(prevVote)
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       if (errorMessage === 'Request timeout') {

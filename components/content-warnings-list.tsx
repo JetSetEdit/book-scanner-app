@@ -77,6 +77,49 @@ const categoryLabels: Record<string, string> = {
   other: "Other"
 }
 
+function getCombinedConfidence(warning: Pick<ContentWarning, 'helpful_count' | 'not_helpful_count' | 'evidence'>) {
+  const helpful = warning.helpful_count || 0
+  const notHelpful = warning.not_helpful_count || 0
+  const votes = helpful + notHelpful
+  const helpfulRatio = votes > 0 ? helpful / votes : null
+
+  const modelSource = warning.evidence?.[0]?.model_source
+  const crossChecked = modelSource === 'both'
+
+  // Community signal buckets (conservative)
+  let community: 'none' | 'mixed' | 'positive' | 'contested' = 'none'
+  if (votes >= 8 && helpfulRatio != null) {
+    if (helpfulRatio >= 0.75) community = 'positive'
+    else if (helpfulRatio <= 0.45) community = 'contested'
+    else community = 'mixed'
+  } else if (votes >= 3) {
+    community = 'mixed'
+  }
+
+  // Combined confidence: treat cross-check as a floor, but let strong negative feedback pull it down.
+  let level: 'Low' | 'Medium' | 'High' = 'Low'
+  if (community === 'positive' && crossChecked) level = 'High'
+  else if (community === 'positive') level = 'Medium'
+  else if (community === 'contested') level = 'Low'
+  else if (crossChecked) level = 'Medium'
+
+  const color =
+    level === 'High'
+      ? 'border-green-500/50 text-green-700 dark:text-green-400'
+      : level === 'Medium'
+        ? 'border-amber-500/50 text-amber-700 dark:text-amber-400'
+        : 'border-muted-foreground/40 text-muted-foreground'
+
+  return {
+    level,
+    color,
+    votes,
+    helpful,
+    notHelpful,
+    crossChecked,
+  }
+}
+
 // Icon Mapping
 const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, legacyCategory: string, className?: string }) => {
   // Granular ID mapping
@@ -500,6 +543,43 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                     : 'S'}
               </Badge>
             )}
+
+            {(() => {
+              const c = getCombinedConfidence(warning)
+              return (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-[10px] font-medium uppercase tracking-wider cursor-default", c.color)}
+                      title="Confidence is based on cross-check + community feedback"
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      {c.level}
+                    </Badge>
+                  </PopoverTrigger>
+                  <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
+                    <div className="space-y-2">
+                      <div className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
+                        Confidence signal
+                      </div>
+                      <div className="text-sm font-medium text-foreground">
+                        {c.level} confidence
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Cross-check: {c.crossChecked ? 'Cross-checked' : 'Single-source'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Community feedback: {c.votes === 0 ? 'No votes yet' : `${c.helpful} helpful • ${c.notHelpful} not helpful (${c.votes} total)`}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground leading-relaxed">
+                        Confidence is a heuristic to help you judge reliability. It is not a guarantee and can change as more people vote.
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )
+            })()}
             
             <ThumbsButtons
               warningId={warning.id}
