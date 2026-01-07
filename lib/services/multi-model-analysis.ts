@@ -1139,10 +1139,13 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             warning.description,
             adjustedSeverity
           )
-          adjusted.reasoning = updateReasoningForSeverity(
-            warning.reasoning,
-            adjustedSeverity,
-            warning.severity_signals || buildSeveritySignals({
+          
+          // Ensure signals are valid before passing to updateReasoningForSeverity
+          let validSignals = warning.severity_signals
+          if (!validSignals || 
+              typeof validSignals.frequency !== 'number' || 
+              typeof validSignals.explicitness !== 'number') {
+            validSignals = buildSeveritySignals({
               presence: undefined,
               detail_level: undefined,
               description: warning.description,
@@ -1150,6 +1153,12 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
               frequency_hint: undefined,
               centrality_hint: undefined
             })
+          }
+          
+          adjusted.reasoning = updateReasoningForSeverity(
+            warning.reasoning,
+            adjustedSeverity,
+            validSignals
           )
         }
 
