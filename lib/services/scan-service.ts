@@ -192,7 +192,8 @@ export async function processIsbnScan(
   onProgress?: ProgressCallback,
   selectedCandidate?: BookCandidate,
   forceRefresh: boolean = false,
-  model?: string
+  model?: string,
+  analysisOptions?: import('./multi-model-analysis').AnalysisOptions
 ): Promise<ScanResult> {
   // Use provided model or default to MODEL_VERSION
   const modelToUse = model || MODEL_VERSION
@@ -843,7 +844,10 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               isbn: cleanIsbn
             },
             onProgress,
-            modelToUse
+            {
+              ...(analysisOptions || {}),
+              model: modelToUse
+            }
           )
           
           // Store no_warnings_reasoning for use in audit log if no warnings found

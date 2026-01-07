@@ -29,6 +29,46 @@ interface BookMetadata {
 
 type ProgressCallback = (message: string) => void
 
+export interface AnalysisOptions {
+  /** Which OpenAI model to use (overrides default MODEL_VERSION) */
+  model?: string
+  /** Enable OpenAI analysis (default: true) */
+  enableOpenAI?: boolean
+  /** Enable Gemini analysis (default: true) */
+  enableGemini?: boolean
+  /** Enable adversarial cross-critique between models (default: true) */
+  enableAdversarial?: boolean
+  /** Enable unique-warning verification pass (default: true) */
+  enableVerification?: boolean
+  /** Enable web-search enrichment + re-analysis when warnings are sparse (default: true) */
+  enableWebEnrichment?: boolean
+  /** Hard cap on number of warnings returned (post-processing) */
+  maxWarnings?: number
+  /** Whether to keep per-warning reasoning text (default: true) */
+  includeReasoning?: boolean
+  /** Truncate description to N characters for this analysis */
+  maxDescriptionChars?: number
+}
+
+function applyDescriptionTruncation(metadata: BookMetadata, maxChars?: number): BookMetadata {
+  if (!maxChars || maxChars <= 0) return metadata
+  const desc = metadata.description || ''
+  if (desc.length <= maxChars) return metadata
+  return { ...metadata, description: desc.slice(0, maxChars) }
+}
+
+function sortWarningsForCapping(warnings: EnhancedContentWarning[]): EnhancedContentWarning[] {
+  const severityRank: Record<string, number> = { severe: 3, moderate: 2, mild: 1 }
+  return [...warnings].sort((a, b) => {
+    const aRank = severityRank[a.severity] || 0
+    const bRank = severityRank[b.severity] || 0
+    if (bRank !== aRank) return bRank - aRank
+    const aConf = a.evidence?.[0]?.confidence ?? 0
+    const bConf = b.evidence?.[0]?.confidence ?? 0
+    return bConf - aConf
+  })
+}
+
 function buildTaxonomyContext(): string {
   const categories = WARNING_CATEGORIES.map(cat => {
     const subcats = cat.subcategories.map(sub =>
@@ -69,7 +109,8 @@ Context Modifiers (add nuance):
 async function analyzeWithOpenAI(
   metadata: BookMetadata,
   onProgress?: ProgressCallback,
-  model?: string
+  model?: string,
+  options?: AnalysisOptions
 ): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
   // Generate dynamic category list from taxonomy
   const categoryLabels = WARNING_CATEGORIES
@@ -81,7 +122,14 @@ async function analyzeWithOpenAI(
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
 
-  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.
+  const maxWarningsInstruction = options?.maxWarnings
+    ? `\nIMPORTANT: Return AT MOST ${options.maxWarnings} warnings. Prioritize the highest-impact and most safety-relevant warnings.`
+    : ''
+  const reasoningInstruction = options?.includeReasoning === false
+    ? `\nIMPORTANT: Omit the per-warning "reasoning" field (or keep it to one short sentence max).`
+    : ''
+
+  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.${maxWarningsInstruction}${reasoningInstruction}
 
 Official References:
 - Guidelines for the Classification of Publications 2005 (F2008C00129)
@@ -408,14 +456,22 @@ DESCRIPTION FORMAT (Australian Classification Board style):
 
 async function analyzeWithGemini(
   metadata: BookMetadata,
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  options?: AnalysisOptions
 ): Promise<EnhancedContentWarning[]> {
   onProgress?.('Analyzing with Gemini...')
 
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
 
-  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.
+    const maxWarningsInstruction = options?.maxWarnings
+      ? `\nIMPORTANT: Return AT MOST ${options.maxWarnings} warnings. Prioritize the highest-impact and most safety-relevant warnings.`
+      : ''
+    const reasoningInstruction = options?.includeReasoning === false
+      ? `\nIMPORTANT: Omit the per-warning \"reasoning\" field (or keep it to one short sentence max).`
+      : ''
+
+    const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.${maxWarningsInstruction}${reasoningInstruction}
 
 Book Information:
 - Title: ${metadata.title}
@@ -1321,7 +1377,7 @@ function combineResults(
 export async function analyzeBookWithMultiModel(
   metadata: BookMetadata,
   onProgress?: ProgressCallback,
-  model?: string
+  modelOrOptions?: string | AnalysisOptions
 ): Promise<{
   warnings: EnhancedContentWarning[]
   noWarningsReasoning?: string
@@ -1341,20 +1397,50 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
 }> {
+  const options: AnalysisOptions =
+    typeof modelOrOptions === 'string'
+      ? { model: modelOrOptions }
+      : (modelOrOptions || {})
+
+  const effectiveOptions: Required<Pick<
+    AnalysisOptions,
+    | 'enableOpenAI'
+    | 'enableGemini'
+    | 'enableAdversarial'
+    | 'enableVerification'
+    | 'enableWebEnrichment'
+    | 'includeReasoning'
+  >> & AnalysisOptions = {
+    enableOpenAI: options.enableOpenAI ?? true,
+    enableGemini: options.enableGemini ?? true,
+    enableAdversarial: options.enableAdversarial ?? true,
+    enableVerification: options.enableVerification ?? true,
+    enableWebEnrichment: options.enableWebEnrichment ?? true,
+    includeReasoning: options.includeReasoning ?? true,
+    ...options,
+  }
+
+  const effectiveMetadata = applyDescriptionTruncation(metadata, effectiveOptions.maxDescriptionChars)
+
   // Run both OpenAI and Gemini in parallel for cross-validation
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
   // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
   
-  // Run both models in parallel for faster analysis and cross-validation
-  const [openaiResult, geminiResult] = await Promise.allSettled([
-    analyzeWithOpenAI(metadata, onProgress, model),
-    analyzeWithGemini(metadata, onProgress).catch(err => {
-      // Gemini failures are non-fatal - log and continue with OpenAI only
-      console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
-      return []
-    })
-  ])
+  // Run enabled models in parallel (when both enabled)
+  const openaiPromise = effectiveOptions.enableOpenAI
+    ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions)
+    : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
+
+  const geminiPromise = effectiveOptions.enableGemini
+    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions).catch(err => {
+        // Gemini failures are non-fatal - log and continue with OpenAI only
+        console.warn('[Multi-Model] Gemini analysis failed, continuing:', err)
+        return []
+      })
+    : Promise.resolve([])
+
+  const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
   
   const openaiWarnings = openaiResult.status === 'fulfilled' 
     ? openaiResult.value.warnings 
@@ -1383,13 +1469,13 @@ export async function analyzeBookWithMultiModel(
   // Adversarial Validation: Models critique each other's warnings
   // This creates a "debate" where each model reviews the other for being too restrictive or too lenient
   let refinedWarnings = combined
-  if (openaiWarnings.length > 0 && geminiWarnings.length > 0) {
+  if (effectiveOptions.enableAdversarial && openaiWarnings.length > 0 && geminiWarnings.length > 0) {
     try {
       const { runAdversarialValidation } = await import('./adversarial-validation')
       const adversarialResult = await runAdversarialValidation(
         openaiWarnings,
         geminiWarnings,
-        metadata,
+        effectiveMetadata,
         onProgress
       )
       
@@ -1414,7 +1500,7 @@ export async function analyzeBookWithMultiModel(
   let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
 
-  if (allUniqueWarnings.length > 0) {
+  if (effectiveOptions.enableVerification && allUniqueWarnings.length > 0) {
     // Use the opposite model for verification (if OpenAI found it, verify with Gemini, and vice versa)
     // This provides cross-validation: warnings found by one model are verified by the other
     const verifierModel = analysis.unique_to_openai.length > 0 && geminiWarnings.length > 0
@@ -1423,7 +1509,7 @@ export async function analyzeBookWithMultiModel(
     
     const { verified, metrics } = await verifyUniqueWarnings(
       allUniqueWarnings,
-      metadata,
+      effectiveMetadata,
       verifierModel,
       onProgress
     )
@@ -1455,7 +1541,7 @@ export async function analyzeBookWithMultiModel(
   // Web Search Enrichment: If we got 0 warnings or very few warnings,
   // search for content warnings from community sources
   // This helps catch mental health themes that may be missing from sanitized descriptions
-  if (finalWarnings.length <= 2) {
+  if (effectiveOptions.enableWebEnrichment && finalWarnings.length <= 2) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
     const hasOnlyGenericWarnings = finalWarnings.length > 0 && 
       finalWarnings.every(w => 
@@ -1482,7 +1568,7 @@ export async function analyzeBookWithMultiModel(
       try {
         const { enrichWithWebSearch } = await import('./web-search-enrichment')
         const enrichmentResult = await enrichWithWebSearch(
-          metadata,
+          effectiveMetadata,
           finalWarnings.length,
           onProgress
         )
@@ -1492,13 +1578,13 @@ export async function analyzeBookWithMultiModel(
           
           // Create enriched metadata with community-sourced context
           const enrichedMetadata: BookMetadata = {
-            ...metadata,
-            description: `${metadata.description}\n\nAdditional context from community sources:\n${enrichmentResult.enrichedContext}`
+            ...effectiveMetadata,
+            description: `${effectiveMetadata.description}\n\nAdditional context from community sources:\n${enrichmentResult.enrichedContext}`
           }
 
           // Run a second analysis with enriched description
           onProgress?.('⏳ Re-analyzing with additional context...')
-          const enrichedResult = await analyzeWithOpenAI(enrichedMetadata, onProgress)
+          const enrichedResult = await analyzeWithOpenAI(enrichedMetadata, onProgress, effectiveOptions.model, effectiveOptions)
           const enrichedWarnings = enrichedResult.warnings
 
           if (enrichedWarnings.length > finalWarnings.length) {
@@ -1524,6 +1610,14 @@ export async function analyzeBookWithMultiModel(
         // Continue with original warnings - don't fail the entire scan
       }
     }
+  }
+
+  // Apply post-processing caps/stripping for benchmarking / quick modes
+  if (typeof effectiveOptions.maxWarnings === 'number' && effectiveOptions.maxWarnings > 0) {
+    finalWarnings = sortWarningsForCapping(finalWarnings).slice(0, effectiveOptions.maxWarnings)
+  }
+  if (effectiveOptions.includeReasoning === false) {
+    finalWarnings = finalWarnings.map(w => ({ ...w, reasoning: undefined }))
   }
 
   return {
