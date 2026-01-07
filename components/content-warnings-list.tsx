@@ -493,7 +493,11 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                       : 'Secondary model'
                 }`}
               >
-                {warning.evidence[0].model_source === 'both' ? 'BOTH' : warning.evidence[0].model_source === 'openai' ? 'GPT' : 'GEM'}
+                {warning.evidence[0].model_source === 'both'
+                  ? 'X'
+                  : warning.evidence[0].model_source === 'openai'
+                    ? 'P'
+                    : 'S'}
               </Badge>
             )}
             
