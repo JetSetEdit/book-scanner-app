@@ -32,6 +32,12 @@ interface BookDetailsProps {
     bookInfoIssues?: string[]
   } | null
   noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
+  analysisMeta?: {
+    hadThinMetadata: boolean
+    usedWebSearch: boolean
+    pipelinePath: string | null
+    analyzedAt: string | null
+  } | null
 }
 
 // Check if we're in dev mode (localhost or dev environment)
@@ -44,7 +50,7 @@ function isDevMode(): boolean {
   )
 }
 
-export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning }: BookDetailsProps) {
+export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning, analysisMeta }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
@@ -418,6 +424,55 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <div className="h-px bg-border flex-1"></div>
                 <h3 className="font-serif text-2xl text-foreground italic">Content Analysis</h3>
                 <div className="h-px bg-border flex-1"></div>
+              </div>
+
+              {/* Transparency line: what this analysis is based on */}
+              <div className="mb-6 max-w-2xl mx-auto text-xs text-muted-foreground">
+                {(() => {
+                  const descriptionLength = (book?.description || '').length
+                  const crossChecked = Array.isArray(warnings)
+                    ? warnings.some((w: any) => w?.evidence?.[0]?.model_source === 'both')
+                    : false
+                  const votesPresent = Array.isArray(warnings)
+                    ? warnings.some((w: any) => (w?.helpful_count || 0) + (w?.not_helpful_count || 0) > 0)
+                    : false
+                  const pipeline = analysisMeta?.pipelinePath?.includes('quick')
+                    ? 'Quick'
+                    : analysisMeta?.pipelinePath?.includes('deep')
+                      ? 'Deep'
+                      : null
+                  const enrichment = analysisMeta?.usedWebSearch ? 'Yes' : analysisMeta ? 'No' : null
+                  const isThin = analysisMeta?.hadThinMetadata === true || descriptionLength < 200
+                  const shouldSuggestDeep = analysisStatus === 'complete' && (pipeline === 'Quick' || isThin || !crossChecked || !votesPresent)
+                  const parts = [
+                    `Description: ${descriptionLength} chars`,
+                    pipeline ? `Mode: ${pipeline}` : null,
+                    enrichment ? `Web enrichment: ${enrichment}` : null,
+                    `Cross-check: ${crossChecked ? 'Yes' : 'No'}`,
+                  ].filter(Boolean)
+                  return (
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium text-foreground">Based on</div>
+                        <div>{parts.join(' • ')}</div>
+                        {shouldSuggestDeep && (
+                          <div className="mt-3">
+                            <Link href={`/scan?isbn=${encodeURIComponent(book.isbn)}&scanMode=deep`}>
+                              <Button variant="outline" size="sm" className="gap-2">
+                                <ScanBarcode className="h-4 w-4" />
+                                Run Deep scan
+                              </Button>
+                            </Link>
+                            <div className="mt-1 text-[10px] text-muted-foreground">
+                              Deep scan is slower but can catch warnings that don’t appear in descriptions.
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
               
               {/* Heads Up Summary with Major Warnings */}

@@ -178,13 +178,17 @@ function ScanTestPageContent() {
     if (!isMounted || hasAutoScanned) return
     
     const isbnParam = searchParams.get('isbn')
+    const scanModeParam = searchParams.get('scanMode')
+    if (scanModeParam === 'quick' || scanModeParam === 'deep') {
+      setScanMode(scanModeParam)
+    }
     if (isbnParam && isbnParam.trim() && !loading && !result) {
       const normalizedIsbn = isbnParam.trim()
       setIsbn(normalizedIsbn)
       setHasAutoScanned(true)
       // Small delay to ensure component is fully mounted
       const timeoutId = setTimeout(() => {
-        performScan(normalizedIsbn)
+        performScan(normalizedIsbn, undefined, scanModeParam === 'quick' || scanModeParam === 'deep' ? scanModeParam : undefined)
       }, 300)
       return () => clearTimeout(timeoutId)
     }
@@ -194,7 +198,7 @@ function ScanTestPageContent() {
   // Note: We store lastIsbn for history, but don't auto-fill the input
   // Users can manually enter or scan a new ISBN each time
 
-  const performScan = async (isbnToScan: string, selectedCandidate?: any) => {
+  const performScan = async (isbnToScan: string, selectedCandidate?: any, scanModeOverride?: 'quick' | 'deep') => {
     // Start timing
     const timer = startTiming()
     markStage('scan-initiated')
@@ -236,7 +240,7 @@ function ScanTestPageContent() {
             forceRefresh: false, // Don't force refresh - use existing book if available
             selectedCandidate: selectedCandidate || undefined,
             timezone: userTimezone,
-            scanMode
+            scanMode: scanModeOverride ?? scanMode
           }),
         })
 

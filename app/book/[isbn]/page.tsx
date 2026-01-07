@@ -66,7 +66,7 @@ export default async function BookPage({ params }: BookPageProps) {
   // Also fetch ai_reasoning for dev mode display when no warnings were found
   const { data: auditLogs } = await supabase
     .from("ai_audit_logs")
-    .select("decision_type, metadata_issues, ai_reasoning")
+    .select("decision_type, metadata_issues, ai_reasoning, had_thin_metadata, used_web_search, pipeline_path, created_at")
     .eq("book_id", book.id)
     .in("decision_type", ["warnings_generated", "no_warnings"])
     .order("created_at", { ascending: false })
@@ -81,6 +81,7 @@ export default async function BookPage({ params }: BookPageProps) {
   const hasAnalysisCompleted = hasAuditLog || hasAiWarnings
   const analysisStatus: 'complete' | 'unknown' = hasAnalysisCompleted ? 'complete' : 'unknown'
   const metadataIssues = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any).metadata_issues : null
+  const latestAudit = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any) : null
   
   // Extract no_warnings_reasoning from audit log for dev mode display
   const noWarningsReasoning = auditLogs && auditLogs.length > 0 && auditLogs[0].decision_type === 'no_warnings'
@@ -100,6 +101,12 @@ export default async function BookPage({ params }: BookPageProps) {
             analysisStatus={analysisStatus}
             metadataIssues={metadataIssues}
             noWarningsReasoning={noWarningsReasoning}
+            analysisMeta={latestAudit ? {
+              hadThinMetadata: !!latestAudit.had_thin_metadata,
+              usedWebSearch: !!latestAudit.used_web_search,
+              pipelinePath: latestAudit.pipeline_path || null,
+              analyzedAt: latestAudit.created_at || null,
+            } : null}
           />
         </div>
       </div>
