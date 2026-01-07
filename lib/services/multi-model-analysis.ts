@@ -964,9 +964,19 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
         const parsed = JSON.parse(content)
         return parsed.verifications || []
       } else {
-        // Use Gemini for verification
+        // Use Gemini for verification (newer models first)
         try {
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+          let model
+          try {
+            model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+          } catch (e) {
+            try {
+              model = genAI.getGenerativeModel({ model: 'gemini-3-flash' })
+            } catch (e2) {
+              model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+            }
+          }
+          
           const result = await model.generateContent(prompt)
           const response = result.response
           const text = response.text()
@@ -980,20 +990,9 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
           const parsed = JSON.parse(jsonMatch[0])
           return parsed.verifications || []
         } catch (geminiError) {
-          // Fallback chain exhausted - skip Gemini verification
+          // All Gemini models failed - rethrow to fall back to OpenAI
           console.warn('All Gemini models failed for verification:', geminiError)
           throw geminiError
-          const result = await model.generateContent(prompt)
-          const response = result.response
-          const text = response.text()
-
-          const jsonMatch = text.match(/\{[\s\S]*\}/)
-          if (!jsonMatch) {
-            throw new Error('No JSON found in Gemini response')
-          }
-
-          const parsed = JSON.parse(jsonMatch[0])
-          return parsed.verifications || []
         }
       }
     })()
@@ -1317,11 +1316,15 @@ export async function analyzeBookWithMultiModel(
 
   if (allUniqueWarnings.length > 0) {
     // Use the opposite model for verification (if OpenAI found it, verify with Gemini, and vice versa)
-    // For simplicity, verify all unique warnings together using OpenAI (more reliable)
+    // This provides cross-validation: warnings found by one model are verified by the other
+    const verifierModel = analysis.unique_to_openai.length > 0 && geminiWarnings.length > 0
+      ? 'gemini' // If OpenAI found unique warnings and Gemini is available, use Gemini to verify
+      : 'openai' // Otherwise use OpenAI (more reliable fallback)
+    
     const { verified, metrics } = await verifyUniqueWarnings(
       allUniqueWarnings,
       metadata,
-      'openai', // Use OpenAI for verification (more reliable)
+      verifierModel,
       onProgress
     )
 
