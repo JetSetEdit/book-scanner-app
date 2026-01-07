@@ -63,6 +63,7 @@ interface ContentWarningsListProps {
   isAuthorApproved?: boolean
   analysisStatus?: 'complete' | 'unknown'
   isbn?: string // ISBN for analysis requests
+  noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
 }
 
 const categoryLabels: Record<string, string> = {
@@ -107,7 +108,7 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning }: ContentWarningsListProps) {
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
   const [requestSent, setRequestSent] = useState(false)
@@ -205,13 +206,30 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
     }
     
     // If analysis is complete and no warnings, show "Safe" message with positive framing
+    const isDevMode = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    
     return (
       <div className="py-12 text-center border-y border-border">
         <div className="flex justify-center mb-4">
           <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-500" />
         </div>
         <h3 className="text-lg font-serif font-medium text-foreground mb-1">✨ Comfort Read</h3>
-        <p className="text-muted-foreground text-sm">We analyzed this book and found no concerning content. This appears to be a safe, cozy read.</p>
+        <p className="text-muted-foreground text-sm mb-4">We analyzed this book and found no concerning content. This appears to be a safe, cozy read.</p>
+        
+        {/* Dev Mode: Show AI reasoning for why no warnings were generated */}
+        {isDevMode && noWarningsReasoning && (
+          <div className="mt-6 p-4 bg-muted/50 border border-border rounded-lg max-w-2xl mx-auto text-left">
+            <div className="flex items-center gap-2 mb-2">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <p className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                Dev Mode: AI Reasoning (No Warnings)
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground font-serif leading-relaxed">
+              {noWarningsReasoning}
+            </p>
+          </div>
+        )}
       </div>
     )
   }

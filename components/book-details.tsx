@@ -42,7 +42,7 @@ function isDevMode(): boolean {
   )
 }
 
-export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues }: BookDetailsProps) {
+export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)

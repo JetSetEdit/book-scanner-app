@@ -22,7 +22,7 @@ export default async function BookPage({ params }: BookPageProps) {
   }
 
 
-  // Fetch content warnings
+  // Fetch content warnings (include evidence for dev mode model source tracking)
   const { data: warnings } = await supabase
     .from("content_warnings")
     .select("*")
@@ -30,9 +30,10 @@ export default async function BookPage({ params }: BookPageProps) {
     .order("helpful_count", { ascending: false })
 
   // Fetch audit logs to determine if analysis has been completed and get metadata issues
+  // Also fetch ai_reasoning for dev mode display when no warnings were found
   const { data: auditLogs } = await supabase
     .from("ai_audit_logs")
-    .select("decision_type, metadata_issues")
+    .select("decision_type, metadata_issues, ai_reasoning")
     .eq("book_id", book.id)
     .in("decision_type", ["warnings_generated", "no_warnings"])
     .order("created_at", { ascending: false })
@@ -47,6 +48,11 @@ export default async function BookPage({ params }: BookPageProps) {
   const hasAnalysisCompleted = hasAuditLog || hasAiWarnings
   const analysisStatus: 'complete' | 'unknown' = hasAnalysisCompleted ? 'complete' : 'unknown'
   const metadataIssues = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any).metadata_issues : null
+  
+  // Extract no_warnings_reasoning from audit log for dev mode display
+  const noWarningsReasoning = auditLogs && auditLogs.length > 0 && auditLogs[0].decision_type === 'no_warnings'
+    ? (auditLogs[0] as any).ai_reasoning
+    : null
 
   // No user validation needed - all warnings are shown without user-specific data
   const warningsWithValidations = warnings || []
@@ -60,6 +66,7 @@ export default async function BookPage({ params }: BookPageProps) {
             warnings={warningsWithValidations}
             analysisStatus={analysisStatus}
             metadataIssues={metadataIssues}
+            noWarningsReasoning={noWarningsReasoning}
           />
         </div>
       </div>
