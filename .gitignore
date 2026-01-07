@@ -3,6 +3,9 @@
 # dependencies
 /node_modules
 
+# Cursor / IDE
+.cursor/
+
 # next.js
 /.next/
 /out/
@@ -36,7 +39,18 @@ next-env.d.ts
 antigravity-wip/
 cursor-wip/
 node_modules
-*.md
+# Markdown
+# We track docs and reports in this repo (design docs, testing reports, benchmark outputs, etc.).
+# Only ignore explicitly-generated/local-only markdown if needed.
+#
+# If you want to keep a specific local-only markdown file out of git, add it here explicitly.
+#
+# Examples:
+# .antigravity-working.md
+# .cursor-working.md
+#
+# Re-include markdown generally.
+!*.md
 backups/
 # Dataset downloads (can be large)
 data/

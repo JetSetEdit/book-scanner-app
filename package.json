@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "1.01.64",
+  "version": "1.01.65",
   "private": true,
   "scripts": {
     "build": "next build",
