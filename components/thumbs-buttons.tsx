@@ -182,6 +182,7 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
           size="sm"
           onClick={() => handleValidate(true)}
           className="gap-1"
+          aria-label="Mark as helpful"
         >
           <ThumbsUp className="h-3 w-3" />
           <span className="text-xs">{localCounts.helpful}</span>
@@ -191,10 +192,23 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
           size="sm"
           onClick={() => handleValidate(false)}
           className="gap-1"
+          aria-label="Mark as not helpful"
         >
           <ThumbsDown className="h-3 w-3" />
           <span className="text-xs">{localCounts.notHelpful}</span>
         </Button>
+        {(localUserValidation === true || localUserValidation === false) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleValidate(localUserValidation)}
+            className="text-xs text-muted-foreground"
+            aria-label="Undo your vote"
+            title="Undo your vote"
+          >
+            Undo
+          </Button>
+        )}
       </div>
     </div>
   )
