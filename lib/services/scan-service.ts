@@ -970,6 +970,16 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   console.error(`[scan-service] WARNING: Description "${description}" for ${w.subcategory_id} is missing "themes"!`)
                 }
 
+                // Store model_source in evidence JSONB for dev mode tracking
+                const evidenceWithModelSource = w.evidence || []
+                if (w.model_source && evidenceWithModelSource.length > 0) {
+                  // Add model_source to first evidence item's metadata
+                  evidenceWithModelSource[0] = {
+                    ...evidenceWithModelSource[0],
+                    model_source: w.model_source // Store in evidence for retrieval in UI
+                  }
+                }
+
                 return {
                   book_id: bookId,
                   category: legacyCategory, // Legacy field - must match DB constraint
@@ -979,7 +989,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   severity: w.severity,
                   confidence_score: w.evidence[0]?.confidence || 0.8,
                   context_modifiers: w.modifiers,
-                  evidence: w.evidence,
+                  evidence: evidenceWithModelSource, // Include model_source in evidence
                   severity_signals: w.severity_signals,
                   taxonomy_version: w.taxonomy_version,
                   presence: w.evidence[0]?.location ? 'on_page' : undefined,

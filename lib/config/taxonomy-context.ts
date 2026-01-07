@@ -101,6 +101,7 @@ export interface EnhancedContentWarning {
   reasoning?: string; // AI reasoning for the warning assignment (preserved from AI response)
   taxonomy_version: string; // Track which taxonomy version was used
   is_spoiler?: boolean; // True if this warning reveals major plot twists or significant plot points
+  model_source?: 'openai' | 'gemini'; // Track which model generated this warning (for dev mode)
 }
 
 /**

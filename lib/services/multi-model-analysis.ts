@@ -810,6 +810,7 @@ function processWarnings(
       other_note: w.other_note, // Preserve AI-provided other_note if available
       description: updatedDescription, // Use updated description that matches computed severity
       reasoning: updatedReasoning, // Use updated reasoning that matches computed severity
+      model_source: source, // Track which model generated this warning
     })
 
     return acc;
@@ -1201,12 +1202,22 @@ function combineResults(
 
   // Process OpenAI warnings
   for (const warning of openaiWarnings) {
+    // Ensure model_source is set
+    if (!warning.model_source) {
+      warning.model_source = 'openai'
+    }
+    
     const geminiWarning = geminiMap.get(warning.subcategory_id)
 
     if (!geminiWarning) {
       uniqueToOpenAI.push(warning)
       combined.push(warning)
     } else {
+      // Ensure gemini warning has model_source
+      if (!geminiWarning.model_source) {
+        geminiWarning.model_source = 'gemini'
+      }
+      
       // Both found it - check severity
       if (warning.severity !== geminiWarning.severity) {
         severityDifferences.push({
@@ -1217,14 +1228,27 @@ function combineResults(
       }
 
       // Use the more severe one, or OpenAI if equal
-      combined.push(warning.severity === 'severe' ||
+      // When both found it, mark as 'both' (we'll handle this in the UI)
+      const selectedWarning = warning.severity === 'severe' ||
         (warning.severity === 'moderate' && geminiWarning.severity === 'mild')
-        ? warning : geminiWarning)
+        ? warning : geminiWarning
+      
+      // Mark as 'both' if both models found it
+      if (selectedWarning.model_source) {
+        selectedWarning.model_source = 'both' as any // Both models found it
+      }
+      
+      combined.push(selectedWarning)
     }
   }
 
   // Process Gemini-only warnings
   for (const warning of geminiWarnings) {
+    // Ensure model_source is set
+    if (!warning.model_source) {
+      warning.model_source = 'gemini'
+    }
+    
     if (!openaiMap.has(warning.subcategory_id)) {
       uniqueToGemini.push(warning)
       combined.push(warning)
