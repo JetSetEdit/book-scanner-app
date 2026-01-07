@@ -13,7 +13,18 @@ import OpenAI from 'openai'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { EnhancedContentWarning } from '../config/taxonomy-context'
 import { WARNING_CATEGORIES, TAXONOMY_VERSION, MODEL_VERSION } from '../config/taxonomy-v2'
-import { buildTaxonomyContext } from './multi-model-analysis'
+// Build taxonomy context (duplicated from multi-model-analysis since it's not exported)
+function buildTaxonomyContext(): string {
+  const categories = WARNING_CATEGORIES.map(cat => {
+    const subcats = cat.subcategories.map(sub =>
+      `    - ${cat.id}.${sub.id}: ${sub.userLabel} (${sub.shortDescription}) [Default: ${sub.defaultSeverityHint || 'none'}]`
+    ).join('\n')
+
+    return `  ${cat.id} (${cat.userLabel}):\n${subcats}`
+  }).join('\n\n')
+
+  return categories
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
