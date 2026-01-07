@@ -4,6 +4,7 @@ import { normalizeISBN } from '@/lib/isbn-validation'
 import { Database } from '@/types/supabase'
 import { isStale, refreshBookMetadata } from '@/lib/book-cache'
 import { MODEL_VERSION, TAXONOMY_VERSION } from '@/lib/config/taxonomy-v2'
+import { assessMetadataQuality, type MetadataQuality } from '@/lib/utils/metadata-quality'
 
 // Helper to validate cover URL is not a placeholder
 async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
@@ -113,6 +114,9 @@ export type ScanResult = {
   isNewBook: boolean
   contentWarningsGenerated: boolean
   authorContextInvestigated: boolean
+  analysisLevel?: 'quick' | 'deep'
+  metadataQuality?: MetadataQuality
+  enrichmentUsed?: boolean
   timings?: ScanTimings
   flags?: {
     usedWebSearch: boolean
@@ -193,7 +197,8 @@ export async function processIsbnScan(
   selectedCandidate?: BookCandidate,
   forceRefresh: boolean = false,
   model?: string,
-  analysisOptions?: import('./multi-model-analysis').AnalysisOptions
+  analysisOptions?: import('./multi-model-analysis').AnalysisOptions,
+  scanMode: 'quick' | 'deep' = 'deep'
 ): Promise<ScanResult> {
   // Use provided model or default to MODEL_VERSION
   const modelToUse = model || MODEL_VERSION
@@ -215,8 +220,10 @@ export async function processIsbnScan(
   // Initialize flags
   let usedWebSearch = false
   let isThinMetadata = false
-  let pipelinePath = 'unknown'
+  let pipelinePath = scanMode === 'quick' ? 'quick' : 'deep'
   let authorContextInvestigated = false
+  let metadataQuality: MetadataQuality | undefined = undefined
+  let enrichmentUsed: boolean | undefined = undefined
 
   // Clean ISBN (remove hyphens, spaces)
   const cleanIsbn = normalizeISBN(isbn)
@@ -620,6 +627,13 @@ export async function processIsbnScan(
     
     onProgress?.(`📚 Book for analysis: "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown'}`)
     onProgress?.(`📝 Current description length: ${bookForAnalysis.description?.length || 0} characters`)
+
+    const metadataAssessment = assessMetadataQuality({
+      description: bookForAnalysis.description,
+      categories: (bookForAnalysis as any).categories,
+      author: bookForAnalysis.author,
+    })
+    metadataQuality = metadataAssessment.quality
     
     // If description is missing or too short, or if forceRefresh is true, try to fetch it
     if (bookForAnalysis && (forceRefresh || !bookForAnalysis.description || bookForAnalysis.description.length <= 100)) {
@@ -736,7 +750,11 @@ export async function processIsbnScan(
       
       // If description is minimal, use web search to get context BEFORE analysis
       let webSearchContext = ''
-      if (isMinimalDescription) {
+      // NOTE: For Quick scans, we prefer multi-model-analysis "web enrichment" (community search + re-analysis)
+      // to avoid duplicating this heavier pre-analysis web search.
+      const shouldSkipPreAnalysisWebSearch = scanMode === 'quick' && metadataAssessment.requiresEnrichment
+
+      if (isMinimalDescription && !shouldSkipPreAnalysisWebSearch) {
         onProgress?.('⚠️ Description is minimal - performing web search to gather context...')
         const webSearchStartTime = performance.now()
         
@@ -826,6 +844,8 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
           console.error('Web search error for minimal description:', webSearchError)
           onProgress?.('⚠️ Web search failed, proceeding with minimal description')
         }
+      } else if (isMinimalDescription && shouldSkipPreAnalysisWebSearch) {
+        onProgress?.('⚡ Quick scan: metadata is thin — relying on community enrichment during analysis...')
       }
       
       // ALWAYS run analysis - never skip
@@ -835,6 +855,29 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
       
       try {
           const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
+
+          // Build effective analysis options (Quick mode defaults, with optional overrides)
+          const effectiveAnalysisOptions: import('./multi-model-analysis').AnalysisOptions =
+            scanMode === 'quick'
+              ? {
+                  enableOpenAI: analysisOptions?.enableOpenAI ?? true,
+                  enableGemini: analysisOptions?.enableGemini ?? false,
+                  enableAdversarial: analysisOptions?.enableAdversarial ?? false,
+                  enableVerification: analysisOptions?.enableVerification ?? false,
+                  enableWebEnrichment:
+                    analysisOptions?.enableWebEnrichment ??
+                    (metadataAssessment.requiresEnrichment ? true : false),
+                  maxWarnings: analysisOptions?.maxWarnings ?? 5,
+                  includeReasoning: analysisOptions?.includeReasoning ?? false,
+                  maxDescriptionChars:
+                    analysisOptions?.maxDescriptionChars ??
+                    (metadataAssessment.requiresEnrichment ? 1500 : 1000),
+                  model: modelToUse,
+                }
+              : {
+                  ...(analysisOptions || {}),
+                  model: modelToUse,
+                }
           
           const analysisResult = await analyzeBookWithMultiModel(
             {
@@ -844,11 +887,14 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               isbn: cleanIsbn
             },
             onProgress,
-            {
-              ...(analysisOptions || {}),
-              model: modelToUse
-            }
+            effectiveAnalysisOptions
           )
+
+          // Record enrichment usage (if multi-model enrichment ran)
+          enrichmentUsed =
+            scanMode === 'quick'
+              ? (analysisResult as any).web_enrichment?.used === true
+              : false
           
           // Store no_warnings_reasoning for use in audit log if no warnings found
           const noWarningsReasoning = analysisResult.noWarningsReasoning
@@ -1356,6 +1402,11 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
               })
             }
           }
+
+          // Update pipeline path with quick/deep + enrichment info
+          if (scanMode === 'quick') {
+            pipelinePath = `quick/${metadataAssessment.requiresEnrichment ? 'thin' : 'rich'}${enrichmentUsed ? '->enriched' : ''}`
+          }
         } catch (analysisError) {
           console.error('Error in analyzeBookWithMultiModel:', analysisError)
           
@@ -1547,6 +1598,9 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
     isNewBook: !existingBook,
     contentWarningsGenerated,
     authorContextInvestigated,
+    analysisLevel: scanMode,
+    metadataQuality,
+    enrichmentUsed: scanMode === 'quick' ? enrichmentUsed : undefined,
     message: analysisError ? `Analysis failed: ${analysisError.message}` : undefined,
     timings,
     flags: {

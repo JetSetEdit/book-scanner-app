@@ -7,8 +7,11 @@ export async function POST(request: NextRequest) {
   try {
     console.log('Scan ISBN API called')
 
-    const { isbn, stream, selectedCandidate, forceRefresh, model } = await request.json()
+    const { isbn, stream, selectedCandidate, forceRefresh, model, scanMode } = await request.json()
     console.log('Processing ISBN:', isbn)
+
+    const normalizedScanMode: 'quick' | 'deep' =
+      scanMode === 'quick' || scanMode === 'deep' ? scanMode : 'deep'
 
     if (!isbn) {
       return NextResponse.json({ error: 'ISBN is required' }, { status: 400 })
@@ -39,7 +42,15 @@ export async function POST(request: NextRequest) {
           }
 
           try {
-            const result = await processIsbnScan(isbn, sendUpdate, selectedCandidate, forceRefresh, model || MODEL_VERSION)
+            const result = await processIsbnScan(
+              isbn,
+              sendUpdate,
+              selectedCandidate,
+              forceRefresh,
+              model || MODEL_VERSION,
+              undefined,
+              normalizedScanMode
+            )
             
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ result })}\n\n`))
           } catch (error) {
@@ -60,7 +71,15 @@ export async function POST(request: NextRequest) {
       })
     } else {
       // Standard JSON response
-      const result = await processIsbnScan(isbn, undefined, selectedCandidate, false, model || MODEL_VERSION)
+      const result = await processIsbnScan(
+        isbn,
+        undefined,
+        selectedCandidate,
+        false,
+        model || MODEL_VERSION,
+        undefined,
+        normalizedScanMode
+      )
       
       
       return NextResponse.json(result)

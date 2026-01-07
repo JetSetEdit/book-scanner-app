@@ -4,7 +4,7 @@ import { ContentWarningsList } from "@/components/content-warnings-list"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode, Flag } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode, Flag, BookOpen } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -140,8 +140,9 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground font-serif italic">
-                  No Cover
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-muted text-muted-foreground">
+                  <BookOpen className="h-10 w-10" />
+                  <span className="font-serif italic text-sm">Cover unavailable</span>
                 </div>
               )}
             </div>

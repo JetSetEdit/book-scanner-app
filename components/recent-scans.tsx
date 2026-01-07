@@ -61,7 +61,8 @@ export function RecentScans() {
   }
 
   // API now handles filtering and deduplication, but double-check for safety
-  const scansWithBooks = scans.filter(scan => scan.book && scan.book.coverUrl)
+  // Show recent scans even if cover is missing (use placeholder icon).
+  const scansWithBooks = scans.filter(scan => scan.book)
 
   if (scansWithBooks.length === 0) {
     return null

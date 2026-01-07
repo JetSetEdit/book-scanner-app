@@ -290,7 +290,10 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                                   className="object-cover"
                                 />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No Cover</div>
+                                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                                  <BookOpen className="h-6 w-6" />
+                                  <span className="text-[10px]">No cover</span>
+                                </div>
                               )}
                             </div>
                           </div>

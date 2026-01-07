@@ -50,6 +50,12 @@ export interface AnalysisOptions {
   maxDescriptionChars?: number
 }
 
+type WebEnrichmentInfo = {
+  attempted: boolean
+  used: boolean
+  added_warnings: number
+}
+
 function applyDescriptionTruncation(metadata: BookMetadata, maxChars?: number): BookMetadata {
   if (!maxChars || maxChars <= 0) return metadata
   const desc = metadata.description || ''
@@ -1404,6 +1410,7 @@ export async function analyzeBookWithMultiModel(
     openai: EnhancedContentWarning[]
     gemini: EnhancedContentWarning[]
   }
+  web_enrichment?: WebEnrichmentInfo
 }> {
   const options: AnalysisOptions =
     typeof modelOrOptions === 'string'
@@ -1507,6 +1514,7 @@ export async function analyzeBookWithMultiModel(
   const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
   let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
+  let webEnrichment: WebEnrichmentInfo | undefined = undefined
 
   if (effectiveOptions.enableVerification && allUniqueWarnings.length > 0) {
     // Use the opposite model for verification (if OpenAI found it, verify with Gemini, and vice versa)
@@ -1574,6 +1582,13 @@ export async function analyzeBookWithMultiModel(
       onProgress?.('⏳ Initial scan found few warnings - searching community sources for additional information...')
       
       try {
+        const originalWarningCount = finalWarnings.length
+        webEnrichment = {
+          attempted: true,
+          used: false,
+          added_warnings: 0,
+        }
+
         const { enrichWithWebSearch } = await import('./web-search-enrichment')
         const enrichmentResult = await enrichWithWebSearch(
           effectiveMetadata,
@@ -1603,6 +1618,11 @@ export async function analyzeBookWithMultiModel(
             const newWarnings = enrichedWarnings.filter(w => !existingSubcategoryIds.has(w.subcategory_id))
             
             finalWarnings = [...finalWarnings, ...newWarnings]
+
+            if (webEnrichment) {
+              webEnrichment.used = true
+              webEnrichment.added_warnings = Math.max(0, finalWarnings.length - originalWarningCount)
+            }
             
             // Update noWarningsReasoning if we now have warnings
             if (finalWarnings.length > 0 && openaiNoWarningsReasoning) {
@@ -1616,6 +1636,11 @@ export async function analyzeBookWithMultiModel(
         console.error('[Web Search Enrichment] Error during enrichment:', error)
         onProgress?.('⚠️ Web search enrichment failed, continuing with initial results')
         // Continue with original warnings - don't fail the entire scan
+        if (webEnrichment) {
+          webEnrichment.attempted = true
+          webEnrichment.used = false
+          webEnrichment.added_warnings = 0
+        }
       }
     }
   }
@@ -1638,7 +1663,8 @@ export async function analyzeBookWithMultiModel(
     model_results: {
       openai: openaiWarnings,
       gemini: geminiWarnings
-    }
+    },
+    web_enrichment: webEnrichment
   }
 }
 

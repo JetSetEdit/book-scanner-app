@@ -16,6 +16,7 @@ import { BarcodeScanner } from "@/components/barcode-scanner"
 import { AccessibleAudioPlayer } from "@/components/accessible-audio-player"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
 import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
@@ -86,6 +87,9 @@ function ScanTestPageContent() {
   
   // Show scanner based on user preference
   const [showScanner, setShowScanner] = useState(preferences.showCameraScanner ?? false)
+
+  // Scan mode (Quick vs Deep). Default to Quick for browsing.
+  const [scanMode, setScanMode] = useState<'quick' | 'deep'>('quick')
   
   // Update showScanner when preference changes
   useEffect(() => {
@@ -184,7 +188,8 @@ function ScanTestPageContent() {
             isbn: isbnToScan, 
             forceRefresh: false, // Don't force refresh - use existing book if available
             selectedCandidate: selectedCandidate || undefined,
-            timezone: userTimezone
+            timezone: userTimezone,
+            scanMode
           }),
         })
 
@@ -364,7 +369,10 @@ function ScanTestPageContent() {
           isNewBook: result.isNewBook || false,
           contentWarningsGenerated: result.contentWarningsGenerated || false,
           timings: result.timings,
-          flags: result.flags
+          flags: result.flags,
+          analysisLevel: result.analysisLevel,
+          metadataQuality: result.metadataQuality,
+          enrichmentUsed: result.enrichmentUsed
         }
         
         console.log('[Scan] Transformed result:', {
@@ -556,6 +564,26 @@ function ScanTestPageContent() {
             <p className="text-xs text-muted-foreground ml-6">
               When enabled, the camera scanner will be shown when you visit this page. You can always toggle it on/off.
             </p>
+
+            {/* Quick vs Deep scan toggle */}
+            <div className="pt-4 border-t border-border/50 space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="quick-scan"
+                  checked={scanMode === 'quick'}
+                  onCheckedChange={(checked) => setScanMode(checked === true ? 'quick' : 'deep')}
+                />
+                <Label
+                  htmlFor="quick-scan"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Quick scan (15–30s, recommended for browsing)
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">
+                Quick mode uses a single model and caps warnings; it conditionally enriches thin metadata to avoid false “G” results. Uncheck for Deep (90–120s) verification.
+              </p>
+            </div>
           </div>
 
           {/* Scan History - Only render after mount to prevent hydration mismatch */}
@@ -983,6 +1011,19 @@ function ScanTestPageContent() {
                 <AlertTitle>Success</AlertTitle>
                 <AlertDescription>
                   Scan completed successfully.
+                  {result.analysisLevel === 'quick' && (
+                    <div className="mt-2">
+                      <Badge variant={result.enrichmentUsed ? "secondary" : "outline"}>
+                        {result.enrichmentUsed ? 'Quick (enriched)' : 'Quick'}
+                        {result.metadataQuality ? ` • ${result.metadataQuality} metadata` : ''}
+                      </Badge>
+                    </div>
+                  )}
+                  {result.analysisLevel === 'deep' && (
+                    <div className="mt-2">
+                      <Badge variant="outline">Deep</Badge>
+                    </div>
+                  )}
                   {result.multiModelAnalysis && (
                     <span className="block mt-1 text-xs">
                       Multi-model analysis completed (GPT-4o + Gemini)

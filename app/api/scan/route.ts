@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
     try {
         // Parse request body once
         const body = await req.json();
-        const { isbn, forceRefresh, selectedCandidate, timezone } = body;
+        const { isbn, forceRefresh, selectedCandidate, timezone, scanMode } = body;
+
+        const normalizedScanMode: 'quick' | 'deep' =
+          scanMode === 'quick' || scanMode === 'deep' ? scanMode : 'deep'
         
         // Check rate limit before processing
         const clientIP = getClientIP(req);
@@ -98,10 +101,18 @@ export async function POST(req: NextRequest) {
                     }
                 }
 
-                console.log(`[Scan API] Starting scan for ISBN: ${isbn}, forceRefresh: ${forceRefresh}, selectedCandidate: ${selectedCandidate ? 'provided' : 'none'}`)
+                console.log(`[Scan API] Starting scan for ISBN: ${isbn}, scanMode: ${normalizedScanMode}, forceRefresh: ${forceRefresh}, selectedCandidate: ${selectedCandidate ? 'provided' : 'none'}`)
                 await writer.write(encoder.encode(`data: ${JSON.stringify({ status: '🚀 Starting scan process...' })}\n\n`))
 
-                const result = await processIsbnScan(isbn, onProgress, selectedCandidate, forceRefresh === true)
+                const result = await processIsbnScan(
+                  isbn,
+                  onProgress,
+                  selectedCandidate,
+                  forceRefresh === true,
+                  undefined,
+                  undefined,
+                  normalizedScanMode
+                )
 
                 // Increment rate limit only after successful scan
                 if (result.success) {
