@@ -55,7 +55,7 @@ interface ContentWarning {
   is_author_verified?: boolean
   source_url?: string | null
   is_spoiler?: boolean
-  evidence?: Array<{ model_source?: 'openai' | 'gemini' | 'both' }> | null // For dev mode: track which model generated this
+  evidence?: Array<{ model_source?: 'openai' | 'gemini' | 'both'; [key: string]: any }> | null // For dev mode: track which model generated this
 }
 
 interface ContentWarningsListProps {

@@ -74,6 +74,7 @@ export interface EvidenceSpan {
   };
   excerpt?: string; // Safe-truncated excerpt (max 200 chars)
   confidence: number; // 0-1
+  model_source?: 'openai' | 'gemini' | 'both'; // Dev mode: track which model generated this warning
 }
 
 /**

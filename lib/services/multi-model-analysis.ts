@@ -1233,8 +1233,14 @@ function combineResults(
         (warning.severity === 'moderate' && geminiWarning.severity === 'mild')
         ? warning : geminiWarning
       
-      // Mark as 'both' if both models found it
-      if (selectedWarning.model_source) {
+      // Mark as 'both' if both models found it (store in evidence for UI)
+      if (selectedWarning.evidence && selectedWarning.evidence.length > 0) {
+        selectedWarning.evidence[0] = {
+          ...selectedWarning.evidence[0],
+          model_source: 'both' as 'openai' | 'gemini' | 'both'
+        }
+      } else if (selectedWarning.model_source) {
+        // Fallback: mark in model_source field
         selectedWarning.model_source = 'both' as any // Both models found it
       }
       
