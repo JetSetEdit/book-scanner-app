@@ -1126,6 +1126,9 @@ If you find any content warnings mentioned online or in reviews (from safe sourc
 
 IMPORTANT: Only use information from safe, open sources. Do not quote retailer product descriptions.`
 
+              // GPT-5 models require max_completion_tokens instead of max_tokens
+              const isGpt5 = modelToUse.includes('gpt-5') || modelToUse.includes('o1') || modelToUse.includes('o3')
+              
               const searchResponse = await openai.chat.completions.create({
                 model: modelToUse,
                 messages: [
@@ -1138,7 +1141,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                     content: searchPrompt
                   }
                 ],
-                max_tokens: 300
+                ...(isGpt5 ? { max_completion_tokens: 500 } : { max_tokens: 500 }) // Increased from 300 to 500 for better context
               }).catch(err => {
                 console.error('Web search verification via OpenAI failed:', err)
                 return null
@@ -1150,10 +1153,12 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 const messageContent = searchResponse.choices[0]?.message?.content || ''
                 
                 // TOS Compliance Check: Reject if response contains retailer indicators
+                // This ensures we never use content from retailer websites, protecting against TOS violations
                 const retailerIndicators = [
                   'amazon.com', 'qbd.com.au', 'booktopia.com.au', 'barnesandnoble.com',
                   'waterstones.com', 'indigo.ca', 'retailer', 'product page', 'buy now',
-                  'add to cart', 'customer reviews on amazon', 'amazon product description'
+                  'add to cart', 'customer reviews on amazon', 'amazon product description',
+                  'amazon.co.uk', 'amazon.ca', 'amazon.com.au'
                 ]
                 
                 const containsRetailerContent = retailerIndicators.some(indicator => 
@@ -1161,11 +1166,12 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 )
                 
                 if (containsRetailerContent) {
-                  console.warn('[Web Search Verification] TOS Compliance: Rejected response containing retailer content')
-                  onProgress?.('⚠️ Web search verification response contained retailer content - rejected for TOS compliance')
-                  // Don't use retailer content - skip verification
+                  console.warn('[Web Search] TOS Compliance: Rejected response containing retailer content')
+                  onProgress?.('⚠️ Web search response contained retailer content - rejected for TOS compliance')
+                  // Don't use retailer content - skip to avoid TOS violation
                   timings.webSearch = performance.now() - webSearchStartTime
                   usedWebSearch = false
+                  webSearchContext = '' // Clear any retailer content
                   // Skip to end of try block - don't process this response
                 } else {
                 
