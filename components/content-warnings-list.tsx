@@ -97,8 +97,11 @@ function getCombinedConfidence(warning: Pick<ContentWarning, 'helpful_count' | '
   }
 
   // Combined confidence: treat cross-check as a floor, but let strong negative feedback pull it down.
-  let level: 'Low' | 'Medium' | 'High' = 'Low'
-  if (community === 'positive' && crossChecked) level = 'High'
+  // IMPORTANT: "Low" implies negative feedback. With zero votes, show "New" instead.
+  let level: 'New' | 'Low' | 'Medium' | 'High' = votes === 0 ? 'New' : 'Low'
+  if (votes === 0) {
+    level = 'New'
+  } else if (community === 'positive' && crossChecked) level = 'High'
   else if (community === 'positive') level = 'Medium'
   else if (community === 'contested') level = 'Low'
   else if (crossChecked) level = 'Medium'
@@ -108,7 +111,9 @@ function getCombinedConfidence(warning: Pick<ContentWarning, 'helpful_count' | '
       ? 'border-green-500/50 text-green-700 dark:text-green-400'
       : level === 'Medium'
         ? 'border-amber-500/50 text-amber-700 dark:text-amber-400'
-        : 'border-muted-foreground/40 text-muted-foreground'
+        : level === 'New'
+          ? 'border-muted-foreground/25 text-muted-foreground'
+          : 'border-muted-foreground/40 text-muted-foreground'
 
   return {
     level,
@@ -573,7 +578,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                         Community feedback: {c.votes === 0 ? 'No votes yet' : `${c.helpful} helpful • ${c.notHelpful} not helpful (${c.votes} total)`}
                       </div>
                       <div className="text-[10px] text-muted-foreground leading-relaxed">
-                        Confidence is a heuristic to help you judge reliability. It is not a guarantee and can change as more people vote.
+                        Confidence is a heuristic based on cross-check + community feedback. It is not a guarantee and can change as more people vote.
                       </div>
                     </div>
                   </PopoverContent>
