@@ -16,6 +16,7 @@ import { BuyButton } from "@/components/BuyButton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Info } from "lucide-react"
 import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
+import { APP_VERSION } from "@/lib/config/version"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -109,7 +110,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               </Button>
             </Link>
             <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground">
-              Book Scanner v1.0
+              Subtext v{APP_VERSION}
             </div>
           </div>
         </div>

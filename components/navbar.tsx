@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { APP_VERSION, APP_VERSION_LABEL, APP_BUILD_DATE } from "@/lib/config/version"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -179,6 +180,11 @@ export function Navbar() {
                   )}
                 </Button>
               )}
+
+              {/* Always-visible version badge (helps confirm deploy + caching state) */}
+              <Badge variant="outline" className="ml-1 font-mono text-[10px] text-muted-foreground">
+                v{APP_VERSION}
+              </Badge>
               
               {/* Dev Settings Dropdown */}
               {isDev && (
