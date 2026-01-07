@@ -1,6 +1,7 @@
 import { BookDetails } from "@/components/book-details"
+import { Button } from "@/components/ui/button"
 import { supabaseAdmin } from "@/lib/supabase/admin"
-import { notFound } from "next/navigation"
+import Link from "next/link"
 
 interface BookPageProps {
   params: Promise<{
@@ -17,8 +18,40 @@ export default async function BookPage({ params }: BookPageProps) {
   // Fetch book data
   const { data: book, error: bookError } = await supabase.from("books").select("*").eq("isbn", isbn).single()
 
+  // If book doesn't exist yet, don't 404 — show a recovery path back into scanning.
+  // This is critical for the search → click flow (users often click books that haven't been scanned yet).
   if (bookError || !book) {
-    notFound()
+    return (
+      <main className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-12">
+          <div className="max-w-2xl mx-auto">
+            <div className="border border-border bg-card/60 p-8">
+              <h1 className="font-serif text-3xl font-bold text-foreground mb-3">This book isn&apos;t in Subtext yet</h1>
+              <p className="text-muted-foreground leading-relaxed mb-6">
+                We couldn&apos;t find ISBN <span className="font-mono text-foreground">{isbn}</span> in the database.
+                Scan it to create the book page and generate content warnings.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Link href={`/scan?isbn=${encodeURIComponent(isbn)}`}>
+                  <Button className="w-full sm:w-auto">Scan this book</Button>
+                </Link>
+                <Link href="/scan">
+                  <Button variant="outline" className="w-full sm:w-auto">Go to scanner</Button>
+                </Link>
+                <Link href="/">
+                  <Button variant="ghost" className="w-full sm:w-auto">Back to home</Button>
+                </Link>
+              </div>
+
+              <p className="text-xs text-muted-foreground mt-6">
+                Tip: scanning from this page will auto-fill the ISBN and start the scan.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    )
   }
 
 
