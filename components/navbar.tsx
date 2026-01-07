@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { APP_VERSION, APP_VERSION_LABEL, APP_BUILD_DATE } from "@/lib/config/version"
+import { CHANGELOG } from "@/lib/config/changelog"
 import { Badge } from "@/components/ui/badge"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -182,9 +184,44 @@ export function Navbar() {
               )}
 
               {/* Always-visible version badge (helps confirm deploy + caching state) */}
-              <Badge variant="outline" className="ml-1 font-mono text-[10px] text-muted-foreground">
-                v{APP_VERSION}
-              </Badge>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button type="button" className="ml-1">
+                    <Badge
+                      variant="outline"
+                      className="font-mono text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
+                      title="What’s new"
+                    >
+                      v{APP_VERSION}
+                    </Badge>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80">
+                  <div className="space-y-3">
+                    <div className="flex items-baseline justify-between">
+                      <div className="font-semibold text-sm">What’s new</div>
+                      <div className="text-[10px] text-muted-foreground font-mono">v{APP_VERSION}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {APP_VERSION_LABEL} • Built {APP_BUILD_DATE}
+                    </div>
+                    <div className="space-y-3">
+                      {CHANGELOG.slice(0, 3).map((entry) => (
+                        <div key={entry.version} className="space-y-1">
+                          <div className="text-xs font-medium text-foreground">
+                            v{entry.version}{entry.title ? ` — ${entry.title}` : ""}
+                          </div>
+                          <ul className="list-disc pl-4 text-xs text-muted-foreground space-y-1">
+                            {entry.changes.slice(0, 4).map((c) => (
+                              <li key={c}>{c}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
               
               {/* Dev Settings Dropdown */}
               {isDev && (
