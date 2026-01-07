@@ -1309,9 +1309,38 @@ export async function analyzeBookWithMultiModel(
 
   const { combined, analysis } = combineResults(openaiWarnings, geminiWarnings)
 
+  // Adversarial Validation: Models critique each other's warnings
+  // This creates a "debate" where each model reviews the other for being too restrictive or too lenient
+  let refinedWarnings = combined
+  if (openaiWarnings.length > 0 && geminiWarnings.length > 0) {
+    try {
+      const { runAdversarialValidation } = await import('./adversarial-validation')
+      const adversarialResult = await runAdversarialValidation(
+        openaiWarnings,
+        geminiWarnings,
+        metadata,
+        onProgress
+      )
+      
+      // Use refined warnings from adversarial validation if available
+      if (adversarialResult.refined_warnings.length > 0) {
+        refinedWarnings = adversarialResult.refined_warnings
+        console.log('[Adversarial Validation] Refined warnings:', {
+          before: combined.length,
+          after: refinedWarnings.length,
+          openai_critiques: adversarialResult.openai_critiques_gemini.length,
+          gemini_critiques: adversarialResult.gemini_critiques_openai.length
+        })
+      }
+    } catch (error) {
+      console.warn('[Adversarial Validation] Failed, using original combined warnings:', error)
+      // Continue with original combined warnings if adversarial validation fails
+    }
+  }
+
   // POC: Verify unique warnings only
   const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
-  let finalWarnings = combined
+  let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
 
   if (allUniqueWarnings.length > 0) {
