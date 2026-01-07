@@ -508,14 +508,21 @@ Instructions:
 }`
 
   try {
-    // Use gemini-2.0-flash (fast and currently available)
-    // Fallback to gemini-2.5-flash if needed
+    // Use newer Gemini models with fallback chain:
+    // 1. gemini-2.5-flash (most balanced, 1M token context)
+    // 2. gemini-3-flash (newest, if available)
+    // 3. gemini-2.0-flash (legacy fallback)
     let model
     try {
-      model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
-    } catch (e) {
-      console.warn('Primary model failed, trying fallback...')
       model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    } catch (e) {
+      try {
+        console.warn('gemini-2.5-flash failed, trying gemini-3-flash...')
+        model = genAI.getGenerativeModel({ model: 'gemini-3-flash' })
+      } catch (e2) {
+        console.warn('gemini-3-flash failed, trying legacy gemini-2.0-flash...')
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+      }
     }
 
     const result = await model.generateContent(prompt)
@@ -973,9 +980,9 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
           const parsed = JSON.parse(jsonMatch[0])
           return parsed.verifications || []
         } catch (geminiError) {
-          // Fallback to gemini-2.5-flash
-          console.warn('gemini-2.0-flash failed, trying gemini-2.5-flash:', geminiError)
-          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+          // Fallback chain exhausted - skip Gemini verification
+          console.warn('All Gemini models failed for verification:', geminiError)
+          throw geminiError
           const result = await model.generateContent(prompt)
           const response = result.response
           const text = response.text()
@@ -1264,16 +1271,36 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
 }> {
-  // Run OpenAI analysis only (Gemini disabled)
+  // Run both OpenAI and Gemini in parallel for cross-validation
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
   // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
-  const openaiResult = await analyzeWithOpenAI(metadata, onProgress, model)
-  const openaiWarnings = openaiResult.warnings
-  const openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
-
-  // Gemini disabled - return empty array
-  const geminiWarnings: EnhancedContentWarning[] = []
+  
+  // Run both models in parallel for faster analysis and cross-validation
+  const [openaiResult, geminiResult] = await Promise.allSettled([
+    analyzeWithOpenAI(metadata, onProgress, model),
+    analyzeWithGemini(metadata, onProgress).catch(err => {
+      // Gemini failures are non-fatal - log and continue with OpenAI only
+      console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
+      return []
+    })
+  ])
+  
+  const openaiWarnings = openaiResult.status === 'fulfilled' 
+    ? openaiResult.value.warnings 
+    : []
+  const openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
+    ? openaiResult.value.noWarningsReasoning
+    : undefined
+  
+  const geminiWarnings = geminiResult.status === 'fulfilled'
+    ? geminiResult.value
+    : []
+  
+  // Log cross-validation status
+  if (geminiWarnings.length > 0) {
+    onProgress?.(`✓ Cross-validated with Gemini (found ${geminiWarnings.length} warning${geminiWarnings.length === 1 ? '' : 's'})`)
+  }
 
   if (openaiWarnings.length > 0) {
     onProgress?.(`⏳ Found ${openaiWarnings.length} potential warning${openaiWarnings.length === 1 ? '' : 's'} - verifying details...`)
