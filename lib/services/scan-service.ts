@@ -695,18 +695,32 @@ export async function processIsbnScan(
       // Also check if description is very short (< 300 chars) and appears to be just marketing copy
       // OR if it appears to be a narrative excerpt (opening line) rather than a plot summary
       const description = bookForAnalysis.description || ''
-      const isNarrativeExcerpt = description.length > 0 && description.length < 500 && (
-        // First-person narrative indicators
-        description.match(/^[A-Z][^.!?]*[.!?]\s*[A-Z]/) && (
-          description.includes(' he ') || description.includes(' she ') || description.includes(' they ') ||
-          description.includes(' his ') || description.includes(' her ') || description.includes(' their ') ||
-          description.includes(' I ') || description.includes(' we ')
-        ) ||
-        // Scene-setting without plot summary indicators
+      // Check for narrative excerpt patterns (even if description is longer)
+      // Look for opening line patterns: starts with scene-setting, contains specific physical details
+      const hasNarrativeOpeningPattern = (
+        // Starts with scene-setting details (apartment, room, door, window, balcony)
         (description.includes(' apartment ') || description.includes(' room ') || description.includes(' door ') || 
-         description.includes(' window ') || description.includes(' balcony ')) &&
+         description.includes(' window ') || description.includes(' balcony ') || description.includes(' closet ')) &&
+        // But lacks plot summary keywords
         !description.toLowerCase().includes('story') && !description.toLowerCase().includes('follows') &&
-        !description.toLowerCase().includes('tells') && !description.toLowerCase().includes('explores')
+        !description.toLowerCase().includes('tells') && !description.toLowerCase().includes('explores') &&
+        !description.toLowerCase().includes('chronicles') && !description.toLowerCase().includes('journey') &&
+        !description.toLowerCase().includes('struggles') && !description.toLowerCase().includes('deals with')
+      )
+      
+      const isNarrativeExcerpt = description.length > 0 && (
+        // Short narrative excerpts (< 500 chars)
+        (description.length < 500 && (
+          // First-person narrative indicators
+          (description.match(/^[A-Z][^.!?]*[.!?]\s*[A-Z]/) && (
+            description.includes(' he ') || description.includes(' she ') || description.includes(' they ') ||
+            description.includes(' his ') || description.includes(' her ') || description.includes(' their ') ||
+            description.includes(' I ') || description.includes(' we ')
+          )) ||
+          hasNarrativeOpeningPattern
+        )) ||
+        // Longer descriptions that still look like narrative excerpts (scene-setting without plot context)
+        (description.length >= 500 && description.length < 1000 && hasNarrativeOpeningPattern)
       )
       
       const isMinimalDescription = !bookForAnalysis.description || 

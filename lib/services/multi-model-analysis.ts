@@ -946,8 +946,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             }
           ],
           response_format: { type: 'json_object' },
-          ...(isGpt5 ? {} : { temperature: 0.3 }), // Slightly higher temperature for more balanced verification
-          max_tokens: 2000
+          ...(isGpt5 ? { max_completion_tokens: 2000 } : { temperature: 0.3, max_tokens: 2000 }) // GPT-5 uses max_completion_tokens, others use max_tokens
         })
 
         const content = response.choices[0].message.content
