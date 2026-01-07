@@ -810,6 +810,21 @@ function processWarnings(
     }
 
     // Update reasoning to match computed severity
+    // Safety: Ensure signals is valid before passing
+    if (!signals || typeof signals.frequency !== 'number' || isNaN(signals.frequency)) {
+      console.warn(`[processWarnings] Invalid signals for ${w.subcategory_id}, rebuilding:`, signals)
+      // Rebuild signals if invalid
+      const rebuiltSignals = buildSeveritySignals({
+        presence: w.presence,
+        detail_level: w.detail_level,
+        description: w.description,
+        category_id: w.subcategory_id?.split('.')[0],
+        frequency_hint: w.frequency_hint,
+        centrality_hint: w.centrality_hint
+      })
+      signals = rebuiltSignals
+    }
+    
     const updatedReasoning = updateReasoningForSeverity(
       w.reasoning,
       severity,
