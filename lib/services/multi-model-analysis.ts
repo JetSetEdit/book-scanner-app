@@ -659,8 +659,16 @@ function updateReasoningForSeverity(
   computedSeverity: 'mild' | 'moderate' | 'severe',
   signals: SeveritySignals | undefined
 ): string {
-  // Safety check: if signals is undefined, provide default values
-  const safeSignals = signals || {
+  // Safety check: if signals is undefined, null, or has undefined properties, provide default values
+  // This prevents TypeError when accessing signals.frequency.toFixed() etc.
+  const safeSignals: SeveritySignals = (signals && 
+    typeof signals === 'object' &&
+    typeof signals.frequency === 'number' && !isNaN(signals.frequency) &&
+    typeof signals.explicitness === 'number' && !isNaN(signals.explicitness) &&
+    typeof signals.proximity === 'number' && !isNaN(signals.proximity) &&
+    typeof signals.centrality === 'number' && !isNaN(signals.centrality) &&
+    Array.isArray(signals.intensity_markers)
+  ) ? signals : {
     frequency: 0.5,
     explicitness: 0.5,
     proximity: 0.5,
