@@ -79,7 +79,7 @@ export function RecentScans() {
             </h2>
           </div>
           
-          <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
+          <div className="flex gap-4 overflow-x-auto overflow-y-visible pt-3 pb-6 -mx-4 px-4 scrollbar-hide">
             {scansWithBooks.slice(0, 8).map((scan) => {
               const timeAgo = formatDistanceToNow(new Date(scan.createdAt), {
                 addSuffix: true,
