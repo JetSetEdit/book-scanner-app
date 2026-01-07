@@ -29,32 +29,33 @@ function formatStatusMessage(message: string): string {
   
   // Convert technical messages to user-friendly ones
   const replacements: [RegExp, string][] = [
-    [/validating isbn and checking local database/i, 'Checking if we already have this book...'],
-    [/checking local database for existing book/i, 'Checking our database...'],
+    [/validating isbn and checking local database/i, 'Searching our library...'],
+    [/checking local database for existing book/i, 'Looking for this book...'],
     [/found metadata for "([^"]+)"/i, 'Found book: $1'],
     [/saving to database/i, 'Saving book information...'],
-    [/book found in local database/i, 'Book found in our database'],
-    [/fetching book metadata from external libraries/i, 'Searching online libraries...'],
+    [/book found in local database/i, 'Found it! Loading book details...'],
+    [/fetching book metadata from external libraries/i, 'Finding book information...'],
     [/external api fetch completed/i, 'Found book information'],
-    [/found \d+ candidate\(s\) from external libraries/i, 'Found book matches'],
-    [/calling fetchbookbyisbn/i, 'Fetching book details...'],
-    [/fetched data from (.+)/i, 'Retrieved from $1'],
-    [/saving description \(\d+ chars\) to database/i, 'Saving book description...'],
-    [/fetched and saved fresh description/i, 'Updated book description'],
-    [/checking if description is sufficient for analysis/i, 'Checking book description...'],
-    [/description for analysis: (\d+) characters/i, 'Using description ($1 characters)'],
+    [/found \d+ candidate\(s\) from external libraries/i, 'Book found!'],
+    [/calling fetchbookbyisbn/i, 'Getting book details...'],
+    [/fetched data from (.+)/i, 'Found on $1'],
+    [/saving description \(\d+ chars\) to database/i, 'Preparing description...'],
+    [/fetched and saved fresh description/i, 'Description ready'],
+    [/checking if description is sufficient for analysis/i, 'Reviewing book summary...'],
+    [/description for analysis: (\d+) characters/i, 'Analyzing $1 characters...'],
     [/starting ai content analysis with openai/i, 'Starting AI analysis...'],
-    [/analyzing: "([^"]+)"/i, 'Analyzing: $1'],
+    [/analyzing: "([^"]+)"/i, 'Checking for: $1'],
     [/using description:/i, 'Reviewing book description'],
-    [/calling analyzebookwithmultimodel/i, 'Running AI analysis...'],
-    [/ai analysis complete: (\d+) warnings generated/i, 'Analysis complete: Found $1 content warnings'],
-    [/analysis took (\d+)ms/i, 'Analysis completed'],
-    [/saving (\d+) content warnings to database/i, 'Saving $1 content warnings...'],
-    [/deleting existing ai-generated warnings/i, 'Clearing previous warnings...'],
-    [/deleted existing ai-generated warnings/i, 'Cleared previous warnings'],
-    [/saved (\d+) content warnings/i, 'Saved $1 content warnings'],
-    [/no content warnings identified by ai analysis/i, 'No content warnings found'],
-    [/description too minimal/i, 'Description is too short'],
+    [/calling analyzebookwithmultimodel/i, 'AI is reading the book...'],
+    [/ai analysis complete: (\d+) warnings generated/i, 'Found $1 content warnings'],
+    [/analysis took (\d+)ms/i, 'Analysis complete!'],
+    [/saving (\d+) content warnings to database/i, 'Saving results...'],
+    [/deleting existing ai-generated warnings/i, 'Updating warnings...'],
+    // Avoid showing this redundant internal step
+    [/deleted existing ai-generated warnings/i, ''],
+    [/saved (\d+) content warnings/i, 'Saved $1 warnings'],
+    [/no content warnings identified by ai analysis/i, 'No warnings detected'],
+    [/description too minimal/i, 'Limited information available, enriching...'],
     [/proceeding with analysis due to force refresh/i, 'Proceeding with analysis...'],
     [/scan process completed/i, 'Scan completed successfully'],
   ]
@@ -174,8 +175,8 @@ function ScanTestPageContent() {
     try {
       markStage('api-request-sent')
       
-      // Use the scan endpoint with multi-model analysis
-        setStatusUpdates(prev => [...prev, "Starting scan with AI analysis..."])
+      // Add an initial (internal-style) status so the progress mapper can show a stage immediately
+      setStatusUpdates(prev => [...prev, "Validating ISBN and checking local database..."])
         
         // Get user's timezone
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -894,6 +895,7 @@ function ScanTestPageContent() {
                       <ul className="space-y-1">
                         {statusUpdates.slice(-3).map((update, idx) => {
                           const cleanUpdate = formatStatusMessage(update)
+                          if (!cleanUpdate) return null
                           const isLatest = idx === statusUpdates.slice(-3).length - 1
                           return (
                             <li 
