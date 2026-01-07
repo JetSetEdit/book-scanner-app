@@ -9,6 +9,31 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.01.86",
+    date: "2026-01-08",
+    title: "Consistency improvements",
+    changes: [
+      "Added a “Based on…” line on book pages (description length, mode, enrichment, cross-check)",
+      "Added a one-click “Run Deep scan” CTA on book pages when results may be incomplete",
+      "Scan page supports deep/quick preselection via URL",
+    ],
+  },
+  {
+    version: "1.01.85",
+    date: "2026-01-07",
+    title: "Mobile clarity",
+    changes: [
+      "Made “Why?” and feedback actions fully visible on mobile (no hover required)",
+      "Hid scan timing debug details from non-dev users",
+    ],
+  },
+  {
+    version: "1.01.84",
+    date: "2026-01-07",
+    title: "Release notes",
+    changes: ["Added a “What’s new” popover under the version badge"],
+  },
+  {
     version: "1.01.83",
     date: "2026-01-07",
     title: "Scan UX cleanup",

@@ -594,42 +594,49 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               userValidation={warning.user_validation}
             />
 
-            {/* Reasoning / Sources - Always show if available */}
-            {(warning.reasoning || warning.source_url) && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2">
-                    <Info className="h-3 w-3 mr-1" /> {warning.reasoning ? 'Why?' : 'Details'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
-                  {warning.reasoning && (
-                    <>
-                      <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">
-                        {isAi ? 'AI Reasoning' : 'Justification'}
-                      </p>
-                      <p className="mb-3">{warning.reasoning}</p>
-                    </>
-                  )}
-                  {warning.source_url && (
-                    <div className={warning.reasoning ? "mt-3 pt-3 border-t border-border" : ""}>
-                      <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">Source</p>
-                      <a
-                        href={warning.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 break-all"
-                      >
-                        {warning.source_url}
-                      </a>
-                    </div>
-                  )}
-                  {!warning.reasoning && !warning.source_url && (
-                    <p className="text-muted-foreground italic">No source notes added yet.</p>
-                  )}
-                </PopoverContent>
-              </Popover>
-            )}
+            {/* Reasoning / Sources */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2"
+                >
+                  <Info className="h-3 w-3 mr-1" /> {warning.reasoning ? 'Why?' : warning.source_url ? 'Details' : 'Why?'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
+                {warning.reasoning && (
+                  <>
+                    <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">
+                      {isAi ? 'AI Reasoning' : 'Justification'}
+                    </p>
+                    <p className="mb-3">{warning.reasoning}</p>
+                  </>
+                )}
+                {warning.source_url && (
+                  <div className={warning.reasoning ? "mt-3 pt-3 border-t border-border" : ""}>
+                    <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">Source</p>
+                    <a
+                      href={warning.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 break-all"
+                    >
+                      {warning.source_url}
+                    </a>
+                  </div>
+                )}
+                {!warning.reasoning && !warning.source_url && (
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground italic">No details available for this warning yet.</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      If this seems inaccurate, use the thumbs feedback (or “Found an error? Report this book.”) to help improve results.
+                    </p>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
 
             {/* Fallback: Show source link if no reasoning popover */}
             {!warning.reasoning && warning.source_url && (
