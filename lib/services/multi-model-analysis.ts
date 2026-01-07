@@ -585,11 +585,19 @@ Instructions:
     const response = await result.response
     const text = response.text()
 
-    // Extract JSON from response (might have markdown code blocks)
+    // Extract JSON from response (might have markdown code blocks or extra prose)
     let jsonText = text
-    const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/)
-    if (jsonMatch) {
-      jsonText = jsonMatch[1]
+    const fencedJson = text.match(/```json\s*([\s\S]*?)\s*```/)
+    const fencedAny = text.match(/```\s*([\s\S]*?)\s*```/)
+    const firstObject = text.match(/\{[\s\S]*\}/)
+    if (fencedJson) {
+      jsonText = fencedJson[1]
+    } else if (fencedAny) {
+      jsonText = fencedAny[1]
+    } else if (firstObject) {
+      jsonText = firstObject[0]
+    } else {
+      throw new Error('No JSON found in Gemini response')
     }
 
     const analysis = JSON.parse(jsonText)
