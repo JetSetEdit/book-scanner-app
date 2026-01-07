@@ -1,9 +1,9 @@
 // Service Worker for Subtext PWA
-const CACHE_NAME = 'subtext-v1'
-const urlsToCache = [
-  '/',
-  '/collection',
-  '/scan',
+// IMPORTANT:
+// - Use network-first for navigations to avoid stale UI after deploys.
+// - Keep cache name bumpable to force cleanup when needed.
+const CACHE_NAME = 'subtext-v2'
+const STATIC_ASSETS = [
   '/logo.png',
   '/manifest.json',
 ]
@@ -12,7 +12,7 @@ const urlsToCache = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(urlsToCache)
+      return cache.addAll(STATIC_ASSETS)
     })
   )
   self.skipWaiting()
@@ -34,6 +34,13 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim()
 })
 
+// Allow the app to force activation of an updated SW
+self.addEventListener('message', (event) => {
+  if (event?.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
@@ -46,12 +53,36 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  const request = event.request
+  const accept = request.headers.get('accept') || ''
+  const isNavigation = request.mode === 'navigate' || accept.includes('text/html')
+
+  // Network-first for navigations to prevent stale pages after deploys.
+  if (isNavigation) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          // Cache a copy for offline fallback
+          const responseToCache = networkResponse.clone()
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache)
+          })
+          return networkResponse
+        })
+        .catch(() => {
+          // Offline: fall back to cached navigation or home
+          return caches.match(request).then((cached) => cached || caches.match('/'))
+        })
+    )
+    return
+  }
+
   event.respondWith(
-    caches.match(event.request).then((response) => {
+    caches.match(request).then((response) => {
       // Return cached version or fetch from network
       return (
         response ||
-        fetch(event.request).then((response) => {
+        fetch(request).then((response) => {
           // Don't cache if not a valid response
           if (!response || response.status !== 200 || response.type !== 'basic') {
             return response
@@ -61,7 +92,7 @@ self.addEventListener('fetch', (event) => {
           const responseToCache = response.clone()
 
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache)
+            cache.put(request, responseToCache)
           })
 
           return response
