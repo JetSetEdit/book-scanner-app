@@ -626,7 +626,7 @@ function ScanTestPageContent() {
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground ml-6">
-                Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Uncheck for Deep (90–120s) verification (costs {DEEP_SCAN_COST} scan credits).
+                Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Deep scan (90–120s) uses {DEEP_SCAN_COST} scan credits from the same daily pool (Quick uses 1).
               </p>
             </div>
 
