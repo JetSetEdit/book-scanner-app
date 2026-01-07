@@ -12,14 +12,14 @@ export async function GET() {
     orientation: 'portrait-primary',
     icons: [
       {
-        src: '/logo_var_2.png',
+        src: '/icon-512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable',
       },
       {
-        src: '/logo-lockup.png',
-        sizes: '512x512',
+        src: '/icon-192.png',
+        sizes: '192x192',
         type: 'image/png',
         purpose: 'any',
       },
@@ -31,14 +31,14 @@ export async function GET() {
         short_name: 'Scan',
         description: 'Scan a book barcode',
         url: '/scan',
-        icons: [{ src: '/logo.png', sizes: '96x96' }],
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }],
       },
       {
         name: 'Bookshelf',
         short_name: 'Books',
         description: 'View your scanned books',
         url: '/collection',
-        icons: [{ src: '/logo.png', sizes: '96x96' }],
+        icons: [{ src: '/icon-192.png', sizes: '192x192' }],
       },
     ],
   }
