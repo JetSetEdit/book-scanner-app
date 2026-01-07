@@ -522,7 +522,8 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             )}
           </div>
 
-          <div className="flex items-center gap-4 opacity-40 group-hover:opacity-100 transition-opacity">
+          {/* On mobile there is no hover, so keep actions fully visible. */}
+          <div className="flex items-center gap-4 transition-opacity md:opacity-40 md:group-hover:opacity-100">
             {/* Dev Mode: Show which model generated this warning (localhost only) */}
             {typeof window !== 'undefined' && window.location.hostname === 'localhost' && warning.evidence && warning.evidence[0]?.model_source && (
               <Badge 

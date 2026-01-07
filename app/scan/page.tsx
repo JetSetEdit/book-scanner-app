@@ -157,6 +157,7 @@ function ScanTestPageContent() {
   const [reportAuthor, setReportAuthor] = useState("")
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState("")
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+  const isDevUi = typeof window !== 'undefined' && window.location.hostname === 'localhost'
   
   // Rate limit tracking
   const [rateLimit, setRateLimit] = useState<{
@@ -1207,8 +1208,8 @@ function ScanTestPageContent() {
                         <h3 className="font-bold text-lg">{result.book.title || "Unknown Title"}</h3>
                         <p className="text-sm text-muted-foreground">{result.book.author}</p>
                         
-                        {/* Timing Display */}
-                        {result.timing && (
+                        {/* Timing Display (dev-only) */}
+                        {isDevUi && result.timing && (
                           <div className="mt-3 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">
                             <div className="font-bold mb-1">⏱️ Scan Timing:</div>
                             <div>Total: <strong>{result.timing.duration.toFixed(0)}ms</strong></div>
