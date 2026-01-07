@@ -234,6 +234,23 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     return highRiskCategories.includes(cat)
   })
 
+  // RC should only trigger for truly extreme content, not just graphic violence in YA/dystopian fiction
+  // Check for multiple extreme indicators OR truly extreme content types
+  // NOTE: This must be calculated AFTER maxImpact is computed
+  const extremeContentTypes = ['extreme_violence', 'extreme_gore', 'extreme_sexual_violence', 'torture_porn', 'snuff']
+  const hasExtremeContentType = warnings.some(w => 
+    extremeContentTypes.some(extremeType => w.subcategory_id?.includes(extremeType))
+  )
+  
+  // Count warnings with very high explicitness (>= 0.9) - not just 0.8
+  const veryHighExplicitnessCount = warnings.filter(w => 
+    w.severity === 'severe' && (w.severity_signals?.explicitness ?? 0) >= 0.9
+  ).length
+  
+  // RC requires: (extreme content type) OR (multiple very high explicitness warnings AND high impact)
+  const hasExtremeContent = hasExtremeContentType || 
+    (veryHighExplicitnessCount >= 3 && maxImpact >= 0.8)
+
   // RC (Refused Classification) - extreme content
   // RC should be very rare - only for truly extreme content that would be refused classification
   // Not just graphic violence in YA/dystopian fiction (which can be MA15+ or R18+)
