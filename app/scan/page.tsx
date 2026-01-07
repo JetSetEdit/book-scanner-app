@@ -582,7 +582,7 @@ function ScanTestPageContent() {
                 </Label>
               </div>
               <p className="text-xs text-muted-foreground ml-6">
-              Quick mode uses a single model and caps warnings; it conditionally enriches thin metadata to avoid false “G” results. Uncheck for Deep (90–120s) verification (costs {DEEP_SCAN_COST} scan credits).
+                Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Uncheck for Deep (90–120s) verification (costs {DEEP_SCAN_COST} scan credits).
               </p>
             </div>
           </div>
@@ -1027,18 +1027,18 @@ function ScanTestPageContent() {
                   )}
                   {result.multiModelAnalysis && (
                     <span className="block mt-1 text-xs">
-                      Multi-model analysis completed (GPT-4o + Gemini)
+                      Cross-check analysis completed
                     </span>
                   )}
                 </AlertDescription>
               </Alert>
 
-              {/* Multi-Model Analysis Display */}
+              {/* Cross-check Analysis Display */}
               {result.multiModelAnalysis && (
                 <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20 space-y-4">
                   <h4 className="font-semibold text-sm flex items-center gap-2">
                     <span className="text-blue-600 dark:text-blue-400">🤖</span>
-                    Multi-Model Analysis
+                    Cross-check Summary
                   </h4>
                   
                   <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1058,7 +1058,7 @@ function ScanTestPageContent() {
 
                   {result.multiModelAnalysis.analysis.unique_to_gpt4o.length > 0 && (
                     <div className="text-xs">
-                      <span className="font-medium">GPT-4o uniquely found:</span>{' '}
+                      <span className="font-medium">Primary model uniquely found:</span>{' '}
                       <span className="text-muted-foreground">
                         {result.multiModelAnalysis.analysis.unique_to_gpt4o.join(', ')}
                       </span>
@@ -1067,7 +1067,7 @@ function ScanTestPageContent() {
 
                   {result.multiModelAnalysis.analysis.unique_to_gemini.length > 0 && (
                     <div className="text-xs">
-                      <span className="font-medium">Gemini uniquely found:</span>{' '}
+                      <span className="font-medium">Secondary model uniquely found:</span>{' '}
                       <span className="text-muted-foreground">
                         {result.multiModelAnalysis.analysis.unique_to_gemini.join(', ')}
                       </span>
@@ -1079,7 +1079,7 @@ function ScanTestPageContent() {
                       <div className="font-medium mb-1">Severity Differences:</div>
                       {result.multiModelAnalysis.analysis.severity_differences.map((diff: any, i: number) => (
                         <div key={i} className="text-muted-foreground ml-2">
-                          {diff.category}: GPT-4o={diff.gpt4o_score.toFixed(2)}, Gemini={diff.gemini_score.toFixed(2)}
+                          {diff.category}: Primary={diff.gpt4o_score.toFixed(2)}, Secondary={diff.gemini_score.toFixed(2)}
                         </div>
                       ))}
                     </div>
@@ -1092,7 +1092,9 @@ function ScanTestPageContent() {
                   <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t">
                     {result.multiModelAnalysis.model_results.map((model: any) => (
                       <div key={model.model} className="p-2 bg-white dark:bg-slate-800 rounded">
-                        <div className="font-medium">{model.model}</div>
+                        <div className="font-medium">
+                          {model.model === 'gpt-4o' ? 'Primary model' : model.model === 'gemini' ? 'Secondary model' : model.model}
+                        </div>
                         <div className="text-muted-foreground">
                           {model.content_warnings.length} warnings • {model.timing}ms
                         </div>
@@ -1198,7 +1200,7 @@ function ScanTestPageContent() {
                                )}
                                {warning.source !== 'combined' && (
                                  <div className="text-xs text-muted-foreground mt-1">
-                                   Source: {warning.source === 'gpt-4o' ? 'GPT-4o only' : 'Gemini only'}
+                                  Source: {warning.source === 'gpt-4o' ? 'Primary model only' : warning.source === 'gemini' ? 'Secondary model only' : warning.source}
                                  </div>
                                )}
                              </div>
