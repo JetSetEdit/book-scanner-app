@@ -16,7 +16,7 @@ import { searchForContentWarnings, SearchResult } from '@/lib/google-search'
 
 export interface EnrichmentResult {
   enrichedContext: string | null
-  source: 'web_search' | null
+  source: 'web_search' | 'llm_fallback' | null
   foundContentWarnings: boolean
 }
 
@@ -35,33 +35,72 @@ export async function enrichWithWebSearch(
   initialWarningsCount: number,
   onProgress?: (message: string) => void
 ): Promise<EnrichmentResult> {
-  // Only enrich if we got 0 warnings or very few generic warnings
-  // This indicates the description may be too sanitized
-  if (initialWarningsCount > 2) {
-    onProgress?.('ℹ️ Sufficient warnings found, skipping web search enrichment')
-    return {
-      enrichedContext: null,
-      source: null,
-      foundContentWarnings: false
-    }
+  // Caller decides whether enrichment is warranted. We keep a lightweight guardrail to avoid
+  // spending time on books that already have many warnings.
+  if (initialWarningsCount > 7) {
+    onProgress?.('ℹ️ Many warnings already present, skipping web enrichment')
+    return { enrichedContext: null, source: null, foundContentWarnings: false }
   }
 
   onProgress?.('🔍 Searching for content warnings from community sources...')
 
   try {
-    // Perform REAL web search using Google Custom Search API
-    const searchResults = await searchForContentWarnings(
-      metadata.title,
-      metadata.author || ''
-    )
+    const hasGoogleKeys = !!process.env.GOOGLE_SEARCH_API_KEY && !!process.env.GOOGLE_SEARCH_ENGINE_ID
+
+    // Perform REAL web search using Google Custom Search API (when configured)
+    const searchResults = hasGoogleKeys
+      ? await searchForContentWarnings(metadata.title, metadata.author || '')
+      : []
 
     if (searchResults.length === 0) {
-      onProgress?.('ℹ️ No search results found from community sources')
-      return {
-        enrichedContext: null,
-        source: null,
-        foundContentWarnings: false
+      if (!hasGoogleKeys) {
+        // Fallback: no live web search configured. Use a cautious LLM-only enrichment that
+        // focuses on "widely reported" triggers without claiming citations.
+        onProgress?.('ℹ️ Web enrichment unavailable (missing Google Search API keys). Using fallback enrichment…')
+        try {
+          const { default: OpenAI } = await import('openai')
+          const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+          const prompt = `List widely-reported content warnings / trigger warnings for the book "${metadata.title}" by ${metadata.author || 'Unknown Author'} (ISBN: ${metadata.isbn || 'unknown'}).
+
+IMPORTANT:
+- Do NOT quote or reproduce retailer descriptions.
+- Do NOT fabricate citations or URLs.
+- If you are uncertain about a warning, label it as "uncertain".
+
+Focus especially on: torture, imprisonment/confinement, explicit sexual content, sexual violence, gore/dismemberment, grief/loss, abuse, and war violence.
+
+Return a compact bullet list.`
+
+          const isGpt5 = true
+          const resp = await openai.chat.completions.create({
+            model: 'gpt-5.2-2025-12-11',
+            messages: [
+              { role: 'system', content: 'You provide cautious, non-hallucinated content warning summaries. If uncertain, say so explicitly.' },
+              { role: 'user', content: prompt },
+            ],
+            ...(isGpt5 ? { max_completion_tokens: 400 } : { max_tokens: 400 }),
+          })
+
+          const text = resp.choices?.[0]?.message?.content?.trim() || ''
+          if (!text) {
+            onProgress?.('ℹ️ Fallback enrichment returned no usable content')
+            return { enrichedContext: null, source: null, foundContentWarnings: false }
+          }
+
+          return {
+            enrichedContext: `LLM fallback enrichment (no live web search configured):\n${text}`,
+            source: 'llm_fallback',
+            foundContentWarnings: true,
+          }
+        } catch (e) {
+          onProgress?.('⚠️ Fallback enrichment failed')
+          return { enrichedContext: null, source: null, foundContentWarnings: false }
+        }
       }
+
+      onProgress?.('ℹ️ No search results found from community sources')
+      return { enrichedContext: null, source: null, foundContentWarnings: false }
     }
 
     // Filter out retailer websites
@@ -107,7 +146,12 @@ export async function enrichWithWebSearch(
       'content warning', 'trigger warning', 'tw:', 'cw:', 'grief', 'anxiety',
       'panic attack', 'depression', 'trauma', 'mental health', 'death', 'loss',
       'enemies to lovers', 'toxic', 'abuse', 'violence', 'self-harm', 'burnout',
-      'ptsd', 'suicide', 'self harm'
+      'ptsd', 'suicide', 'self harm',
+      // High-signal "sanitized blurb" omissions
+      'torture', 'imprisonment', 'confinement', 'captivity', 'kidnapping',
+      'explicit sexual', 'explicit sex', 'smut', 'spice', 'sexual content',
+      'sexual assault', 'rape', 'non-consensual', 'non consensual',
+      'gore', 'dismember', 'dismemberment'
     ]
 
     const foundContentWarnings = contentWarningIndicators.some(indicator => {

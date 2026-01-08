@@ -1618,7 +1618,9 @@ export async function analyzeBookWithMultiModel(
           onProgress
         )
 
-        if (enrichmentResult.enrichedContext && enrichmentResult.foundContentWarnings) {
+        // IMPORTANT: Don't require the snippets to literally contain "content warning" language.
+        // If we got any enrichment context, it can still help the second-pass analysis.
+        if (enrichmentResult.enrichedContext) {
           onProgress?.('⏳ Gathering additional information from community sources...')
           
           // Create enriched metadata with community-sourced context
@@ -1629,16 +1631,19 @@ export async function analyzeBookWithMultiModel(
 
           // Run a second analysis with enriched description
           onProgress?.('⏳ Re-analyzing with additional context...')
-          const enrichedResult = await analyzeWithOpenAI(enrichedMetadata, onProgress, effectiveOptions.model, effectiveOptions)
+          // Allow the enriched pass to return more warnings (so major omissions can actually surface).
+          const enrichedOptions = {
+            ...effectiveOptions,
+            maxWarnings: Math.max(Number(effectiveOptions.maxWarnings || 0), 8),
+          }
+          const enrichedResult = await analyzeWithOpenAI(enrichedMetadata, onProgress, effectiveOptions.model, enrichedOptions)
           const enrichedWarnings = enrichedResult.warnings
 
-          if (enrichedWarnings.length > finalWarnings.length) {
-            onProgress?.(`✓ Found ${enrichedWarnings.length - finalWarnings.length} additional warning${enrichedWarnings.length - finalWarnings.length === 1 ? '' : 's'} from community sources`)
-            
-            // Combine original warnings with enriched warnings (deduplicate by subcategory_id)
-            const existingSubcategoryIds = new Set(finalWarnings.map(w => w.subcategory_id))
-            const newWarnings = enrichedWarnings.filter(w => !existingSubcategoryIds.has(w.subcategory_id))
-            
+          const existingSubcategoryIds = new Set(finalWarnings.map(w => w.subcategory_id))
+          const newWarnings = enrichedWarnings.filter(w => !existingSubcategoryIds.has(w.subcategory_id))
+
+          if (newWarnings.length > 0) {
+            onProgress?.(`✓ Found ${newWarnings.length} additional warning${newWarnings.length === 1 ? '' : 's'} from enrichment`)
             finalWarnings = [...finalWarnings, ...newWarnings]
 
             if (webEnrichment) {
@@ -1668,8 +1673,13 @@ export async function analyzeBookWithMultiModel(
   }
 
   // Apply post-processing caps/stripping for benchmarking / quick modes
-  if (typeof effectiveOptions.maxWarnings === 'number' && effectiveOptions.maxWarnings > 0) {
-    finalWarnings = sortWarningsForCapping(finalWarnings).slice(0, effectiveOptions.maxWarnings)
+  const maxWarningsForReturn =
+    webEnrichment?.used === true
+      ? Math.max(Number(effectiveOptions.maxWarnings || 0), 8)
+      : effectiveOptions.maxWarnings
+
+  if (typeof maxWarningsForReturn === 'number' && maxWarningsForReturn > 0) {
+    finalWarnings = sortWarningsForCapping(finalWarnings).slice(0, maxWarningsForReturn)
   }
   if (effectiveOptions.includeReasoning === false) {
     finalWarnings = finalWarnings.map(w => ({ ...w, reasoning: undefined }))

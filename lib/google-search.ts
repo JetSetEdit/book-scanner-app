@@ -104,9 +104,30 @@ export async function searchForContentWarnings(
   title: string,
   author: string
 ): Promise<SearchResult[]> {
-  // Construct a targeted query that focuses on user-generated content warnings
-  const query = `"${title}" "${author}" content warnings trigger warnings parents guide`
-  
-  return performWebSearch(query, 5)
+  // Construct targeted queries that focus on user-generated content warnings.
+  // We run a couple variants to increase recall for "missing major themes" cases.
+  const queries = [
+    `"${title}" "${author}" content warnings trigger warnings parents guide`,
+    `"${title}" "${author}" trigger warnings torture explicit sexual content`,
+    `"${title}" "${author}" "TW" "CW" "content warnings"`,
+  ]
+
+  const results: SearchResult[] = []
+  for (const q of queries) {
+    const r = await performWebSearch(q, 3)
+    results.push(...r)
+  }
+
+  // Dedupe by link
+  const seen = new Set<string>()
+  const deduped: SearchResult[] = []
+  for (const r of results) {
+    const link = (r.link || '').trim()
+    if (!link || seen.has(link)) continue
+    seen.add(link)
+    deduped.push(r)
+  }
+
+  return deduped.slice(0, 9)
 }
 
