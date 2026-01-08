@@ -89,7 +89,36 @@ export default async function BookPage({ params }: BookPageProps) {
     : null
 
   // No user validation needed - all warnings are shown without user-specific data
-  const warningsWithValidations = warnings || []
+  const warningsWithValidations = (() => {
+    const list: any[] = warnings || []
+    // Dedupe by (category_id, subcategory_id) for display stability.
+    // This protects the UI even if multiple scans accidentally inserted duplicates.
+    const severityRank = (sev: any) => {
+      switch (String(sev || '').toLowerCase()) {
+        case 'severe': return 3
+        case 'moderate': return 2
+        case 'mild': return 1
+        default: return 0
+      }
+    }
+    const byKey = new Map<string, any>()
+    for (const w of list) {
+      const key = `${w?.category_id || w?.category || 'unknown'}.${w?.subcategory_id || 'unknown'}`
+      const existing = byKey.get(key)
+      if (!existing) {
+        byKey.set(key, w)
+        continue
+      }
+      // Prefer higher severity; if equal, prefer the one with more votes; else keep existing.
+      const existingVotes = (existing?.helpful_count || 0) + (existing?.not_helpful_count || 0)
+      const wVotes = (w?.helpful_count || 0) + (w?.not_helpful_count || 0)
+      const sevDelta = severityRank(w?.severity) - severityRank(existing?.severity)
+      if (sevDelta > 0 || (sevDelta === 0 && wVotes > existingVotes)) {
+        byKey.set(key, w)
+      }
+    }
+    return Array.from(byKey.values())
+  })()
 
   return (
     <main className="min-h-screen bg-background">

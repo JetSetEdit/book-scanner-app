@@ -162,33 +162,43 @@ async function logAuditDecision(params: {
     bookInfoIssues?: string[]
   }
 }) {
-  try {
-    const auditLog: any = {
-      book_id: params.bookId,
-      isbn: params.isbn,
-      decision_type: params.decisionType,
-      warnings_count: params.warningsCount,
-      ai_reasoning: params.aiReasoning,
-      confidence_level: params.confidenceLevel || null,
-      book_title: params.bookTitle || null,
-      book_author: params.bookAuthor || null,
-      description_length: params.descriptionLength || null,
-      had_thin_metadata: params.hadThinMetadata || false,
-      used_web_search: params.usedWebSearch || false,
-      raw_ai_response: params.rawAiResponse || null,
-      model_version: params.modelVersion || null,
-      taxonomy_version: params.taxonomyVersion || null,
-      pipeline_path: params.pipelinePath || null,
-      metadata_issues: params.metadataIssues || null
-    }
-
-    await supabaseAdmin
-      .from('ai_audit_logs')
-      .insert(auditLog)
-  } catch (error) {
-    console.error('Failed to log audit decision:', error)
-    // Don't throw - audit logging failure shouldn't break the scan
+  // Supabase returns { error } rather than throwing; handle it explicitly.
+  const auditLog: any = {
+    book_id: params.bookId,
+    isbn: params.isbn,
+    decision_type: params.decisionType,
+    warnings_count: params.warningsCount,
+    ai_reasoning: params.aiReasoning,
+    confidence_level: params.confidenceLevel || null,
+    book_title: params.bookTitle || null,
+    book_author: params.bookAuthor || null,
+    description_length: params.descriptionLength || null,
+    had_thin_metadata: params.hadThinMetadata || false,
+    used_web_search: params.usedWebSearch || false,
+    raw_ai_response: params.rawAiResponse || null,
+    model_version: params.modelVersion || null,
+    taxonomy_version: params.taxonomyVersion || null,
+    pipeline_path: params.pipelinePath || null,
+    metadata_issues: params.metadataIssues || null,
   }
+
+  const { error } = await supabaseAdmin.from('ai_audit_logs').insert(auditLog)
+  if (!error) return
+
+  const msg = String((error as any)?.message || '')
+
+  // Backwards-compatible retry: some environments may not yet have newer columns.
+  if (msg.includes('metadata_issues') && msg.includes('does not exist')) {
+    const { metadata_issues, ...withoutMetadataIssues } = auditLog
+    const retry = await supabaseAdmin.from('ai_audit_logs').insert(withoutMetadataIssues as any)
+    if (retry.error) {
+      console.warn('[Audit Log] Failed to insert (retry w/o metadata_issues):', String((retry.error as any)?.message || retry.error))
+    }
+    return
+  }
+
+  console.warn('[Audit Log] Failed to insert ai_audit_logs row:', msg)
+  // Don't throw - audit logging failure shouldn't break the scan
 }
 
 export async function processIsbnScan(
@@ -865,8 +875,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   enableAdversarial: analysisOptions?.enableAdversarial ?? false,
                   enableVerification: analysisOptions?.enableVerification ?? false,
                   enableWebEnrichment:
-                    analysisOptions?.enableWebEnrichment ??
-                    (metadataAssessment.requiresEnrichment ? true : false),
+                    analysisOptions?.enableWebEnrichment ?? true,
                   maxWarnings: analysisOptions?.maxWarnings ?? 5,
                   includeReasoning: analysisOptions?.includeReasoning ?? false,
                   maxDescriptionChars:
