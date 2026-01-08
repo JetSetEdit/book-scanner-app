@@ -146,7 +146,13 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     w.subcategory_id?.includes('explicit_sexual_content')
   )
   const hasIntenseRomanceOrSpice = warnings.some(w => 
-    w.subcategory_id?.includes('intense_romance_or_spice')
+    w.subcategory_id?.includes('intense_romance')
+  )
+  const hasIncestOrTabooSex = warnings.some(w =>
+    w.subcategory_id?.includes('incest_taboo')
+  )
+  const hasSexualViolence = warnings.some(w =>
+    w.subcategory_id?.includes('sexual_violence')
   )
   const hasGraphicViolence = warnings.some(w => 
     w.subcategory_id?.includes('graphic_violence')
@@ -311,6 +317,20 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     rating = 'G'
     ageRecommendation = 'Suitable for all ages'
     reasoning = 'Content warnings are present but impact is very mild. Suitable for general audiences.'
+  }
+
+  // Minimum floors for specific high-risk topics.
+  // Even if the model marks these as "moderate" (low explicitness), they should not land at M.
+  // This helps catch sanitized-blurb cases where taboo content is present but described vaguely.
+  const ratingRank: Record<ClassificationRating, number> = { G: 0, PG: 1, M: 2, 'MA15+': 3, 'R18+': 4, RC: 5 }
+  let floor: ClassificationRating | null = null
+  if (hasSexualViolence) floor = 'R18+'
+  else if (hasIncestOrTabooSex || hasExplicitSexualContent) floor = 'MA15+'
+
+  if (floor && ratingRank[rating] < ratingRank[floor]) {
+    rating = floor
+    ageRecommendation = floor === 'R18+' ? 'Recommended for ages 18+' : 'Recommended for ages 15+'
+    reasoning = `${floor} floor applied due to ${hasSexualViolence ? 'sexual violence' : hasIncestOrTabooSex ? 'incest/taboo sexual content' : 'explicit sexual content'}. ${reasoning}`
   }
 
   // Add explainable reasoning with top contributing warning
