@@ -1578,7 +1578,22 @@ export async function analyzeBookWithMultiModel(
     finalWarnings.length <= 7 &&
     finalWarnings.every(w => genericClusterIds.has(w.subcategory_id))
 
-  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster)) {
+  // Another common sanitized pattern (e.g., epic fantasy blurbs):
+  // lots of violence/politics signals but no sexual content warnings at all.
+  // If a book has multiple violence-related warnings and *zero* sexual_content.*,
+  // we should attempt enrichment to catch taboo/omitted triggers (SA/incest) from community sources.
+  const hasAnySexualContentWarning = finalWarnings.some(w => (w.subcategory_id || '').startsWith('sexual_content.'))
+  const hasViolenceSignal = finalWarnings.some(w =>
+    (w.subcategory_id || '').startsWith('violence.') ||
+    w.subcategory_id === 'death_or_grief.near_death'
+  )
+  const looksLikeViolenceWithoutSex =
+    finalWarnings.length >= 4 &&
+    finalWarnings.length <= 7 &&
+    hasViolenceSignal &&
+    !hasAnySexualContentWarning
+
+  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster || looksLikeViolenceWithoutSex)) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
     const hasOnlyGenericWarnings = finalWarnings.length > 0 && 
       finalWarnings.every(w => 
@@ -1592,6 +1607,7 @@ export async function analyzeBookWithMultiModel(
     // 3. We have 1-2 warnings but they're all relationship/alcohol (might be missing mental health)
     const shouldEnrich = finalWarnings.length === 0 ||
       looksLikeGenericCluster ||
+      looksLikeViolenceWithoutSex ||
       hasOnlyGenericWarnings ||
       (finalWarnings.length <= 2 &&
        !finalWarnings.some(w => 
