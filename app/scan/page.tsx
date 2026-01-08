@@ -104,6 +104,7 @@ function ScanTestPageContent() {
 
   // Scan mode (Quick vs Deep). Default to Quick for browsing.
   const [scanMode, setScanMode] = useState<'quick' | 'deep'>('quick')
+  const [forceRefresh, setForceRefresh] = useState(false)
   const DEEP_SCAN_COST = 2
   
   // Initialize camera visibility:
@@ -180,8 +181,13 @@ function ScanTestPageContent() {
     
     const isbnParam = searchParams.get('isbn')
     const scanModeParam = searchParams.get('scanMode')
+    const forceRefreshParam = searchParams.get('forceRefresh')
+    const forceRefreshFromUrl = forceRefreshParam === '1' || forceRefreshParam === 'true'
     if (scanModeParam === 'quick' || scanModeParam === 'deep') {
       setScanMode(scanModeParam)
+    }
+    if (forceRefreshFromUrl) {
+      setForceRefresh(true)
     }
     if (isbnParam && isbnParam.trim() && !loading && !result) {
       const normalizedIsbn = isbnParam.trim()
@@ -189,7 +195,12 @@ function ScanTestPageContent() {
       setHasAutoScanned(true)
       // Small delay to ensure component is fully mounted
       const timeoutId = setTimeout(() => {
-        performScan(normalizedIsbn, undefined, scanModeParam === 'quick' || scanModeParam === 'deep' ? scanModeParam : undefined)
+        performScan(
+          normalizedIsbn,
+          undefined,
+          scanModeParam === 'quick' || scanModeParam === 'deep' ? scanModeParam : undefined,
+          forceRefreshFromUrl ? true : undefined
+        )
       }, 300)
       return () => clearTimeout(timeoutId)
     }
@@ -199,7 +210,12 @@ function ScanTestPageContent() {
   // Note: We store lastIsbn for history, but don't auto-fill the input
   // Users can manually enter or scan a new ISBN each time
 
-  const performScan = async (isbnToScan: string, selectedCandidate?: any, scanModeOverride?: 'quick' | 'deep') => {
+  const performScan = async (
+    isbnToScan: string,
+    selectedCandidate?: any,
+    scanModeOverride?: 'quick' | 'deep',
+    forceRefreshOverride?: boolean
+  ) => {
     // Start timing
     const timer = startTiming()
     markStage('scan-initiated')
@@ -238,7 +254,7 @@ function ScanTestPageContent() {
           },
           body: JSON.stringify({ 
             isbn: isbnToScan, 
-            forceRefresh: false, // Don't force refresh - use existing book if available
+            forceRefresh: forceRefreshOverride ?? forceRefresh,
             selectedCandidate: selectedCandidate || undefined,
             timezone: userTimezone,
             scanMode: scanModeOverride ?? scanMode
@@ -628,6 +644,26 @@ function ScanTestPageContent() {
               </div>
               <p className="text-xs text-muted-foreground ml-6">
                 Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Deep scan (90–120s) uses {DEEP_SCAN_COST} scan credits from the same daily pool (Quick uses 1).
+              </p>
+            </div>
+
+            {/* Force refresh toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="force-refresh"
+                  checked={forceRefresh}
+                  onCheckedChange={(checked) => setForceRefresh(checked === true)}
+                />
+                <Label
+                  htmlFor="force-refresh"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Force refresh (re-scan and replace existing warnings)
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground ml-6">
+                Recommended when testing changes. This deletes existing AI-generated warnings for the book and regenerates them.
               </p>
             </div>
 

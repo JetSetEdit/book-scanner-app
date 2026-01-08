@@ -441,7 +441,13 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                     : analysisMeta?.pipelinePath?.includes('deep')
                       ? 'Deep'
                       : null
-                  const enrichment = analysisMeta?.usedWebSearch ? 'Yes' : analysisMeta ? 'No' : null
+                  const enrichment = (() => {
+                    if (!analysisMeta) return null
+                    const p = analysisMeta.pipelinePath || ''
+                    if (p.includes('->enriched')) return 'Yes'
+                    if (p.includes('->enrich_attempted')) return 'Attempted'
+                    return analysisMeta.usedWebSearch ? 'Yes' : 'No'
+                  })()
                   const isThin = analysisMeta?.hadThinMetadata === true || descriptionLength < 200
                   const shouldSuggestDeep = analysisStatus === 'complete' && (pipeline === 'Quick' || isThin || !crossChecked || !votesPresent)
                   const parts = [

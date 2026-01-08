@@ -900,20 +900,30 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
           )
 
           // Record enrichment usage (if multi-model enrichment ran)
-          const webEnrichmentUsed = (analysisResult as any).web_enrichment?.used === true
+          const webEnrichmentInfo = (analysisResult as any).web_enrichment
+          const webEnrichmentAttempted = webEnrichmentInfo?.attempted === true
+          const webEnrichmentUsed = webEnrichmentInfo?.used === true
           enrichmentUsed = scanMode === 'quick' ? webEnrichmentUsed : false
 
           // Treat enrichment as a "web search" provenance signal for transparency.
-          // The UI uses audit logs to show whether we went beyond the blurb; web enrichment qualifies.
+          // IMPORTANT: We only mark usedWebSearch=true when enrichment was USED (i.e., changed output),
+          // but we also encode "attempted" into pipelinePath so the UI can show Attempted vs No.
           if (webEnrichmentUsed) {
             usedWebSearch = true
           }
 
           // Update pipeline path early so audit logs reflect what actually happened.
           if (scanMode === 'quick') {
-            pipelinePath = `quick/${metadataAssessment.requiresEnrichment ? 'thin' : 'rich'}${webEnrichmentUsed ? '->enriched' : ''}`
+            const base = `quick/${metadataAssessment.requiresEnrichment ? 'thin' : 'rich'}`
+            pipelinePath = webEnrichmentUsed
+              ? `${base}->enriched`
+              : webEnrichmentAttempted
+                ? `${base}->enrich_attempted`
+                : base
           } else if (webEnrichmentUsed) {
             pipelinePath = `${pipelinePath}->enriched`
+          } else if (webEnrichmentAttempted) {
+            pipelinePath = `${pipelinePath}->enrich_attempted`
           }
           
           // Store no_warnings_reasoning for use in audit log if no warnings found
