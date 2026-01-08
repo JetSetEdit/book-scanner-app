@@ -31,8 +31,8 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-01-08",
     title: "Consistency improvements",
     changes: [
-      "Added a "Based on…" line on book pages (description length, mode, enrichment, cross-check)",
-      "Added a one-click "Run Deep scan" CTA on book pages when results may be incomplete",
+      "Added a \"Based on…\" line on book pages (description length, mode, enrichment, cross-check)",
+      "Added a one-click \"Run Deep scan\" CTA on book pages when results may be incomplete",
       "Scan page supports deep/quick preselection via URL",
     ],
   },
