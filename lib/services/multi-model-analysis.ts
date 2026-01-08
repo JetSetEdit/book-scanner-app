@@ -219,6 +219,12 @@ Instructions:
        - "family_dynamics.deception_or_secrets" for deception/lying to friends or family
        - "family_dynamics.divorce" for relationship breakdown/separation
        - "family_dynamics.other_family_dynamics" for other family/social dynamics
+
+ 2b. CRITICAL: CHILD HARM / INFANTICIDE (high trust category)
+   - If the description or enrichment context mentions infanticide, intentional harm to a newborn/infant, attempted murder of a baby, or deliberate harm to children, you MUST use:
+     - "violence.infanticide_or_intentional_child_harm"
+   - Do NOT bury this under generic "death" or "near death" when the content is intentional harm.
+   - This category should generally not be mild.
    - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field. 
      * BEFORE returning empty, explicitly ask yourself: "Does this book contain grief, anxiety, panic attacks, or intense emotional distress?"
      * If YES, these are CONTENT WARNINGS. Do not return empty. Create a warning for "mental_health" or "themes".
@@ -861,8 +867,15 @@ function processWarnings(
         reasoning: w.reasoning || ''
       } as any)
 
+      // If the model over-claims sexual violence without clear signals, downgrade to consent ambiguity.
       if (!violenceCheck.isViolence && subcategoryId === 'sexual_content.sexual_violence') {
         subcategoryId = 'sexual_content.consent_ambiguity'
+      }
+
+      // Conversely, if the model under-calls non-consensual acts as "consent ambiguity",
+      // upgrade to sexual violence when strong signals are present (e.g., "groping", "unwanted", "assault").
+      if (violenceCheck.isViolence && subcategoryId === 'sexual_content.consent_ambiguity' && violenceCheck.confidence >= 0.7) {
+        subcategoryId = 'sexual_content.sexual_violence'
       }
     }
 

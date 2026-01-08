@@ -89,6 +89,12 @@ export const AGE_ESCALATION_WEIGHTS: EscalationWeight[] = [
   },
   {
     category: 'violence',
+    subcategory: 'infanticide_or_intentional_child_harm',
+    weight: 0.8,
+    reasoning: 'Intentional harm to infants/children is highly disturbing and should strongly escalate age rating'
+  },
+  {
+    category: 'violence',
     subcategory: 'domestic_violence',
     weight: 0.6,
     reasoning: 'Domestic violence is serious and disturbing'

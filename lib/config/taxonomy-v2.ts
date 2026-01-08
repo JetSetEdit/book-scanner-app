@@ -431,6 +431,12 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'severe'
       },
       {
+        id: 'infanticide_or_intentional_child_harm',
+        userLabel: 'Infanticide / Intentional Harm to a Child',
+        shortDescription: 'Infanticide, attempted murder of a newborn/child, or intentional harm targeting infants/children (distinct from accidental harm or general peril).',
+        defaultSeverityHint: 'severe'
+      },
+      {
         id: 'human_trafficking',
         userLabel: 'Human Trafficking',
         shortDescription: 'Human trafficking, sex trafficking, or forced servitude. Distinct from general kidnapping.',
