@@ -877,7 +877,8 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   enableWebEnrichment:
                     analysisOptions?.enableWebEnrichment ?? true,
                   maxWarnings: analysisOptions?.maxWarnings ?? 5,
-                  includeReasoning: analysisOptions?.includeReasoning ?? false,
+                  // Show "Why?" details by default in Quick mode too (helps users validate warnings and vote).
+                  includeReasoning: analysisOptions?.includeReasoning ?? true,
                   maxDescriptionChars:
                     analysisOptions?.maxDescriptionChars ??
                     (metadataAssessment.requiresEnrichment ? 1500 : 1000),
