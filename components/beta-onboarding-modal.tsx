@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
@@ -11,8 +11,13 @@ const DISCLAIMER_VERSION = "2026-01-08-v1"
 export function BetaOnboardingModal() {
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const hasCheckedRef = useRef(false)
 
   useEffect(() => {
+    // Prevent double-checking in React Strict Mode
+    if (hasCheckedRef.current) return
+    hasCheckedRef.current = true
+
     setMounted(true)
     // Check if user has already accepted
     const hasAccepted = localStorage.getItem(STORAGE_KEY) === "true"
@@ -51,7 +56,7 @@ export function BetaOnboardingModal() {
   }
 
   // Don't render until mounted to avoid hydration mismatch
-  if (!mounted) {
+  if (!mounted || !isOpen) {
     return null
   }
 
