@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Get country from Vercel's geo headers
-  const country = request.geo?.country || request.headers.get('x-vercel-ip-country');
+  // Allow testing via URL parameter: ?test-country=US
+  const testCountry = request.nextUrl.searchParams.get('test-country');
+  // Get country from Vercel's geo headers (or test parameter)
+  const country = testCountry || request.geo?.country || request.headers.get('x-vercel-ip-country');
   
   // During development, allow localhost/no geo data
   const isDevelopment = process.env.NODE_ENV === 'development';
