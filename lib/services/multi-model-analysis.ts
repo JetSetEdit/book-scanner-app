@@ -1554,10 +1554,31 @@ export async function analyzeBookWithMultiModel(
 
       // Final message will be shown by scan-service
 
-  // Web Search Enrichment: If we got 0 warnings or very few warnings,
-  // search for content warnings from community sources
-  // This helps catch mental health themes that may be missing from sanitized descriptions
-  if (effectiveOptions.enableWebEnrichment && finalWarnings.length <= 2) {
+  // Web Search Enrichment: If we got 0 warnings or very few (or very generic) warnings,
+  // search for content warnings from community sources.
+  // This helps catch themes that may be missing from sanitized descriptions or overly-generic model outputs.
+  //
+  // NOTE: We intentionally trigger enrichment not just for 0–2 warnings, but also for certain
+  // "generic clusters" that frequently indicate a sanitized summary (e.g., War + Near Death + Deception).
+  //
+  // Real-world example: Some books produce a small set of broad, non-specific warnings (war/weapons/near-death/secrets)
+  // while missing major themes (torture, explicit sexual content, confinement). Enrichment helps pull in community
+  // context to recover those.
+  const genericClusterIds = new Set<string>([
+    'violence.war',
+    'violence.weapons',
+    'violence.physical_violence',
+    'death_or_grief.near_death',
+    'family_dynamics.deception_or_secrets',
+    'sexual_content.intense_romance',
+  ])
+
+  const looksLikeGenericCluster =
+    finalWarnings.length > 0 &&
+    finalWarnings.length <= 7 &&
+    finalWarnings.every(w => genericClusterIds.has(w.subcategory_id))
+
+  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster)) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
     const hasOnlyGenericWarnings = finalWarnings.length > 0 && 
       finalWarnings.every(w => 
@@ -1569,9 +1590,10 @@ export async function analyzeBookWithMultiModel(
     // 1. We have 0 warnings (definitely need enrichment)
     // 2. We only have generic warnings (likely sanitized)
     // 3. We have 1-2 warnings but they're all relationship/alcohol (might be missing mental health)
-    const shouldEnrich = finalWarnings.length === 0 || 
+    const shouldEnrich = finalWarnings.length === 0 ||
+      looksLikeGenericCluster ||
       hasOnlyGenericWarnings ||
-      (finalWarnings.length <= 2 && 
+      (finalWarnings.length <= 2 &&
        !finalWarnings.some(w => 
          w.subcategory_id?.includes('mental_health') ||
          w.subcategory_id?.includes('grief') ||

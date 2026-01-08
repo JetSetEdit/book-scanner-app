@@ -891,10 +891,21 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
           )
 
           // Record enrichment usage (if multi-model enrichment ran)
-          enrichmentUsed =
-            scanMode === 'quick'
-              ? (analysisResult as any).web_enrichment?.used === true
-              : false
+          const webEnrichmentUsed = (analysisResult as any).web_enrichment?.used === true
+          enrichmentUsed = scanMode === 'quick' ? webEnrichmentUsed : false
+
+          // Treat enrichment as a "web search" provenance signal for transparency.
+          // The UI uses audit logs to show whether we went beyond the blurb; web enrichment qualifies.
+          if (webEnrichmentUsed) {
+            usedWebSearch = true
+          }
+
+          // Update pipeline path early so audit logs reflect what actually happened.
+          if (scanMode === 'quick') {
+            pipelinePath = `quick/${metadataAssessment.requiresEnrichment ? 'thin' : 'rich'}${webEnrichmentUsed ? '->enriched' : ''}`
+          } else if (webEnrichmentUsed) {
+            pipelinePath = `${pipelinePath}->enriched`
+          }
           
           // Store no_warnings_reasoning for use in audit log if no warnings found
           const noWarningsReasoning = analysisResult.noWarningsReasoning
@@ -1053,19 +1064,44 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                 }
               })
               .filter((w): w is NonNullable<typeof w> => w !== null) // Remove null entries
+
+            // Dedupe by (category_id, subcategory_id) to prevent duplicate rows when the model outputs
+            // the same warning multiple times (e.g., "Near Death" x2).
+            const severityRank = (sev: any) => {
+              switch (String(sev || '').toLowerCase()) {
+                case 'severe': return 3
+                case 'moderate': return 2
+                case 'mild': return 1
+                default: return 0
+              }
+            }
+            const dedupedMap = new Map<string, (typeof warningsToInsert)[number]>()
+            for (const w of warningsToInsert) {
+              const key = `${w.category_id}.${w.subcategory_id}`
+              const existing = dedupedMap.get(key)
+              if (!existing) {
+                dedupedMap.set(key, w)
+                continue
+              }
+              // Keep the higher-severity version if they differ
+              if (severityRank(w.severity) > severityRank(existing.severity)) {
+                dedupedMap.set(key, w)
+              }
+            }
+            const warningsToInsertDeduped = Array.from(dedupedMap.values())
             
             const { data: insertedWarnings, error: warningsError } = await supabaseAdmin
               .from('content_warnings')
-              .insert(warningsToInsert)
+              .insert(warningsToInsertDeduped)
               .select()
             
             if (warningsError) {
               console.error('Failed to save warnings:', warningsError)
-              console.error('Warnings that failed to insert:', JSON.stringify(warningsToInsert, null, 2))
+              console.error('Warnings that failed to insert:', JSON.stringify(warningsToInsertDeduped, null, 2))
               onProgress?.(`⚠️ Warning: Failed to save content warnings: ${warningsError.message}`)
             } else {
               contentWarningsGenerated = true
-              const savedCount = insertedWarnings?.length || warningsToInsert.length
+              const savedCount = insertedWarnings?.length || warningsToInsertDeduped.length
               onProgress?.(`✅ Saved ${savedCount} content warnings`)
               analysisCompleted = true
               
@@ -1125,7 +1161,6 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
             let webSearchFoundWarnings = false
             let webSearchContext = ''
             let reanalysisResult: { warnings: any[] } | null = null
-            let usedWebSearch = false
             
             // Use AI's reasoning for why no warnings were found, if provided
             const aiNoWarningsReasoning = noWarningsReasoning || ''
@@ -1403,10 +1438,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
             }
           }
 
-          // Update pipeline path with quick/deep + enrichment info
-          if (scanMode === 'quick') {
-            pipelinePath = `quick/${metadataAssessment.requiresEnrichment ? 'thin' : 'rich'}${enrichmentUsed ? '->enriched' : ''}`
-          }
+          // pipelinePath is set earlier (and used for audit + return flags)
         } catch (analysisError) {
           console.error('Error in analyzeBookWithMultiModel:', analysisError)
           
