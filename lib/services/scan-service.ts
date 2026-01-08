@@ -1697,7 +1697,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           modelVersion: MODEL_VERSION,
           taxonomyVersion: TAXONOMY_VERSION,
           pipelinePath: `${pipelinePath} -> safety_check`,
-          modelUsed: null // Safety check doesn't track model assignment
+          modelUsed: null, // Safety check doesn't track model assignment
           metadataIssues: (bookForSafetyCheck as any).metadataIssues || undefined
         })
         
