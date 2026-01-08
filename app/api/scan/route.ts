@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIsbnScan } from '@/lib/services/scan-service';
-import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy } from '@/lib/utils/rate-limiter';
+import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted } from '@/lib/utils/rate-limiter';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +28,18 @@ export async function POST(req: NextRequest) {
         
         // Check rate limit before processing
         const clientIP = getClientIP(req);
-        const rateLimit = checkRateLimitWithCost(clientIP, SCAN_CREDITS_PER_DAY, timezone, scanCost);
+        const allowlisted = isIpAllowlisted(clientIP)
+        const baseStatus = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
+        const rateLimit = allowlisted
+          ? {
+              ...baseStatus,
+              allowed: true,
+              remaining: SCAN_CREDITS_PER_DAY,
+              cost: scanCost,
+              required: scanCost,
+              unlimited: true,
+            }
+          : checkRateLimitWithCost(clientIP, SCAN_CREDITS_PER_DAY, timezone, scanCost);
         
         if (!rateLimit.allowed) {
             // Format reset time in user's timezone if provided, otherwise use UTC
@@ -64,7 +75,8 @@ export async function POST(req: NextRequest) {
                                 limit: SCAN_CREDITS_PER_DAY,
                                 remaining: 0,
                                 resetAt: rateLimit.resetAt,
-                                cost: scanCost
+                                cost: scanCost,
+                                unlimited: false,
                             }
                         }
                     })}\n\n`))
@@ -124,7 +136,9 @@ export async function POST(req: NextRequest) {
 
                 // Increment rate limit only after successful scan
                 if (result.success) {
-                  incrementRateLimitBy(clientIP, timezone, scanCost)
+                  if (!allowlisted) {
+                    incrementRateLimitBy(clientIP, timezone, scanCost)
+                  }
                 }
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
@@ -141,9 +155,10 @@ export async function POST(req: NextRequest) {
                   ...result,
                   rateLimit: {
                     limit: SCAN_CREDITS_PER_DAY,
-                    remaining: updatedRateLimit.remaining,
+                    remaining: allowlisted ? SCAN_CREDITS_PER_DAY : updatedRateLimit.remaining,
                     resetAt: updatedRateLimit.resetAt,
-                    cost: scanCost
+                    cost: scanCost,
+                    unlimited: allowlisted,
                   }
                 }
                 

@@ -13,6 +13,28 @@ interface RateLimitEntry {
 // In-memory store: IP -> RateLimitEntry
 const rateLimitStore = new Map<string, RateLimitEntry>()
 
+function getIpAllowlistSet(): Set<string> {
+  const raw = process.env.RATE_LIMIT_IP_ALLOWLIST || ''
+  const items = raw
+    .split(/[,;\n]/g)
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+  return new Set(items)
+}
+
+/**
+ * Allowlist specific client IPs from rate limiting.
+ *
+ * Configure via env:
+ *   RATE_LIMIT_IP_ALLOWLIST="1.2.3.4, 5.6.7.8"
+ */
+export function isIpAllowlisted(ip: string): boolean {
+  if (!ip || ip === 'unknown') return false
+  const allowlist = getIpAllowlistSet()
+  return allowlist.size > 0 && allowlist.has(ip)
+}
+
 // Clean up old entries every hour
 setInterval(() => {
   const now = Date.now()
@@ -28,6 +50,16 @@ setInterval(() => {
  */
 export function getClientIP(request: Request): string {
   // Try various headers (Vercel, Cloudflare, etc.)
+  const cfConnectingIp = request.headers.get('cf-connecting-ip')
+  if (cfConnectingIp) {
+    return cfConnectingIp.trim()
+  }
+
+  const vercelForwardedFor = request.headers.get('x-vercel-forwarded-for')
+  if (vercelForwardedFor) {
+    return vercelForwardedFor.split(',')[0].trim()
+  }
+
   const forwarded = request.headers.get('x-forwarded-for')
   if (forwarded) {
     return forwarded.split(',')[0].trim()
@@ -35,7 +67,7 @@ export function getClientIP(request: Request): string {
   
   const realIP = request.headers.get('x-real-ip')
   if (realIP) {
-    return realIP
+    return realIP.trim()
   }
   
   // Fallback (won't work in serverless, but good for local dev)

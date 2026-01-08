@@ -164,6 +164,7 @@ function ScanTestPageContent() {
     limit: number
     remaining: number
     resetAt: number
+    unlimited?: boolean
   } | null>(null)
   
   useEffect(() => {
@@ -723,7 +724,7 @@ function ScanTestPageContent() {
           {rateLimit && (
             <div className={cn(
               "mb-6 p-4 border rounded-lg",
-              rateLimit.remaining === 0 
+              rateLimit.remaining === 0 && !rateLimit.unlimited
                 ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500 text-yellow-700" 
                 : "bg-muted/30 border-border"
             )}>
@@ -731,14 +732,16 @@ function ScanTestPageContent() {
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4" />
                   <span className="text-sm font-medium">
-                    {rateLimit.remaining === 0 ? (
+                    {rateLimit.unlimited ? (
+                      <>Unlimited scan credits today</>
+                    ) : rateLimit.remaining === 0 ? (
                       <>Daily scan credit limit reached</>
                     ) : (
                       <>{rateLimit.remaining} of {rateLimit.limit} scan credits remaining today</>
                     )}
                   </span>
                 </div>
-                {rateLimit.remaining === 0 && (
+                {rateLimit.remaining === 0 && !rateLimit.unlimited && (
                   <span className="text-xs text-muted-foreground">
                     Resets {new Date(rateLimit.resetAt).toLocaleTimeString('en-US', { 
                       hour: 'numeric', 
@@ -749,7 +752,7 @@ function ScanTestPageContent() {
                   </span>
                 )}
               </div>
-              {rateLimit.remaining > 0 && (
+              {rateLimit.remaining > 0 && !rateLimit.unlimited && (
                 <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
                   <div
                     className="bg-primary h-1.5 rounded-full transition-all duration-300"
@@ -757,9 +760,11 @@ function ScanTestPageContent() {
                   />
                 </div>
               )}
-              <div className="mt-3 flex justify-end">
-                <RateLimitFeedbackDialog rateLimitRemaining={rateLimit.remaining} />
-              </div>
+              {!rateLimit.unlimited && (
+                <div className="mt-3 flex justify-end">
+                  <RateLimitFeedbackDialog rateLimitRemaining={rateLimit.remaining} />
+                </div>
+              )}
             </div>
           )}
 
@@ -816,15 +821,15 @@ function ScanTestPageContent() {
                   onChange={(e) => setIsbn(e.target.value)}
                   className="flex-1"
                   autoFocus={!showScanner}
-                  disabled={rateLimit?.remaining === 0}
+                  disabled={rateLimit?.remaining === 0 && !rateLimit?.unlimited}
                 />
-                <Button type="submit" disabled={loading || !isbn.trim() || rateLimit?.remaining === 0}>
+                <Button type="submit" disabled={loading || !isbn.trim() || (rateLimit?.remaining === 0 && !rateLimit?.unlimited)}>
                   {loading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Scanning
                     </>
-                  ) : rateLimit?.remaining === 0 ? (
+                  ) : rateLimit?.remaining === 0 && !rateLimit?.unlimited ? (
                     <>
                       Limit Reached
                     </>
