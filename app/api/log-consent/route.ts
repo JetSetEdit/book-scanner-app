@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -6,28 +7,43 @@ export async function POST(request: NextRequest) {
     
     // Get country from headers for logging
     const country = request.geo?.country || request.headers.get('x-vercel-ip-country');
+    const ipAddress = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip');
     
-    const logEntry = {
-      ...body,
-      country,
-      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-      timestamp: new Date().toISOString(),
-    };
+    // Insert into database
+    const { error: insertError } = await supabaseAdmin
+      .from('consent_logs')
+      .insert({
+        timestamp: body.timestamp || new Date().toISOString(),
+        disclaimer_version: body.disclaimerVersion || 'unknown',
+        user_agent: body.userAgent || null,
+        country: country || null,
+        ip_address: ipAddress || null,
+      });
     
-    // TODO: Send to your preferred logging service
-    // For now, just log to console (in production, send to database or analytics)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Consent accepted:', logEntry);
+    if (insertError) {
+      console.error('Error inserting consent log:', insertError);
+      // Don't fail the request if logging fails - consent is still accepted
+      // Just log to console in dev mode
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Consent accepted (failed to log to DB):', {
+          timestamp: body.timestamp,
+          disclaimerVersion: body.disclaimerVersion,
+          country,
+          ip: ipAddress,
+        });
+      }
+    } else if (process.env.NODE_ENV === 'development') {
+      console.log('Consent logged successfully:', {
+        timestamp: body.timestamp,
+        disclaimerVersion: body.disclaimerVersion,
+        country,
+      });
     }
-    
-    // You can add database insertion here later
-    // await db.consentLogs.insert(logEntry);
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('Error logging consent:', error);
-    }
-    return NextResponse.json({ error: 'Failed to log consent' }, { status: 500 });
+    console.error('Error logging consent:', error);
+    // Don't fail the request - consent is still accepted even if logging fails
+    return NextResponse.json({ success: true }); // Return success to not block user
   }
 }
