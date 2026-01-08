@@ -647,25 +647,27 @@ function ScanTestPageContent() {
               </p>
             </div>
 
-            {/* Force refresh toggle */}
-            <div className="space-y-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="force-refresh"
-                  checked={forceRefresh}
-                  onCheckedChange={(checked) => setForceRefresh(checked === true)}
-                />
-                <Label
-                  htmlFor="force-refresh"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                >
-                  Force refresh (re-scan and replace existing warnings)
-                </Label>
+            {/* Force refresh toggle - Dev only */}
+            {isDevUi && (
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="force-refresh"
+                    checked={forceRefresh}
+                    onCheckedChange={(checked) => setForceRefresh(checked === true)}
+                  />
+                  <Label
+                    htmlFor="force-refresh"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                  >
+                    Force refresh (re-scan and replace existing warnings)
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-6">
+                  Recommended when testing changes. This deletes existing AI-generated warnings for the book and regenerates them.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground ml-6">
-                Recommended when testing changes. This deletes existing AI-generated warnings for the book and regenerates them.
-              </p>
-            </div>
+            )}
 
             {/* Troubleshoot Camera (collapsed by default) */}
             <Collapsible open={showTroubleshoot} onOpenChange={setShowTroubleshoot}>
