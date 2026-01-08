@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIsbnScan } from '@/lib/services/scan-service';
-import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted } from '@/lib/utils/rate-limiter';
+import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted, shouldAssignGemini } from '@/lib/utils/rate-limiter';
 
 export const runtime = 'nodejs';
 
@@ -40,6 +40,11 @@ export async function POST(req: NextRequest) {
               unlimited: true,
             }
           : checkRateLimitWithCost(clientIP, SCAN_CREDITS_PER_DAY, timezone, scanCost);
+        
+        // Determine model assignment (only for Quick scans)
+        const modelAssignment = normalizedScanMode === 'quick' 
+          ? (shouldAssignGemini(clientIP) ? 'gemini' : 'openai')
+          : null // Deep scans ignore IP assignment
         
         if (!rateLimit.allowed) {
             // Format reset time in user's timezone if provided, otherwise use UTC
@@ -131,7 +136,8 @@ export async function POST(req: NextRequest) {
                   forceRefresh === true,
                   undefined,
                   undefined,
-                  normalizedScanMode
+                  normalizedScanMode,
+                  modelAssignment
                 )
 
                 // Increment rate limit only after successful scan

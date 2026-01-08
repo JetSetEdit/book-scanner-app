@@ -13,6 +13,13 @@ interface RateLimitEntry {
 // In-memory store: IP -> RateLimitEntry
 const rateLimitStore = new Map<string, RateLimitEntry>()
 
+// In-memory store for Gemini daily usage (single global counter)
+interface GeminiUsageEntry {
+  count: number
+  resetAt: number // Timestamp when limit resets (UTC midnight)
+}
+const geminiUsageStore = new Map<string, GeminiUsageEntry>()
+
 function getIpAllowlistSet(): Set<string> {
   const raw = process.env.RATE_LIMIT_IP_ALLOWLIST || ''
   const items = raw
@@ -41,6 +48,12 @@ setInterval(() => {
   for (const [ip, entry] of rateLimitStore.entries()) {
     if (entry.resetAt < now) {
       rateLimitStore.delete(ip)
+    }
+  }
+  // Also clean up Gemini usage store
+  for (const [key, entry] of geminiUsageStore.entries()) {
+    if (entry.resetAt < now) {
+      geminiUsageStore.delete(key)
     }
   }
 }, 60 * 60 * 1000) // 1 hour
@@ -322,3 +335,79 @@ export function getRateLimitStatus(ip: string, limit: number = 5, timezone?: str
   }
 }
 
+/**
+ * Deterministically assign model based on IP address
+ * Same IP always gets same model for consistency
+ * @param ip Client IP address
+ * @returns 'gemini' | 'openai'
+ */
+export function getModelForIP(ip: string): 'gemini' | 'openai' {
+  // Simple hash for deterministic assignment
+  let hash = 0
+  for (let i = 0; i < ip.length; i++) {
+    hash = ((hash << 5) - hash) + ip.charCodeAt(i)
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  // Use hash to assign: 50% Gemini, 50% OpenAI
+  // This ensures same IP always gets same model
+  return Math.abs(hash) % 2 === 0 ? 'gemini' : 'openai'
+}
+
+/**
+ * Get current day's Gemini usage count
+ * @returns Number of Gemini requests today (resets at UTC midnight)
+ */
+export function getDailyGeminiUsage(): number {
+  const now = Date.now()
+  const resetAt = (() => {
+    const tomorrow = new Date()
+    tomorrow.setUTCHours(24, 0, 0, 0) // Reset at midnight UTC
+    return tomorrow.getTime()
+  })()
+  
+  const entry = geminiUsageStore.get('gemini_daily_usage')
+  if (!entry || entry.resetAt < now) {
+    return 0
+  }
+  return entry.count
+}
+
+/**
+ * Increment Gemini usage counter
+ * Resets at UTC midnight
+ */
+export function incrementGeminiUsage(): void {
+  const now = Date.now()
+  const resetAt = (() => {
+    const tomorrow = new Date()
+    tomorrow.setUTCHours(24, 0, 0, 0) // Reset at midnight UTC
+    return tomorrow.getTime()
+  })()
+  
+  const entry = geminiUsageStore.get('gemini_daily_usage')
+  if (!entry || entry.resetAt < now) {
+    geminiUsageStore.set('gemini_daily_usage', { count: 1, resetAt })
+  } else {
+    entry.count++
+  }
+}
+
+/**
+ * Check if IP should be assigned Gemini (considers daily quota)
+ * @param ip Client IP address
+ * @returns true if IP should get Gemini, false for OpenAI
+ */
+export function shouldAssignGemini(ip: string): boolean {
+  const usage = getDailyGeminiUsage()
+  const threshold = parseInt(process.env.GEMINI_QUOTA_WARNING_THRESHOLD || '15', 10)
+  
+  // If over threshold, force OpenAI for all new assignments
+  if (usage >= threshold) {
+    return false
+  }
+  
+  // Otherwise, use IP hash
+  // Note: With 20 RPD limit, this will primarily assign Gemini to a small subset
+  // of IPs for experimental testing. Most users will get OpenAI.
+  return getModelForIP(ip) === 'gemini'
+}

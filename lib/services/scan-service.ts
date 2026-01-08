@@ -161,6 +161,7 @@ async function logAuditDecision(params: {
     descriptionReason?: string
     bookInfoIssues?: string[]
   }
+  modelUsed?: 'openai' | 'gemini' | 'multi' | null
 }) {
   // Supabase returns { error } rather than throwing; handle it explicitly.
   const auditLog: any = {
@@ -180,6 +181,7 @@ async function logAuditDecision(params: {
     taxonomy_version: params.taxonomyVersion || null,
     pipeline_path: params.pipelinePath || null,
     metadata_issues: params.metadataIssues || null,
+    model_used: params.modelUsed || null,
   }
 
   const { error } = await supabaseAdmin.from('ai_audit_logs').insert(auditLog)
@@ -197,6 +199,16 @@ async function logAuditDecision(params: {
     return
   }
 
+  // Backwards-compatible retry: some environments may not yet have model_used column.
+  if (msg.includes('model_used') && msg.includes('does not exist')) {
+    const { model_used, ...withoutModelUsed } = auditLog
+    const retry = await supabaseAdmin.from('ai_audit_logs').insert(withoutModelUsed as any)
+    if (retry.error) {
+      console.warn('[Audit Log] Failed to insert (retry w/o model_used):', String((retry.error as any)?.message || retry.error))
+    }
+    return
+  }
+
   console.warn('[Audit Log] Failed to insert ai_audit_logs row:', msg)
   // Don't throw - audit logging failure shouldn't break the scan
 }
@@ -208,7 +220,8 @@ export async function processIsbnScan(
   forceRefresh: boolean = false,
   model?: string,
   analysisOptions?: import('./multi-model-analysis').AnalysisOptions,
-  scanMode: 'quick' | 'deep' = 'deep'
+  scanMode: 'quick' | 'deep' = 'deep',
+  modelAssignment?: 'gemini' | 'openai' | null
 ): Promise<ScanResult> {
   // Use provided model or default to MODEL_VERSION
   const modelToUse = model || MODEL_VERSION
@@ -867,11 +880,13 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
           const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
 
           // Build effective analysis options (Quick mode defaults, with optional overrides)
+          // Apply IP-based model assignment for Quick scans only
           const effectiveAnalysisOptions: import('./multi-model-analysis').AnalysisOptions =
             scanMode === 'quick'
               ? {
-                  enableOpenAI: analysisOptions?.enableOpenAI ?? true,
-                  enableGemini: analysisOptions?.enableGemini ?? false,
+                  // IP-based assignment: use assigned model only (unless explicitly overridden)
+                  enableOpenAI: analysisOptions?.enableOpenAI ?? (modelAssignment === 'openai'),
+                  enableGemini: analysisOptions?.enableGemini ?? (modelAssignment === 'gemini'),
                   enableAdversarial: analysisOptions?.enableAdversarial ?? false,
                   enableVerification: analysisOptions?.enableVerification ?? false,
                   enableWebEnrichment:
@@ -885,6 +900,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   model: modelToUse,
                 }
               : {
+                  // Deep scans: ignore IP assignment, use multi-model (quality priority)
                   ...(analysisOptions || {}),
                   model: modelToUse,
                 }
@@ -899,6 +915,33 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
             onProgress,
             effectiveAnalysisOptions
           )
+
+          // Determine which models were actually used for audit logging
+          // Check if models were enabled and ran successfully (even if they found 0 warnings)
+          const modelResults = (analysisResult as any).model_results
+          const openaiEnabled = effectiveAnalysisOptions.enableOpenAI
+          const geminiEnabled = effectiveAnalysisOptions.enableGemini
+          // Model results arrays exist if the model ran (even if empty)
+          const openaiSucceeded = openaiEnabled && Array.isArray(modelResults?.openai)
+          const geminiSucceeded = geminiEnabled && Array.isArray(modelResults?.gemini)
+          
+          let auditModelUsed: 'openai' | 'gemini' | 'multi' | null = null
+          if (openaiEnabled && geminiEnabled) {
+            // Both enabled - check if both succeeded
+            auditModelUsed = (openaiSucceeded && geminiSucceeded) ? 'multi' : 
+                           (openaiSucceeded ? 'openai' : (geminiSucceeded ? 'gemini' : null))
+          } else if (openaiEnabled) {
+            auditModelUsed = openaiSucceeded ? 'openai' : null
+          } else if (geminiEnabled) {
+            auditModelUsed = geminiSucceeded ? 'gemini' : null
+          }
+
+          // Increment Gemini usage counter if Gemini was successfully used
+          if (modelAssignment === 'gemini' && geminiSucceeded) {
+            const { incrementGeminiUsage, getDailyGeminiUsage } = await import('@/lib/utils/rate-limiter')
+            incrementGeminiUsage()
+            console.log(`[Gemini Usage] Incremented counter (now at ${getDailyGeminiUsage()}/day)`)
+          }
 
           // Record enrichment usage (if multi-model enrichment ran)
           const webEnrichmentInfo = (analysisResult as any).web_enrichment
@@ -1075,6 +1118,17 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   }
                 }
 
+                // Map model_source to model_used for database
+                // model_source can be 'openai', 'gemini', or 'both' (when both models agreed)
+                let modelUsed: 'openai' | 'gemini' | 'multi' | null = null
+                if (w.model_source === 'openai') {
+                  modelUsed = 'openai'
+                } else if (w.model_source === 'gemini') {
+                  modelUsed = 'gemini'
+                } else if (w.model_source === 'both') {
+                  modelUsed = 'multi'
+                }
+
                 return {
                   book_id: bookId,
                   category: legacyCategory, // Legacy field - must match DB constraint
@@ -1094,7 +1148,8 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   is_spoiler: w.is_spoiler === true,
                   source: 'ai_generated',
                   other_note: otherNote, // Will be undefined for non-other_* subcategories
-                  reasoning: w.reasoning || undefined // Include AI reasoning if available
+                  reasoning: w.reasoning || undefined, // Include AI reasoning if available
+                  model_used: modelUsed // Store which model(s) generated this warning
                 }
               })
               .filter((w): w is NonNullable<typeof w> => w !== null) // Remove null entries
@@ -1184,7 +1239,8 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   modelVersion: MODEL_VERSION,
                   taxonomyVersion: TAXONOMY_VERSION,
                   pipelinePath: pipelinePath,
-                  metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
+                  metadataIssues: (bookForAnalysis as any).metadataIssues || undefined,
+                  modelUsed: auditModelUsed
                 })
             }
           } else {
@@ -1399,7 +1455,8 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                           modelVersion: MODEL_VERSION,
                           taxonomyVersion: TAXONOMY_VERSION,
                           pipelinePath: `${pipelinePath} -> web_search_verification`,
-                          metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
+                          metadataIssues: (bookForAnalysis as any).metadataIssues || undefined,
+                          modelUsed: auditModelUsed
                         })
                       }
                     }
@@ -1467,7 +1524,8 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 modelVersion: MODEL_VERSION,
                 taxonomyVersion: TAXONOMY_VERSION,
                 pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath,
-                metadataIssues: (bookForAnalysis as any).metadataIssues || undefined
+                metadataIssues: (bookForAnalysis as any).metadataIssues || undefined,
+                modelUsed: auditModelUsed
               })
             }
           }
@@ -1639,6 +1697,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           modelVersion: MODEL_VERSION,
           taxonomyVersion: TAXONOMY_VERSION,
           pipelinePath: `${pipelinePath} -> safety_check`,
+          modelUsed: null // Safety check doesn't track model assignment
           metadataIssues: (bookForSafetyCheck as any).metadataIssues || undefined
         })
         

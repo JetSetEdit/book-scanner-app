@@ -64,10 +64,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid deviceId' }, { status: 400 })
     }
 
-    // Fetch warning data to get severity and taxonomy info for RLHF logging
+    // Fetch warning data to get severity, taxonomy info, and model_used for RLHF logging
     const { data: warningData, error: warningError } = await supabaseAdmin
       .from('content_warnings')
-      .select('severity, category_id, subcategory_id')
+      .select('severity, category_id, subcategory_id, model_used')
       .eq('id', warningId)
       .single()
 
@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
       p_warning_id: warningId,
       p_device_id: trimmedDeviceId,
       p_is_helpful: isHelpful,
+      p_model_used: warningData?.model_used || null,
     })
 
     if (error) {
