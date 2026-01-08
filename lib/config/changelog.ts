@@ -9,12 +9,22 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.01.114",
+    date: "2026-01-08",
+    title: "Legal compliance & access control",
+    changes: [
+      "Updated welcome modal with comprehensive legal disclaimers and terms",
+      "Implemented geo-blocking to restrict access to Australia only",
+      "Added consent logging for compliance tracking",
+    ],
+  },
+  {
     version: "1.01.86",
     date: "2026-01-08",
     title: "Consistency improvements",
     changes: [
-      "Added a “Based on…” line on book pages (description length, mode, enrichment, cross-check)",
-      "Added a one-click “Run Deep scan” CTA on book pages when results may be incomplete",
+      "Added a "Based on…" line on book pages (description length, mode, enrichment, cross-check)",
+      "Added a one-click "Run Deep scan" CTA on book pages when results may be incomplete",
       "Scan page supports deep/quick preselection via URL",
     ],
   },
