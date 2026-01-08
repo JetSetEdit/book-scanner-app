@@ -96,6 +96,11 @@ function getLastChangelogVersion(): string | null {
 
 function getRecentCommits(sinceVersion: string): CommitInfo[] {
   try {
+    // Skip git operations if not in a git repo or during build (Vercel doesn't have .git)
+    if (!existsSync('.git') || process.env.VERCEL === '1') {
+      return []
+    }
+    
     // Get commits since the last changelog entry version
     // Use git log to find commits after the last changelog version
     const lastChangelogVersion = getLastChangelogVersion()
@@ -107,33 +112,33 @@ function getRecentCommits(sinceVersion: string): CommitInfo[] {
       try {
         const versionCommit = execSync(
           `git log --oneline --grep="${lastChangelogVersion}" --format="%H" -1`,
-          { encoding: 'utf-8', cwd: process.cwd() }
+          { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
         ).trim()
         
         if (versionCommit) {
           logOutput = execSync(
             `git log --oneline --no-merges ${versionCommit}..HEAD`,
-            { encoding: 'utf-8', cwd: process.cwd() }
+            { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
           ).trim()
         } else {
           // Fallback to last 3 days if version commit not found
           logOutput = execSync(
             `git log --oneline --no-merges --since="3 days ago"`,
-            { encoding: 'utf-8', cwd: process.cwd() }
+            { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
           ).trim()
         }
       } catch {
         // Fallback to last 3 days
         logOutput = execSync(
           `git log --oneline --no-merges --since="3 days ago"`,
-          { encoding: 'utf-8', cwd: process.cwd() }
+          { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
         ).trim()
       }
     } else {
       // No changelog found, use last 3 days
       logOutput = execSync(
         `git log --oneline --no-merges --since="3 days ago"`,
-        { encoding: 'utf-8', cwd: process.cwd() }
+        { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
       ).trim()
     }
     
@@ -183,7 +188,10 @@ function getRecentCommits(sinceVersion: string): CommitInfo[] {
     
     return commits
   } catch (error) {
-    console.warn('⚠️  Could not fetch git commits for changelog analysis')
+    // Silently fail - this is expected in CI/build environments without git
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('⚠️  Could not fetch git commits for changelog analysis:', error)
+    }
     return []
   }
 }
