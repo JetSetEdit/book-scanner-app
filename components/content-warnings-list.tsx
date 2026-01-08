@@ -27,7 +27,8 @@ import {
   Activity,
   Hash,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
@@ -36,6 +37,8 @@ import { TagWithTooltip } from "@/components/tag-with-tooltip"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/utils/dark-romance-context"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { getWarningPhrase } from "@/lib/services/warning-phraser"
 
 interface ContentWarning {
   id: string
@@ -289,6 +292,29 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   const officialVerifiedWarnings = filteredWarnings.filter(w => w.is_author_verified === true)
   const standardAiWarnings = aiWarnings.filter(w => w.is_author_verified !== true)
 
+  // Helper function to group warnings by category
+  function groupWarningsByCategory(warnings: ContentWarning[]) {
+    const grouped = new Map<string, { category: string; categoryLabel: string; warnings: ContentWarning[] }>()
+    
+    for (const warning of warnings) {
+      const categoryId = warning.category_id || 'other'
+      const category = getCategoryById(categoryId)
+      const categoryLabel = category?.userLabel || categoryLabels[warning.category] || warning.category || 'Other'
+      
+      if (!grouped.has(categoryId)) {
+        grouped.set(categoryId, {
+          category: categoryId,
+          categoryLabel,
+          warnings: []
+        })
+      }
+      
+      grouped.get(categoryId)!.warnings.push(warning)
+    }
+    
+    return Array.from(grouped.values()).sort((a, b) => a.categoryLabel.localeCompare(b.categoryLabel))
+  }
+
   return (
     <TooltipProvider>
       <div className="space-y-16">
@@ -349,9 +375,31 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
             <div className="h-px bg-border flex-1"></div>
           </div>
 
-          <div className="space-y-0">
-            {standardAiWarnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} isAi={true} />
+          <div className="space-y-2">
+            {groupWarningsByCategory(standardAiWarnings).map((group) => (
+              <Collapsible key={group.category} defaultOpen={false}>
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left">
+                  <div className="flex items-center gap-3">
+                    <CategoryIcon
+                      id={group.category}
+                      legacyCategory={group.category}
+                      className="h-4 w-4 text-muted-foreground"
+                    />
+                    <span className="font-medium text-sm">{group.categoryLabel}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {group.warnings.length}
+                    </Badge>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-0 border-t border-border mt-2">
+                    {group.warnings.map((warning) => (
+                      <WarningItem key={warning.id} warning={warning} isAi={true} />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
         </section>
@@ -369,9 +417,31 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
             <div className="h-px bg-border flex-1"></div>
           </div>
 
-          <div className="space-y-0">
-            {communityWarnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} />
+          <div className="space-y-2">
+            {groupWarningsByCategory(communityWarnings).map((group) => (
+              <Collapsible key={group.category} defaultOpen={false}>
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left">
+                  <div className="flex items-center gap-3">
+                    <CategoryIcon
+                      id={group.category}
+                      legacyCategory={group.category}
+                      className="h-4 w-4 text-muted-foreground"
+                    />
+                    <span className="font-medium text-sm">{group.categoryLabel}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {group.warnings.length}
+                    </Badge>
+                  </div>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-0 border-t border-border mt-2">
+                    {group.warnings.map((warning) => (
+                      <WarningItem key={warning.id} warning={warning} />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
         </section>
@@ -517,7 +587,16 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               </div>
             ) : (
               <p className="text-muted-foreground text-base leading-relaxed font-serif">
-                {warning.description}
+                {(() => {
+                  const phrase = getWarningPhrase(warning.category_id)
+                  // If description already starts with a phrase-like pattern, use it as-is
+                  if (warning.description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) {
+                    return warning.description
+                  }
+                  // Otherwise, prepend the rotated phrase
+                  const cleanPhrase = phrase.replace('…', '')
+                  return `${cleanPhrase} ${warning.description.toLowerCase()}`
+                })()}
               </p>
             )}
           </div>
@@ -536,10 +615,8 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                 )}
                 title={`Generated by: ${
                   warning.evidence[0].model_source === 'both'
-                    ? 'Cross-checked'
-                    : warning.evidence[0].model_source === 'openai'
-                      ? 'Primary model'
-                      : 'Secondary model'
+                    ? 'Cross-checked by AI'
+                    : 'AI analysis'
                 }`}
               >
                 {warning.evidence[0].model_source === 'both'
@@ -558,7 +635,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                     <Badge
                       variant="outline"
                       className={cn("text-[10px] font-medium uppercase tracking-wider cursor-default", c.color)}
-                      title="Confidence is based on cross-check + community feedback"
+                      title="Confidence is based on AI verification and community feedback"
                     >
                       <Users className="h-3 w-3 mr-1" />
                       {c.level}
@@ -573,13 +650,13 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                         {c.level} confidence
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Cross-check: {c.crossChecked ? 'Cross-checked' : 'Single-source'}
+                        Verification: {c.crossChecked ? 'Verified by multiple checks' : 'Single analysis'}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Community feedback: {c.votes === 0 ? 'No votes yet' : `${c.helpful} helpful • ${c.notHelpful} not helpful (${c.votes} total)`}
                       </div>
                       <div className="text-[10px] text-muted-foreground leading-relaxed">
-                        Confidence is a heuristic based on cross-check + community feedback. It is not a guarantee and can change as more people vote.
+                        Confidence is based on AI verification and community feedback. It is not a guarantee and can change as more people vote.
                       </div>
                     </div>
                   </PopoverContent>

@@ -5,7 +5,7 @@
  * Update this when deploying new versions.
  */
 
-export const APP_VERSION = "1.01.124"
+export const APP_VERSION = "1.02.0"
 export const APP_VERSION_LABEL = "Public Beta"
 export const APP_BUILD_DATE = "2026-01-08" // YYYY-MM-DD - Update on each deployment
 
@@ -29,6 +29,17 @@ export const APP_BUILD_ID = getBuildId()
 
 // Version history
 export const VERSION_HISTORY = [
+  {
+    version: "1.02.0",
+    label: "Public Beta",
+    date: "2026-01-08",
+    changes: [
+      "Added dynamic reader summaries for content warnings",
+      "Implemented accordion grouping by category",
+      "Added phrase rotation for warning descriptions",
+      "Enhanced UX with collapsible warning sections"
+    ]
+  },
   {
     version: "1.01.0",
     label: "Public Beta",

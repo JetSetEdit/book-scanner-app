@@ -17,6 +17,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Info } from "lucide-react"
 import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { APP_VERSION } from "@/lib/config/version"
+import { generateSummary } from "@/lib/services/warning-renderer"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -389,13 +390,13 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               )
             })()}
 
-            {/* Metadata Issues - Display even for Comfort Read books */}
-            {metadataIssues && (metadataIssues.missingCover || metadataIssues.missingDescription) && (
+            {/* Metadata Issues - Dev mode only */}
+            {isDev && metadataIssues && (metadataIssues.missingCover || metadataIssues.missingDescription) && (
               <div className="mt-12 p-6 border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg">
                 <div className="flex items-start gap-3">
                   <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 space-y-3">
-                    <h4 className="font-medium text-amber-900 dark:text-amber-100">Metadata Limitations</h4>
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100">Metadata Limitations (Dev Mode)</h4>
                     <div className="space-y-2 text-sm text-amber-800 dark:text-amber-200">
                       {metadataIssues.missingCover && (
                         <div>
@@ -426,7 +427,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <div className="h-px bg-border flex-1"></div>
               </div>
 
-              {/* Transparency line: what this analysis is based on */}
+              {/* Transparency line: what this analysis is based on (Dev mode only) */}
+              {isDev && (
               <div className="mb-6 max-w-2xl mx-auto text-xs text-muted-foreground">
                 {(() => {
                   const descriptionLength = (book?.description || '').length
@@ -454,7 +456,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                     `Description: ${descriptionLength} chars`,
                     pipeline ? `Mode: ${pipeline}` : null,
                     enrichment ? `Web enrichment: ${enrichment}` : null,
-                    `Cross-check: ${crossChecked ? 'Yes' : 'No'}`,
+                    `Verified: ${crossChecked ? 'Yes' : 'No'}`,
                   ].filter(Boolean)
                   return (
                     <div className="flex items-start gap-2">
@@ -480,6 +482,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   )
                 })()}
               </div>
+              )}
               
               {/* Heads Up Summary with Major Warnings */}
               {(() => {
@@ -668,6 +671,15 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               <p className="text-sm text-muted-foreground italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
               </p>
+
+              {/* Dynamic Reader Summary */}
+              {warnings && warnings.length > 0 && (
+                <div className="mb-8 p-6 bg-muted/30 border border-border rounded-lg">
+                  <p className="text-base leading-relaxed font-serif text-foreground italic">
+                    {generateSummary(warnings)}
+                  </p>
+                </div>
+              )}
 
               <ContentWarningsList
                 warnings={warnings}

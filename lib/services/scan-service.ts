@@ -570,7 +570,8 @@ export async function processIsbnScan(
     
     // Early return if book exists AND has been analyzed (has audit log)
     // If book exists but has no audit log, we should still run analysis
-    if (!forceRefresh && bookId) {
+    // Deep scans should always proceed with analysis, even if book exists
+    if (!forceRefresh && scanMode !== 'deep' && bookId) {
       // Check if book has been analyzed (has audit log)
       const { data: existingAuditLog } = await supabaseAdmin
         .from('ai_audit_logs')
