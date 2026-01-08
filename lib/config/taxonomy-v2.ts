@@ -18,11 +18,25 @@
 export const TAXONOMY_VERSION = "2.5.0";
 export const MODEL_VERSION = "gpt-5.2-2025-12-11";
 
+/**
+ * Warning Subcategory with severity classification
+ * 
+ * @property defaultSeverityScore - Proto-RLHF severity score (0-10 scale) for future ranking/RLHF.
+ *   This is NOT a user-facing severity change. Scores are expected to be adjusted by data later
+ *   (do NOT treat them as fixed truths). This is proto-RLHF infrastructure - scores will evolve
+ *   with feedback data.
+ * @property severityScoreOrigin - Tracks the source of the severity score (e.g., 'hand_tuned_v1',
+ *   'rlhf_v2', etc.). Allows distinguishing legacy hand-tuned scores from learned ones.
+ */
 export interface WarningSubcategory {
   id: string;
   userLabel: string;
   shortDescription: string;
   defaultSeverityHint?: 'mild' | 'moderate' | 'severe';
+  /** Proto-RLHF severity score (0-10 scale) for future ranking/RLHF. Not user-facing. */
+  defaultSeverityScore?: number;
+  /** Tracks score source: 'hand_tuned_v1', 'rlhf_v2', etc. */
+  severityScoreOrigin?: string;
 }
 
 export interface WarningCategory {
@@ -45,73 +59,97 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'disordered_eating',
         userLabel: 'Disordered Eating',
         shortDescription: 'Disordered eating, eating disorders, body image issues.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'weight_loss_dieting',
         userLabel: 'Weight Loss / Dieting Focus',
         shortDescription: 'Chronic diet talk, weight loss focus, "makeover" plots, or dieting narratives. Distinct from disordered eating but may be triggering for ED-sensitive readers. Keywords: makeover, diet culture, clean eating.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'anxiety',
         userLabel: 'Anxiety',
         shortDescription: 'Anxiety, panic attacks, stress, anxiety disorders.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'depression',
         userLabel: 'Depression',
         shortDescription: 'Depression, mood disorders, depressive episodes.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'ptsd',
         userLabel: 'PTSD / Trauma',
         shortDescription: 'Post-traumatic stress disorder, trauma, traumatic experiences.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'self_harm',
         userLabel: 'Self-Harm',
         shortDescription: 'Self-harm behaviors, cutting, non-suicidal self-injury.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'suicidal_ideation',
         userLabel: 'Suicidal Ideation',
         shortDescription: 'Suicidal thoughts, attempts, detailed descriptions of suicide.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'suicide_minor',
         userLabel: 'Suicide of a Minor',
         shortDescription: 'Suicide or suicidal ideation involving a child or minor character.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'casual_suicidal_ideation',
         userLabel: 'Casual Suicidal Ideation / Jokes',
         shortDescription: 'Non-graphic but repeated "jokes" or casual references to suicide, self-harm, or death wishes. Less severe than acute suicidal content but may still be triggering.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'workplace_burnout',
         userLabel: 'Workplace Burnout / Toxic Workplace',
         shortDescription: 'Workplace burnout, toxic work environments, overwork, or professional stress. May include exploitation, harassment, or unsafe working conditions.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'academic_pressure',
         userLabel: 'Academic Pressure / Exam Stress',
         shortDescription: 'Academic pressure, exam stress, academic competition, or intense educational pressure. May include academic failure, grade anxiety, or competitive academic environments.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_mental_health',
         userLabel: 'Other Mental Health',
         shortDescription: 'Other mental health themes not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       }
     ]
   },
@@ -125,148 +163,196 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'explicit_sexual_content',
         userLabel: 'Explicit Sexual Content',
         shortDescription: 'Explicit sexual scenes, graphic sexual descriptions.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'sexual_violence',
         userLabel: 'Sexual Violence',
         shortDescription: 'Sexual assault, rape, non-consensual sexual content.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'intense_romance',
         userLabel: 'Intense Romance / Spice',
         shortDescription: 'Intense romantic/sexual tension, steamy scenes, explicit romance/spice content. Note: Emotional romantic tension alone may not require a warning.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'sexual_themes',
         userLabel: 'Sexual Themes',
         shortDescription: 'Sexual themes, discussions, references (non-explicit).',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'infidelity_cheating',
         userLabel: 'Infidelity / Cheating',
         shortDescription: 'Infidelity, cheating in relationships, or sexual/romantic betrayal. Also see Emotional Abuse category for relationship dynamics.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'pornography_sex_work',
         userLabel: 'Pornography / Sex Work',
         shortDescription: 'Explicit pornography, sex work representation, or sexual content industry themes.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       // Sexual Dynamics & Framing
       {
         id: 'power_imbalance',
         userLabel: 'Power Imbalance',
         shortDescription: 'Sexual or romantic dynamics involving authority, dependency, or unequal power (e.g., boss/employee, teacher/student, age gaps).',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'consent_ambiguity',
         userLabel: 'Ambiguous or Non-Explicit Consent (Dub-Con)',
         shortDescription: 'Consent is unclear, negotiated implicitly, or framed as resistance/desire tension. Also known as "Dub-Con" in dark romance.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'cnc',
         userLabel: 'Consensual Non-Consent (CNC)',
         shortDescription: 'Consensual non-consent, CNC play, or negotiated non-consent scenarios. Distinct from actual non-consent.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'somnophilia',
         userLabel: 'Somnophilia / Sleep Play',
         shortDescription: 'Non-consensual or dub-consensual sexual acts while one partner is sleeping or unconscious.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'coercion_pressure',
         userLabel: 'Sexual Coercion / Pressure',
         shortDescription: 'Emotional pressure, manipulation, or obligation leading to sexual activity.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'degradation_humiliation',
         userLabel: 'Degradation / Humiliation',
         shortDescription: 'Sexual content involving humiliation, degradation, or verbal diminishment.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'possessive_dynamics',
         userLabel: 'Possessive or Obsessive Dynamics',
         shortDescription: 'Sexual or romantic framing involving ownership, obsession, or control.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       // Kink / Sexual Practices (Neutral Descriptors)
       {
         id: 'bdsm_themes',
         userLabel: 'BDSM Themes',
         shortDescription: 'Power exchange, dominance/submission, or restraint themes.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'roleplay',
         userLabel: 'Sexual Roleplay',
         shortDescription: 'Sexual roleplay scenarios as part of intimacy.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'exhibitionism_voyeurism',
         userLabel: 'Exhibitionism / Voyeurism',
         shortDescription: 'Sexual content involving being watched or watching.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'taboo_fetish_themes',
         userLabel: 'Taboo or Fetish Themes',
         shortDescription: 'Fetish-focused sexual framing outside mainstream romance norms.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'breeding_kink',
         userLabel: 'Breeding Kink',
         shortDescription: 'Sexual focus on impregnation, breeding, or pregnancy as kink. Distinct from actual pregnancy/childbirth.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'knife_play',
         userLabel: 'Knife Play / Blood Play',
         shortDescription: 'Sexualized use of knives, blood play, or weapon play in sexual contexts.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'primal_play',
         userLabel: 'Primal Play',
         shortDescription: 'Hunting/chasing dynamics, primal kink, or "touch her and you die" tropes in sexual/romantic contexts.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       // Sexual Shaming & Language
       {
         id: 'slut_shaming',
         userLabel: 'Sexual Shaming Language',
         shortDescription: 'Language that shames or devalues characters for sexual behaviour.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'purity_culture',
         userLabel: 'Purity / Virginity Framing',
         shortDescription: 'Sexual value tied to virginity, purity, or sexual restraint.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'misogynistic_sexual_language',
         userLabel: 'Gendered Sexual Degradation',
         shortDescription: 'Sexually degrading language targeting women or gendered characters.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_sexual_content',
         userLabel: 'Other Sexual Content',
         shortDescription: 'Other sexual content not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       }
     ]
   },
@@ -280,62 +366,79 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'gaslighting',
         userLabel: 'Gaslighting',
         shortDescription: 'Gaslighting, psychological manipulation, making someone question their reality.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
       },
       {
         id: 'manipulation',
         userLabel: 'Manipulation',
         shortDescription: 'Manipulative behavior, emotional manipulation, coercive control.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'controlling_behavior',
         userLabel: 'Controlling Behavior',
         shortDescription: 'Controlling relationships, possessiveness, isolation.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'toxic_friendships',
         userLabel: 'Toxic Friendships',
         shortDescription: 'Toxic friendships, unhealthy social dynamics, peer pressure.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'cheating',
         userLabel: 'Cheating',
         shortDescription: 'Infidelity, cheating in relationships, betrayal.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'emotional_abuse',
         userLabel: 'Emotional Abuse',
         shortDescription: 'Emotional abuse, verbal abuse, psychological abuse.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'stalking',
         userLabel: 'Stalking',
         shortDescription: 'Stalking, obsessive following, or unwanted surveillance.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'financial_abuse',
         userLabel: 'Financial Abuse',
         shortDescription: 'Financial abuse, economic control, or financial manipulation.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'grooming',
         userLabel: 'Grooming',
         shortDescription: 'Grooming, predatory behavior, or manipulation of vulnerable individuals (often in age-gap or power imbalance contexts).',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_toxic_relationships',
         userLabel: 'Other Toxic Relationships',
         shortDescription: 'Other toxic relationship dynamics not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -348,32 +451,41 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'bullying',
         userLabel: 'Bullying',
         shortDescription: 'Bullying, harassment, intimidation.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'hazing',
         userLabel: 'Hazing',
         shortDescription: 'Hazing, initiation rituals, forced participation.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'public_humiliation',
         userLabel: 'Public Humiliation',
         shortDescription: 'Public humiliation, shaming, embarrassment.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'social_pressure',
         userLabel: 'Social Pressure',
         shortDescription: 'Intense social pressure, peer pressure, conformity pressure.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_social_cruelty',
         userLabel: 'Other Social Cruelty',
         shortDescription: 'Other forms of social cruelty not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -386,98 +498,129 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'physical_violence',
         userLabel: 'Physical Violence',
         shortDescription: 'Physical fighting, combat, brawls, physical altercations.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'graphic_violence',
         userLabel: 'Graphic Violence',
         shortDescription: 'Graphic violence, gore, detailed violence, blood.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'weapons',
         userLabel: 'Weapons',
         shortDescription: 'Weapons, gun violence, knife violence, weapon use.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'school_shootings',
         userLabel: 'School Shootings / Mass Violence',
         shortDescription: 'School shootings, mass shootings, or mass violence events.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'war',
         userLabel: 'War',
         shortDescription: 'War, military violence, battle scenes, combat.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'domestic_violence',
         userLabel: 'Domestic Violence',
         shortDescription: 'Domestic violence, intimate partner violence, family violence.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'torture',
         userLabel: 'Torture',
         shortDescription: 'Torture, extreme violence, prolonged suffering.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'kidnapping_confinement',
         userLabel: 'Kidnapping / Confinement',
         shortDescription: 'Kidnapping, abduction, confinement, being held against will, captivity.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'infanticide_or_intentional_child_harm',
         userLabel: 'Infanticide / Intentional Harm to a Child',
         shortDescription: 'Infanticide, attempted murder of a newborn/child, or intentional harm targeting infants/children (distinct from accidental harm or general peril).',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'human_trafficking',
         userLabel: 'Human Trafficking',
         shortDescription: 'Human trafficking, sex trafficking, or forced servitude. Distinct from general kidnapping.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'cannibalism',
         userLabel: 'Cannibalism',
         shortDescription: 'Cannibalism, eating human flesh, or cannibalistic themes.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'violence_against_children',
         userLabel: 'Violence Against Children',
         shortDescription: 'Violence directed at children, child abuse, harm to minors. Implicitly covers suicidal content involving minors (see also: suicide_minor for explicit tagging).',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'crime_non_violent',
         userLabel: 'Non-Violent Crime / Prison',
         shortDescription: 'General crime content: robbery, non-violent crime, prison/jail settings, interrogations, or criminal justice system themes. May be tagged even when violence is mild. Keywords: heist, robbery, prison setting, courtroom drama.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'animal_cruelty',
         userLabel: 'Animal Cruelty',
         shortDescription: 'Animal cruelty, harm to animals, animal death, pet death.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'police_brutality',
         userLabel: 'Police Brutality / State Violence',
         shortDescription: 'Police brutality, state violence, or systemic violence by authorities.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_violence',
         userLabel: 'Other Violence',
         shortDescription: 'Other forms of violence not covered by specific subcategories.',
-        defaultSeverityHint: 'moderate'
-      }
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -490,32 +633,41 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'alcohol',
         userLabel: 'Alcohol',
         shortDescription: 'Alcohol consumption, drinking, alcohol abuse.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'drug_use',
         userLabel: 'Drug Use',
         shortDescription: 'Drug use, drug abuse, illegal substances.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'addiction',
         userLabel: 'Addiction',
         shortDescription: 'Addiction, substance dependence, substance use disorder.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'overdose',
         userLabel: 'Overdose',
         shortDescription: 'Overdose, drug-related medical emergencies, poisoning.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_substance_use',
         userLabel: 'Other Substance Use',
         shortDescription: 'Other substance-related content not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -528,62 +680,81 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'character_death',
         userLabel: 'Character Death',
         shortDescription: 'Character deaths, on-page deaths, death scenes.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'terminal_illness',
         userLabel: 'Terminal Illness',
         shortDescription: 'Terminal illness, dying characters, end-of-life care.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'grief',
         userLabel: 'Grief',
         shortDescription: 'Grief, mourning, loss, bereavement.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'funeral_scenes',
         userLabel: 'Funeral Scenes',
         shortDescription: 'Funeral scenes, death rituals, memorial services.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'near_death',
         userLabel: 'Near Death',
         shortDescription: 'Near-death experiences, life-threatening situations.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'past_death',
         userLabel: 'Past Death',
         shortDescription: 'Past deaths (discussed but not shown), historical deaths.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'miscarriage_abortion',
         userLabel: 'Miscarriage / Abortion',
         shortDescription: 'Miscarriage, stillbirth, abortion, pregnancy loss.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'death_animals',
         userLabel: 'Animal Death',
         shortDescription: 'Animal death, pet death, or harm to animals.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'grief_processing',
         userLabel: 'Grief Processing',
         shortDescription: 'Detailed grief processing, mourning, or loss processing.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_death_grief',
         userLabel: 'Other Death / Grief',
         shortDescription: 'Other death/grief-related content not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -596,115 +767,161 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'racism',
         userLabel: 'Racism',
         shortDescription: 'Racism, racial discrimination, racial slurs.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'sexism',
         userLabel: 'Sexism',
         shortDescription: 'Sexism, gender discrimination, misogyny, misandry.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'homophobia',
         userLabel: 'Homophobia',
         shortDescription: 'Homophobia, anti-LGBTQ+ content, discrimination against gay/lesbian people.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'transphobia',
         userLabel: 'Transphobia',
         shortDescription: 'Transphobia, anti-trans content, discrimination against transgender people.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'acephobia',
         userLabel: 'Acephobia',
         shortDescription: 'Discrimination against asexual people, invalidation of asexuality, or pressure to be sexual.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'lesbophobia',
         userLabel: 'Lesbophobia',
         shortDescription: 'Discrimination specifically against lesbians or lesbian relationships.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'biphobia',
         userLabel: 'Biphobia',
         shortDescription: 'Discrimination against bisexual people, biphobic stereotypes, or invalidation of bisexuality.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'misgendering',
         userLabel: 'Misgendering / Deadnaming',
         shortDescription: 'Misgendering, deadnaming, or use of incorrect pronouns for transgender or non-binary characters.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'queerphobia',
         userLabel: 'Queerphobia',
         shortDescription: 'General anti-queer sentiment, queerphobic language, or discrimination against LGBTQ+ people.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'religious_discrimination',
         userLabel: 'Religious Discrimination',
         shortDescription: 'Religious discrimination, religious intolerance, religious persecution.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'ableism',
         userLabel: 'Ableism',
         shortDescription: 'Ableism, discrimination against disabilities, disability slurs.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'cultural_appropriation',
         userLabel: 'Cultural Appropriation / Colonial Themes',
         shortDescription: 'Cultural appropriation, colonial themes, exploitation of Indigenous or marginalized cultures, or problematic representation of cultural groups.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'antisemitism',
         userLabel: 'Antisemitism',
         shortDescription: 'Antisemitism, anti-Jewish discrimination, or Jewish stereotypes.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'islamophobia',
         userLabel: 'Islamophobia',
         shortDescription: 'Islamophobia, anti-Muslim discrimination, or Muslim stereotypes.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'fatphobia',
         userLabel: 'Fatphobia / Body Shaming',
         shortDescription: 'Discrimination based on weight, body shaming, anti-fat bias, or cruelty toward fat characters.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'classism',
         userLabel: 'Classism / Poverty',
         shortDescription: 'Discrimination based on class, extreme poverty, homelessness, or economic status discrimination.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'economic_collapse',
         userLabel: 'Economic Collapse / Eviction / Job Loss',
         shortDescription: 'Economic collapse, eviction, foreclosure, job loss, or sudden economic hardship. Distinct from chronic poverty. Keywords: recession, foreclosure, redundancy, layoffs.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'queer_joy_identity',
         userLabel: 'Queer Joy / Identity Focus',
         shortDescription: 'Non-triggering identity flags: coming out arcs, transition journeys, or positive LGBTQ+ identity exploration. Not discrimination, but identity-focused content that some readers seek or avoid. Keywords: coming out arc, transition journey, found family (queer).',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'religious_joy_identity',
+        userLabel: 'Religious Joy / Positive Identity',
+        shortDescription: 'Non-triggering identity flags: positive religious identity exploration, faith journeys, or affirming religious content. Not discrimination, but identity-focused content that some readers seek or avoid. Keywords: faith journey, religious community, spiritual growth.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_discrimination',
         userLabel: 'Other Discrimination',
         shortDescription: 'Other forms of discrimination not covered by specific subcategories.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       }
     ]
   },
@@ -718,20 +935,25 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'strong_language',
         userLabel: 'Strong Language',
         shortDescription: 'Strong language, profanity, swearing.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'slurs',
         userLabel: 'Slurs',
         shortDescription: 'Slurs, hate speech, derogatory language.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_language',
         userLabel: 'Other Language',
         shortDescription: 'Other language-related content not covered by specific subcategories.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -744,74 +966,97 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'snakes',
         userLabel: 'Snakes / Serpents',
         shortDescription: 'Snakes, serpents, or snake-like creatures.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'spiders',
         userLabel: 'Spiders / Arachnids',
         shortDescription: 'Spiders, arachnids, or spider-like creatures.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'needles',
         userLabel: 'Needles / Medical Procedures',
         shortDescription: 'Needles, injections, medical procedures, or blood draws.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'heights',
         userLabel: 'Heights / Falling',
         shortDescription: 'Heights, falling, vertigo, or high places.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'water',
         userLabel: 'Water / Drowning',
         shortDescription: 'Water, drowning, deep water, or aquaphobia triggers.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'enclosed_spaces',
         userLabel: 'Enclosed Spaces / Claustrophobia',
         shortDescription: 'Enclosed spaces, claustrophobia, being trapped, or confinement.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'darkness',
         userLabel: 'Darkness / Nyctophobia',
         shortDescription: 'Darkness, being in the dark, or fear of the dark.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'blood',
         userLabel: 'Blood / Hemophobia',
         shortDescription: 'Blood, gore, or blood-related medical content.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'vomiting',
         userLabel: 'Vomiting / Emetophobia',
         shortDescription: 'Vomiting, nausea, or scenes depicting sickness.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'trypophobia',
         userLabel: 'Trypophobia',
         shortDescription: 'Clusters of small holes, patterns, or trypophobia triggers.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'dental_trauma',
         userLabel: 'Dental Trauma',
         shortDescription: 'Dental procedures, teeth falling out, pulling teeth, or dental gore.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_phobias',
         userLabel: 'Other Phobias',
         shortDescription: 'Other specific phobias or fear triggers not covered above.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -824,68 +1069,89 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'medical_procedures',
         userLabel: 'Medical Procedures',
         shortDescription: 'Surgery, medical procedures, hospital scenes, or medical trauma.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'medical_detail_procedural',
         userLabel: 'Medical Detail / Procedural',
         shortDescription: 'Non-graphic surgery or medical procedures without trauma focus. Clinical or procedural medical content.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'plastic_surgery_cosmetic',
         userLabel: 'Plastic Surgery / Cosmetic Procedures',
         shortDescription: 'Plastic surgery, cosmetic procedures, or elective body modification. Distinct from body horror and general medical trauma.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'pandemics_contagion',
         userLabel: 'Pandemics / Contagion',
         shortDescription: 'Pandemics, plague, outbreaks, contagion narratives, or infectious disease themes. Common post-2020 trigger. Keywords: plague, outbreak, virus, lockdown.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'infertility',
         userLabel: 'Infertility',
         shortDescription: 'Infertility, long-term lack of conception, or inability to conceive. Distinct from pregnancy loss.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'pregnancy_loss',
         userLabel: 'Pregnancy Loss',
         shortDescription: 'Miscarriage, stillbirth, or pregnancy loss. Distinct from infertility (long-term conception issues).',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'chronic_illness',
         userLabel: 'Chronic Illness',
         shortDescription: 'Chronic illness, disability, or long-term health conditions.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'cancer',
         userLabel: 'Cancer',
         shortDescription: 'Cancer, cancer treatment, or cancer-related illness.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'body_horror',
         userLabel: 'Body Horror',
         shortDescription: 'Body horror, extreme body modification, or graphic body-related content.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 9,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'pregnancy_childbirth',
         userLabel: 'Pregnancy / Childbirth',
         shortDescription: 'Pregnancy, childbirth, pregnancy complications, or pregnancy-related trauma.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_medical',
         userLabel: 'Other Medical / Health',
         shortDescription: 'Other medical or health-related content not covered above.',
-        defaultSeverityHint: 'moderate'
-      }
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -898,32 +1164,41 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'cult_content',
         userLabel: 'Cult Dynamics',
         shortDescription: 'Cult dynamics, indoctrination, or cult manipulation.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'religious_trauma',
         userLabel: 'Religious Trauma',
         shortDescription: 'Religious trauma, religious abuse, or religious-based harm.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'occult',
         userLabel: 'Occult / Supernatural',
         shortDescription: 'Occult themes, supernatural elements, or dark magic.',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'excommunication',
         userLabel: 'Excommunication / Religious Exclusion',
         shortDescription: 'Excommunication, religious exclusion, or religious shunning.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_religious_cult',
         userLabel: 'Other Religious / Cult',
         shortDescription: 'Other religious or cult-related content not covered above.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -936,38 +1211,49 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'parental_abandonment',
         userLabel: 'Parental Abandonment',
         shortDescription: 'Parental abandonment, estrangement, or parents leaving.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'foster_care_adoption',
         userLabel: 'Foster Care / Adoption Trauma',
         shortDescription: 'Foster care trauma, adoption breakdown, or displacement of children.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'divorce',
         userLabel: 'Divorce / Separation',
         shortDescription: 'Divorce, separation, or relationship breakdown. Moved from Death / Grief to better reflect family dynamics context.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'deception_or_secrets',
         userLabel: 'Deception / Secrets',
         shortDescription: 'Deception, lying, or secret-keeping involving friends or family (e.g., hiding relationship status, lying to friends, keeping secrets from loved ones).',
-        defaultSeverityHint: 'mild'
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'incest_taboo',
         userLabel: 'Incest / Pseudo-Incest',
         shortDescription: 'Incest, pseudo-incest (step-siblings), or blood relation sexual/romantic content.',
-        defaultSeverityHint: 'severe'
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 10,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other_family_dynamics',
         userLabel: 'Other Family Dynamics',
         shortDescription: 'Other family-related trauma or dynamics not covered above.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   },
   {
@@ -980,20 +1266,25 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         id: 'natural_disasters',
         userLabel: 'Natural Disasters',
         shortDescription: 'Natural disasters, environmental trauma, or climate-related events.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'accidents',
         userLabel: 'Car Accidents / Crashes',
         shortDescription: 'Car crashes, plane crashes, or severe vehicle accidents.',
-        defaultSeverityHint: 'moderate'
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
       },
       {
         id: 'other',
         userLabel: 'Other',
         shortDescription: 'Other potentially triggering content.',
-        defaultSeverityHint: 'mild'
-      }
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'}
     ]
   }
 ];
@@ -1022,6 +1313,38 @@ export function getSubcategoryById(categoryId: string, subcategoryId: string): W
   const category = getCategoryById(categoryId);
   if (!category) return undefined;
   return category.subcategories.find(s => s.id === subcategoryId);
+}
+
+/**
+ * Get the severity score for a subcategory (0-10 scale, proto-RLHF)
+ * 
+ * Returns the explicit defaultSeverityScore if present, otherwise computes from defaultSeverityHint.
+ * This allows backward compatibility with subcategories that only have hints.
+ * 
+ * @param subcategory - The warning subcategory
+ * @returns Severity score (0-10), or undefined if no hint or score available
+ */
+export function getSeverityScore(subcategory: WarningSubcategory): number | undefined {
+  // If explicit score exists, use it
+  if (subcategory.defaultSeverityScore !== undefined) {
+    return subcategory.defaultSeverityScore;
+  }
+  
+  // Otherwise, compute from hint
+  if (subcategory.defaultSeverityHint) {
+    switch (subcategory.defaultSeverityHint) {
+      case 'mild':
+        return 3; // Low mild default
+      case 'moderate':
+        return 6; // Medium moderate default
+      case 'severe':
+        return 9; // High severe default
+      default:
+        return undefined;
+    }
+  }
+  
+  return undefined;
 }
 
 export function getAllSubcategories(): Array<{ categoryId: string; subcategory: WarningSubcategory }> {
@@ -1075,6 +1398,39 @@ export function validateSubcategoryParent(categoryId: string, subcategoryId: str
   const category = getCategoryById(categoryId);
   if (!category) return false;
   return category.subcategories.some(s => s.id === subcategoryId);
+}
+
+/**
+ * Normalize a category.subcategory pair to its canonical form.
+ * If the pair is invalid but the subcategory exists under a different category,
+ * remaps it to the canonical location.
+ * 
+ * @param categoryId The category ID from the warning
+ * @param subcategoryId The subcategory ID from the warning
+ * @returns Normalized category ID, or null if subcategory doesn't exist anywhere
+ */
+export function normalizeCategorySubcategory(
+  categoryId: string,
+  subcategoryId: string
+): { categoryId: string; subcategoryId: string } | null {
+  // First, check if the provided pair is valid
+  if (validateSubcategoryParent(categoryId, subcategoryId)) {
+    return { categoryId, subcategoryId };
+  }
+  
+  // If not valid, search all categories for this subcategory
+  const allSubcategories = getAllSubcategories();
+  const found = allSubcategories.find(
+    ({ subcategory }) => subcategory.id === subcategoryId
+  );
+  
+  if (found) {
+    // Subcategory exists but under a different category - return canonical location
+    return { categoryId: found.categoryId, subcategoryId: found.subcategory.id };
+  }
+  
+  // Subcategory doesn't exist anywhere in taxonomy
+  return null;
 }
 
 /**

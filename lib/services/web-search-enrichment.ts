@@ -151,7 +151,13 @@ Return a compact bullet list.`
       'torture', 'imprisonment', 'confinement', 'captivity', 'kidnapping',
       'explicit sexual', 'explicit sex', 'smut', 'spice', 'sexual content',
       'sexual assault', 'rape', 'non-consensual', 'non consensual',
-      'gore', 'dismember', 'dismemberment'
+      'gore', 'dismember', 'dismemberment',
+      // Infanticide/child harm indicators (for books like Verity)
+      'infanticide', 'child murder', 'baby death', 'intentional child harm',
+      'harm to children', 'child abuse', 'child death', 'murder of child',
+      // Sexual violence indicators (for books like Normal People)
+      'groping', 'unwanted touching', 'molestation', 'sexual assault',
+      'non-consensual sex', 'forced sex', 'unwanted sexual'
     ]
 
     const foundContentWarnings = contentWarningIndicators.some(indicator => {

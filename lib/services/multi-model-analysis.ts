@@ -76,15 +76,43 @@ function sortWarningsForCapping(warnings: EnhancedContentWarning[]): EnhancedCon
 }
 
 function buildTaxonomyContext(): string {
+  // High-severity subcategories that should be prioritized
+  const highSeveritySubcategories = new Set([
+    'violence.infanticide_or_intentional_child_harm',
+    'sexual_content.sexual_violence',
+    'violence.torture',
+    'violence.human_trafficking',
+    'violence.cannibalism',
+  ])
+
   const categories = WARNING_CATEGORIES.map(cat => {
-    const subcats = cat.subcategories.map(sub =>
-      `    - ${cat.id}.${sub.id}: ${sub.userLabel} (${sub.shortDescription}) [Default: ${sub.defaultSeverityHint || 'none'}]`
-    ).join('\n')
+    const subcats = cat.subcategories.map(sub => {
+      const subcategoryId = `${cat.id}.${sub.id}`
+      const isHighSeverity = highSeveritySubcategories.has(subcategoryId)
+      const severityMarker = isHighSeverity ? ' [SEVERE - HIGH PRIORITY]' : ''
+      const defaultSeverity = sub.defaultSeverityHint || 'none'
+      // TODO (Future RLHF): Consider exposing severity scores as relative ordering hints
+      // rather than hard labels to avoid overfitting early hand-tuned choices.
+      // For example: "Higher severity: infanticide (score ~10) vs moderate themes (score ~5)"
+      // instead of explicit numeric scores in prompts.
+      return `    - ${subcategoryId}: ${sub.userLabel} (${sub.shortDescription}) [Default: ${defaultSeverity}]${severityMarker}`
+    }).join('\n')
 
     return `  ${cat.id} (${cat.userLabel}):\n${subcats}`
   }).join('\n\n')
 
-  return categories
+  // Add a note at the top highlighting high-severity categories
+  const highSeverityNote = `IMPORTANT: The following subcategories are HIGH PRIORITY and should be checked FIRST if signals are present:
+  - violence.infanticide_or_intentional_child_harm [SEVERE]
+  - sexual_content.sexual_violence [SEVERE]
+  - violence.torture [SEVERE]
+  - violence.human_trafficking [SEVERE]
+  - violence.cannibalism [SEVERE]
+
+Available Categories and Subcategories:
+`
+
+  return highSeverityNote + categories
 }
 
 /**
@@ -210,7 +238,26 @@ Instructions:
    - If you cannot identify specific content warnings from the description or web search context, return [] (empty array)
    - DO NOT quote the book description verbatim. Use Australian Classification Board terminology (e.g., "Strong themes of emotional abuse" instead of quoting a diary entry).
    - Use the Board's standardized advisory language. Reference: https://www.classification.gov.au/classification-ratings/how-rating-decided
-   - IMPORTANT: Pay special attention to RELATIONSHIP AND EMOTIONAL CONTENT that may be triggering:
+
+ 2a. CRITICAL: CHILD HARM / INFANTICIDE (HIGH PRIORITY - check this FIRST)
+   - **HIGHEST PRIORITY**: If the description mentions "bone-chilling admissions", "family tragedy", "horrifying truth", "disturbing admissions", or similar language about family/child harm, OR if enrichment context mentions infanticide, intentional harm to a newborn/infant, attempted murder of a baby, child murder, baby death, or deliberate harm to children, you MUST use:
+     - "violence.infanticide_or_intentional_child_harm"
+   - Examples of signals: "infanticide", "child murder", "baby death", "intentional child harm", "murder of a child", "harm to children"
+   - Do NOT bury this under generic "death", "near death", or "other_violence" when the content is intentional harm to a child.
+   - This category should generally be SEVERE, not mild or moderate.
+   - If enrichment context explicitly mentions infanticide or child murder, use this category even if the description is vague.
+
+ 2b. CRITICAL: SEXUAL VIOLENCE DETECTION (HIGH PRIORITY)
+   - **IMPORTANT**: If the description or enrichment context mentions "groping", "unwanted touching", "molestation", "sexual assault", "non-consensual", "forced", or similar terms, you MUST classify as:
+     - "sexual_content.sexual_violence" (NOT "explicit_sexual_content" or "consent_ambiguity")
+   - Examples of signals that indicate sexual violence (not consent play):
+     * "groping", "unwanted touching", "molestation", "sexual assault", "rape"
+     * "non-consensual", "non consensual", "forced", "unwanted"
+     * "victim", "survivor", "trauma", "abuse" (in sexual context)
+   - If enrichment context mentions these terms, use sexual_violence even if the description is vague.
+   - Do NOT classify as "explicit_sexual_content" or "consent_ambiguity" when these violence signals are present.
+
+ 2c. IMPORTANT: Pay special attention to RELATIONSHIP AND EMOTIONAL CONTENT that may be triggering:
      * Deception, lying, or secret-keeping (e.g., "lying through their teeth", "haven't told anyone", "pretending to be together")
      * Relationship breakdown, separation, or breakups (e.g., "broke up", "divorced", "separated")
      * Emotional stress from relationship issues (e.g., "can't bear to", "pretending", "faking", "hiding feelings")
@@ -219,12 +266,21 @@ Instructions:
        - "family_dynamics.deception_or_secrets" for deception/lying to friends or family
        - "family_dynamics.divorce" for relationship breakdown/separation
        - "family_dynamics.other_family_dynamics" for other family/social dynamics
+   - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field. 
+     * BEFORE returning empty, explicitly ask yourself: "Does this book contain grief, anxiety, panic attacks, or intense emotional distress?"
+     * If YES, these are CONTENT WARNINGS. Do not return empty. Create a warning for "mental_health" or "themes".
+     * If NO, and it is truly lighthearted (e.g., "Cozy Mystery", "RomCom" with no angst), then return empty.
+     * In your reasoning, explicitly state: "No content warnings found. Review of themes (grief, anxiety, violence) came back negative. Tone is lighthearted."
 
- 2b. CRITICAL: CHILD HARM / INFANTICIDE (high trust category)
-   - If the description or enrichment context mentions infanticide, intentional harm to a newborn/infant, attempted murder of a baby, or deliberate harm to children, you MUST use:
-     - "violence.infanticide_or_intentional_child_harm"
-   - Do NOT bury this under generic "death" or "near death" when the content is intentional harm.
-   - This category should generally not be mild.
+2d. GENRE AWARENESS FOR ROMANCE AND FANTASY/YA WITH ROMANCE:
+     * Deception, lying, or secret-keeping (e.g., "lying through their teeth", "haven't told anyone", "pretending to be together")
+     * Relationship breakdown, separation, or breakups (e.g., "broke up", "divorced", "separated")
+     * Emotional stress from relationship issues (e.g., "can't bear to", "pretending", "faking", "hiding feelings")
+     * Pressure to maintain appearances or keep secrets from friends/family
+     * These should be flagged as:
+       - "family_dynamics.deception_or_secrets" for deception/lying to friends or family
+       - "family_dynamics.divorce" for relationship breakdown/separation
+       - "family_dynamics.other_family_dynamics" for other family/social dynamics
    - IMPORTANT: If the warnings array is empty, you MUST provide a "no_warnings_reasoning" field. 
      * BEFORE returning empty, explicitly ask yourself: "Does this book contain grief, anxiety, panic attacks, or intense emotional distress?"
      * If YES, these are CONTENT WARNINGS. Do not return empty. Create a warning for "mental_health" or "themes".
@@ -872,9 +928,11 @@ function processWarnings(
         subcategoryId = 'sexual_content.consent_ambiguity'
       }
 
-      // Conversely, if the model under-calls non-consensual acts as "consent ambiguity",
+      // Conversely, if the model under-calls non-consensual acts as "consent ambiguity" or "explicit sexual content",
       // upgrade to sexual violence when strong signals are present (e.g., "groping", "unwanted", "assault").
-      if (violenceCheck.isViolence && subcategoryId === 'sexual_content.consent_ambiguity' && violenceCheck.confidence >= 0.7) {
+      if (violenceCheck.isViolence && 
+          (subcategoryId === 'sexual_content.consent_ambiguity' || subcategoryId === 'sexual_content.explicit_sexual_content') && 
+          violenceCheck.confidence >= 0.7) {
         subcategoryId = 'sexual_content.sexual_violence'
       }
     }
@@ -1606,7 +1664,12 @@ export async function analyzeBookWithMultiModel(
     hasViolenceSignal &&
     !hasAnySexualContentWarning
 
-  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster || looksLikeViolenceWithoutSex)) {
+  // "other_violence" is often a sign that the AI detected violence but couldn't classify it properly.
+  // This frequently happens when severe content (like infanticide) is present but sanitized from descriptions.
+  // Enrichment can help recover the specific violence type from community sources.
+  const hasOtherViolence = finalWarnings.some(w => w.subcategory_id === 'violence.other_violence')
+
+  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster || looksLikeViolenceWithoutSex || hasOtherViolence)) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
     const hasOnlyGenericWarnings = finalWarnings.length > 0 && 
       finalWarnings.every(w => 
@@ -1618,9 +1681,11 @@ export async function analyzeBookWithMultiModel(
     // 1. We have 0 warnings (definitely need enrichment)
     // 2. We only have generic warnings (likely sanitized)
     // 3. We have 1-2 warnings but they're all relationship/alcohol (might be missing mental health)
+    // 4. We have "other_violence" (likely masking specific severe content like infanticide)
     const shouldEnrich = finalWarnings.length === 0 ||
       looksLikeGenericCluster ||
       looksLikeViolenceWithoutSex ||
+      hasOtherViolence ||
       hasOnlyGenericWarnings ||
       (finalWarnings.length <= 2 &&
        !finalWarnings.some(w => 
@@ -1647,9 +1712,13 @@ export async function analyzeBookWithMultiModel(
           onProgress
         )
 
+        // Store enriched context for post-enrichment upgrade checks
+        let enrichedContextText: string | null = null
+
         // IMPORTANT: Don't require the snippets to literally contain "content warning" language.
         // If we got any enrichment context, it can still help the second-pass analysis.
         if (enrichmentResult.enrichedContext) {
+          enrichedContextText = enrichmentResult.enrichedContext
           onProgress?.('⏳ Gathering additional information from community sources...')
           
           // Create enriched metadata with community-sourced context
@@ -1686,6 +1755,94 @@ export async function analyzeBookWithMultiModel(
             }
           } else {
             onProgress?.('ℹ️ Enrichment did not find additional warnings beyond initial scan')
+          }
+        }
+
+        // Post-enrichment validation: Check for missed classifications using enriched context
+        if (enrichedContextText) {
+          onProgress?.('⏳ Validating warnings with enriched context...')
+          const enrichedContextLower = enrichedContextText.toLowerCase()
+          
+          // Check 1: Sexual violence upgrade (explicit_sexual_content -> sexual_violence)
+          finalWarnings = finalWarnings.map(w => {
+            // Only check sexual content warnings
+            if (w.subcategory_id?.includes('sexual')) {
+              const violenceCheck = isActualSexualViolence(
+                {
+                  subcategory_id: w.subcategory_id,
+                  description: w.description,
+                  reasoning: w.reasoning || ''
+                } as any,
+                enrichedContextText
+              )
+
+              // Upgrade if strong signals found in enriched context
+              if (violenceCheck.isViolence && 
+                  (w.subcategory_id === 'sexual_content.consent_ambiguity' || 
+                   w.subcategory_id === 'sexual_content.explicit_sexual_content') && 
+                  violenceCheck.confidence >= 0.7) {
+                onProgress?.(`✓ Upgraded ${w.subcategory_id} to sexual_violence based on enriched context`)
+                return {
+                  ...w,
+                  subcategory_id: 'sexual_content.sexual_violence'
+                }
+              }
+            }
+            return w
+          })
+
+          // Check 2: Infanticide detection (other_violence -> infanticide_or_intentional_child_harm)
+          const hasOtherViolence = finalWarnings.some(w => w.subcategory_id === 'violence.other_violence')
+          const infanticideSignals = [
+            'infanticide', 'child murder', 'baby death', 'intentional child harm',
+            'murder of a child', 'harm to children', 'child abuse', 'child death'
+          ]
+          const hasInfanticideSignal = infanticideSignals.some(signal => 
+            enrichedContextLower.includes(signal)
+          )
+
+          if (hasOtherViolence && hasInfanticideSignal) {
+            // Check if infanticide warning already exists
+            const hasInfanticideWarning = finalWarnings.some(w => 
+              w.subcategory_id === 'violence.infanticide_or_intentional_child_harm'
+            )
+
+            if (!hasInfanticideWarning) {
+              // Replace other_violence with infanticide_or_intentional_child_harm
+              const otherViolenceIndex = finalWarnings.findIndex(w => 
+                w.subcategory_id === 'violence.other_violence'
+              )
+              if (otherViolenceIndex !== -1) {
+                onProgress?.('✓ Upgraded other_violence to infanticide_or_intentional_child_harm based on enriched context')
+                finalWarnings[otherViolenceIndex] = {
+                  ...finalWarnings[otherViolenceIndex],
+                  subcategory_id: 'violence.infanticide_or_intentional_child_harm',
+                  description: 'Strong themes of infanticide or intentional harm to a child.',
+                  severity: 'severe'
+                }
+              } else {
+                // Add new infanticide warning if other_violence wasn't found (shouldn't happen, but safety check)
+                onProgress?.('✓ Adding infanticide_or_intentional_child_harm warning based on enriched context')
+                finalWarnings.push({
+                  subcategory_id: 'violence.infanticide_or_intentional_child_harm',
+                  severity: 'severe' as const,
+                  modifiers: [],
+                  evidence: [{
+                    source: 'community' as const,
+                    excerpt: 'Enrichment context indicated infanticide or child harm',
+                    confidence: 0.7
+                  }],
+                  description: 'Strong themes of infanticide or intentional harm to a child.',
+                  reasoning: 'Enrichment context from community sources indicated infanticide or intentional child harm, which was not explicitly mentioned in the book description.',
+                  presence: 'on_page' as const,
+                  detail_level: 'moderate' as const,
+                  frequency_hint: 'theme' as const,
+                  centrality_hint: 'central' as const,
+                  is_spoiler: false,
+                  taxonomy_version: TAXONOMY_VERSION
+                } as EnhancedContentWarning)
+              }
+            }
           }
         }
       } catch (error) {

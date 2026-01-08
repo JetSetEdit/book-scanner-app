@@ -105,11 +105,20 @@ export async function searchForContentWarnings(
   author: string
 ): Promise<SearchResult[]> {
   // Construct targeted queries that focus on user-generated content warnings.
-  // We run a couple variants to increase recall for "missing major themes" cases.
+  // We run multiple variants to increase recall for "missing major themes" cases,
+  // including explicit searches for high-severity content that's often sanitized from blurbs.
   const queries = [
+    // General content warning searches
     `"${title}" "${author}" content warnings trigger warnings parents guide`,
-    `"${title}" "${author}" trigger warnings torture explicit sexual content`,
     `"${title}" "${author}" "TW" "CW" "content warnings"`,
+    // High-severity content that's often omitted from descriptions
+    `"${title}" "${author}" trigger warnings torture explicit sexual content`,
+    // Explicit infanticide/child harm searches (for books like Verity)
+    `"${title}" "${author}" infanticide child murder baby death intentional child harm`,
+    `"${title}" "${author}" content warnings infanticide child harm`,
+    // Explicit sexual violence searches (for books like Normal People)
+    `"${title}" "${author}" sexual assault groping unwanted touching molestation`,
+    `"${title}" "${author}" content warnings sexual violence non-consensual`,
   ]
 
   const results: SearchResult[] = []

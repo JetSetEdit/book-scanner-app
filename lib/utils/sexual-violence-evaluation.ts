@@ -67,13 +67,18 @@ const CONSENT_PLAY_SIGNALS = [
 /**
  * Check if a warning should be classified as sexual violence
  * vs dark romance consent play
+ * 
+ * @param warning - The content warning to evaluate
+ * @param enrichedContext - Optional enriched context from web search that may contain additional signals
  */
 export function isActualSexualViolence(
-  warning: ContentWarning
+  warning: ContentWarning,
+  enrichedContext?: string | null
 ): { isViolence: boolean; confidence: number; reasoning: string[] } {
   const text = [
     warning.description,
     warning.reasoning,
+    enrichedContext, // Include enriched context in signal detection
   ]
     .filter(Boolean)
     .join(' ')

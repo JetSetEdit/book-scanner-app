@@ -151,9 +151,6 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
   const hasIncestOrTabooSex = warnings.some(w =>
     w.subcategory_id?.includes('incest_taboo')
   )
-  const hasSexualViolence = warnings.some(w =>
-    w.subcategory_id?.includes('sexual_violence')
-  )
   const hasGraphicViolence = warnings.some(w => 
     w.subcategory_id?.includes('graphic_violence')
   )

@@ -3,7 +3,7 @@ import { fetchBookByISBN, fetchCandidatesByISBN, BookCandidate } from '@/lib/boo
 import { normalizeISBN } from '@/lib/isbn-validation'
 import { Database } from '@/types/supabase'
 import { isStale, refreshBookMetadata } from '@/lib/book-cache'
-import { MODEL_VERSION, TAXONOMY_VERSION } from '@/lib/config/taxonomy-v2'
+import { MODEL_VERSION, TAXONOMY_VERSION, normalizeCategorySubcategory, getCategoryById } from '@/lib/config/taxonomy-v2'
 import { assessMetadataQuality, type MetadataQuality } from '@/lib/utils/metadata-quality'
 
 // Helper to validate cover URL is not a placeholder
@@ -965,12 +965,26 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
                   return null
                 }
                 
-                const [categoryId, subcategoryId] = w.subcategory_id.split('.')
+                const [originalCategoryId, subcategoryId] = w.subcategory_id.split('.')
                 
                 // Validate split result
-                if (!categoryId || !subcategoryId) {
+                if (!originalCategoryId || !subcategoryId) {
                   console.error(`[Warning] Failed to parse subcategory_id: ${w.subcategory_id}, skipping warning`)
                   return null
+                }
+                
+                // Normalize category/subcategory pair (remap if subcategory exists under different category)
+                const normalized = normalizeCategorySubcategory(originalCategoryId, subcategoryId)
+                if (!normalized) {
+                  console.error(`[Warning] Subcategory ${subcategoryId} does not exist in taxonomy, skipping warning`)
+                  return null
+                }
+                
+                const categoryId = normalized.categoryId
+                
+                // Log remapping if category changed
+                if (categoryId !== originalCategoryId) {
+                  console.warn(`[CW_NORMALIZE] Remapped ${originalCategoryId}.${subcategoryId} -> ${categoryId}.${subcategoryId}`)
                 }
                 
                 // Map to legacy category for database constraint compatibility
