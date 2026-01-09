@@ -6,7 +6,7 @@
  * Auto-generates changelog entries when significant user-facing changes are detected
  */
 
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { execSync } from 'child_process'
 
@@ -142,6 +142,39 @@ function getRecentCommits(sinceVersion: string): CommitInfo[] {
       ).trim()
     }
     
+    // Also check for staged/uncommitted changes that might indicate user-facing work
+    // This helps when version is incremented before committing
+    let hasUncommittedUserFacingChanges = false
+    try {
+      const stagedFiles = execSync(
+        `git diff --cached --name-only`,
+        { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
+      ).trim()
+      
+      const unstagedFiles = execSync(
+        `git diff --name-only`,
+        { encoding: 'utf-8', cwd: process.cwd(), stdio: ['ignore', 'pipe', 'ignore'] }
+      ).trim()
+      
+      // If there are significant changes to user-facing files, add a synthetic commit
+      const allChangedFiles = (stagedFiles + '\n' + unstagedFiles).split('\n').filter(Boolean)
+      const userFacingFiles = allChangedFiles.filter(f => 
+        f.includes('components/') || 
+        (f.includes('app/') && !f.includes('api/')) ||
+        f.includes('lib/services/') ||
+        (f.includes('lib/config/version.ts') && allChangedFiles.length > 1) // version.ts alone doesn't count
+      )
+      
+      if (userFacingFiles.length > 0 && (!logOutput || logOutput.trim().length === 0)) {
+        // No commits found but there are uncommitted user-facing changes
+        // Add a synthetic entry to trigger changelog update
+        logOutput = '0000000 feat: user-facing changes (uncommitted changes detected)'
+        hasUncommittedUserFacingChanges = true
+      }
+    } catch {
+      // Ignore errors checking for uncommitted changes
+    }
+    
     if (!logOutput) return []
     
     const commits: CommitInfo[] = []
@@ -204,7 +237,10 @@ function shouldUpdateChangelog(commits: CommitInfo[]): boolean {
   const fixCount = commits.filter(c => c.type === 'fix' && c.isUserFacing).length
   const userFacingCount = commits.filter(c => c.isUserFacing).length
   
-  return featCount >= 1 || fixCount >= 2 || userFacingCount >= 3
+  // Also check for synthetic "uncommitted changes" entry
+  const hasUncommittedChanges = commits.some(c => c.message.includes('uncommitted changes detected'))
+  
+  return featCount >= 1 || fixCount >= 2 || userFacingCount >= 3 || hasUncommittedChanges
 }
 
 function generateChangelogEntry(commits: CommitInfo[], newVersion: string, buildDate: string): string {

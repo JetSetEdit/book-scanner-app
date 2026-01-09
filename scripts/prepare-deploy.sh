@@ -25,6 +25,12 @@ echo ""
 echo "📝 Staging version files..."
 git add lib/config/version.ts package.json
 
+# Stage changelog if it was updated (check both staged and unstaged changes)
+if git diff --name-only | grep -q "lib/config/changelog.ts" || git diff --cached --name-only | grep -q "lib/config/changelog.ts"; then
+  echo "📝 Staging changelog updates..."
+  git add lib/config/changelog.ts
+fi
+
 echo ""
 echo "✅ Ready for deployment!"
 echo ""

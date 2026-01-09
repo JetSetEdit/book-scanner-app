@@ -5,7 +5,7 @@
  * Update this when deploying new versions.
  */
 
-export const APP_VERSION = "1.03.0"
+export const APP_VERSION = "1.03.1"
 export const APP_VERSION_LABEL = "Public Beta"
 export const APP_BUILD_DATE = "2026-01-09" // YYYY-MM-DD - Update on each deployment
 
