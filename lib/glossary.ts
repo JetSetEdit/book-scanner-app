@@ -33,6 +33,10 @@ export const GLOSSARY: Record<string, string> = {
   "Explicit Sexual Content": "Explicit sexual scenes, graphic sexual descriptions.",
   "Intense Romance / Spice": "Intense romantic/sexual tension, steamy scenes, explicit romance/spice content.",
   "Sexual Themes": "Sexual themes, discussions, references (non-explicit).",
+  
+  // Discrimination & Social Issues
+  "Classism / Poverty": "Discrimination based on class, extreme poverty, homelessness, or economic status discrimination.",
+  "Workplace Burnout / Toxic Workplace": "Workplace burnout, toxic work environments, overwork, or professional stress. May include exploitation, harassment, or unsafe working conditions.",
 };
 
 /**

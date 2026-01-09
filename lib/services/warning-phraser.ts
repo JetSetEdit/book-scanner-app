@@ -34,6 +34,7 @@ export function getWarningPhrase(categoryId: string | null | undefined): string 
 
 /**
  * Format a warning description with the rotated phrase
+ * Removes redundant phrases to avoid "Explores themes involving moderate themes..."
  */
 export function formatWarningDescription(
   categoryId: string | null | undefined,
@@ -42,12 +43,32 @@ export function formatWarningDescription(
   const phrase = getWarningPhrase(categoryId)
   
   // If description already starts with a phrase-like pattern, use it as-is
-  // Otherwise, prepend the phrase
   if (description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) {
     return description
   }
   
   // Remove the ellipsis and combine
   const cleanPhrase = phrase.replace('…', '')
-  return `${cleanPhrase} ${description.toLowerCase()}`
+  let combined = `${cleanPhrase} ${description.toLowerCase()}`
+  
+  // Fix redundant phrases like "Explores themes involving moderate themes..."
+  // Pattern: "Explores themes involving" + "moderate themes of..." → "Explores moderate themes of..."
+  combined = combined.replace(
+    /(Explores|Includes|Contains|Features|Addresses|Touches)\s+themes\s+involving\s+(moderate|mild|strong|severe)\s+themes\s+of/gi,
+    (match, verb, severity) => `${verb} ${severity} themes of`
+  )
+  
+  // Also fix "themes involving moderate themes" (without "of") → "moderate themes"
+  combined = combined.replace(
+    /(Explores|Includes|Contains|Features|Addresses|Touches)\s+themes\s+involving\s+(moderate|mild|strong|severe)\s+themes\b/gi,
+    (match, verb, severity) => `${verb} ${severity} themes`
+  )
+  
+  // Fix "themes involving themes of" → "themes of"
+  combined = combined.replace(
+    /\bthemes\s+involving\s+themes\s+of\b/gi,
+    'themes of'
+  )
+  
+  return combined
 }
