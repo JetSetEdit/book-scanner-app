@@ -166,7 +166,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   const [requestSent, setRequestSent] = useState(false)
   const [userState, setUserState] = useState<string | null>(null)
   const [stateServices, setStateServices] = useState<any>(null)
-
+  
   // Filter warnings based on trope mode
   const filteredWarnings = warnings.filter(warning => {
     const context = getWarningContext(warning.category_id, warning.subcategory_id, warning.description)
@@ -271,7 +271,8 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   const showSupportResources = hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief || hasBullying || hasRacism;
 
   // Show quick exit button for highly sensitive content (domestic violence, sexual assault, abuse)
-  const showQuickExit = hasAbuseOrViolence || hasSexualAssault;
+  // Only show if user has enabled it in preferences
+  const showQuickExit = (hasAbuseOrViolence || hasSexualAssault) && (preferences.enableQuickExit !== false);
 
   const handleQuickExit = () => {
     window.location.href = 'https://www.google.com'
@@ -466,12 +467,12 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
         <div className="fixed top-4 right-4 z-50 md:top-6 md:right-6">
           <Button
             onClick={handleQuickExit}
-            variant="destructive"
+            variant="outline"
             size="sm"
-            className="shadow-lg hover:shadow-xl transition-all animate-in fade-in slide-in-from-top-2"
+            className="bg-background/95 backdrop-blur-sm border-border/50 shadow-md hover:shadow-lg hover:border-destructive/50 hover:text-destructive transition-all animate-in fade-in slide-in-from-top-2 text-xs font-medium"
             aria-label="Quick exit - leave this page immediately"
           >
-            <LogOut className="h-4 w-4 mr-2" />
+            <LogOut className="h-3.5 w-3.5 mr-1.5" />
             Quick Exit
           </Button>
         </div>
@@ -486,7 +487,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 onClick={handleQuickExit}
                 variant="ghost"
                 size="sm"
-                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                className="text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
                 aria-label="Quick exit - leave this page immediately"
               >
                 <LogOut className="h-3 w-3 mr-1.5" />
@@ -519,15 +520,15 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                       </a>
                     ))}
                     {/* National services */}
-                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
-                    </a>
-                    <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
-                    </a>
-                    <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
-                    </a>
+                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
+                </a>
+                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
+                </a>
+                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                  Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
+                </a>
                     <a href="https://mensline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
                       MensLine <span className="text-muted-foreground/60 ml-1">1300 78 99 78</span>
                     </a>
@@ -679,7 +680,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                       Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
                     </a>
                   </div>
-                </div>
+              </div>
               )}
 
               {/* General Support Note */}
@@ -743,7 +744,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 <CollapsibleContent>
                   <div className="space-y-0 border-t border-border mt-2">
                     {group.warnings.map((warning) => (
-                      <WarningItem key={warning.id} warning={warning} isAi={true} />
+              <WarningItem key={warning.id} warning={warning} isAi={true} />
                     ))}
                   </div>
                 </CollapsibleContent>
@@ -785,7 +786,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 <CollapsibleContent>
                   <div className="space-y-0 border-t border-border mt-2">
                     {group.warnings.map((warning) => (
-                      <WarningItem key={warning.id} warning={warning} />
+              <WarningItem key={warning.id} warning={warning} />
                     ))}
                   </div>
                 </CollapsibleContent>
@@ -1020,48 +1021,48 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
             />
 
             {/* Reasoning / Sources */}
-            <Popover>
-              <PopoverTrigger asChild>
+              <Popover>
+                <PopoverTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2"
                 >
                   <Info className="h-3 w-3 mr-1" /> {warning.reasoning ? 'Why?' : warning.source_url ? 'Details' : 'Why?'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
-                {warning.reasoning && (
-                  <>
-                    <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">
-                      {isAi ? 'AI Reasoning' : 'Justification'}
-                    </p>
-                    <p className="mb-3">{warning.reasoning}</p>
-                  </>
-                )}
-                {warning.source_url && (
-                  <div className={warning.reasoning ? "mt-3 pt-3 border-t border-border" : ""}>
-                    <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">Source</p>
-                    <a
-                      href={warning.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 break-all"
-                    >
-                      {warning.source_url}
-                    </a>
-                  </div>
-                )}
-                {!warning.reasoning && !warning.source_url && (
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="max-w-xs p-4 text-xs bg-popover border border-border shadow-xl text-popover-foreground">
+                  {warning.reasoning && (
+                    <>
+                      <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">
+                        {isAi ? 'AI Reasoning' : 'Justification'}
+                      </p>
+                      <p className="mb-3">{warning.reasoning}</p>
+                    </>
+                  )}
+                  {warning.source_url && (
+                    <div className={warning.reasoning ? "mt-3 pt-3 border-t border-border" : ""}>
+                      <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">Source</p>
+                      <a
+                        href={warning.source_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 break-all"
+                      >
+                        {warning.source_url}
+                      </a>
+                    </div>
+                  )}
+                  {!warning.reasoning && !warning.source_url && (
                   <div className="space-y-2">
                     <p className="text-muted-foreground italic">No details available for this warning yet.</p>
                     <p className="text-[10px] text-muted-foreground">
                       If this seems inaccurate, use the thumbs feedback (or “Found an error? Report this book.”) to help improve results.
                     </p>
                   </div>
-                )}
-              </PopoverContent>
-            </Popover>
+                  )}
+                </PopoverContent>
+              </Popover>
 
             {/* Fallback: Show source link if no reasoning popover */}
             {!warning.reasoning && warning.source_url && (
