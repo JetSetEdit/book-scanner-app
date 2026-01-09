@@ -18,6 +18,7 @@ import { Info } from "lucide-react"
 import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { APP_VERSION } from "@/lib/config/version"
 import { generateSummary } from "@/lib/services/warning-renderer"
+import { FeedbackDialog } from "@/components/feedback-dialog"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -692,20 +693,29 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               {/* Feedback / Report Section */}
               <div className="mt-12 pt-8 border-t border-border">
                 <div className="flex flex-col items-center justify-center">
-                  <a
-                    href="https://tally.so/r/placeholder"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent"
-                    >
-                      <Flag className="h-3.5 w-3.5 mr-1.5" />
-                      Found an error? Report this book.
-                    </Button>
-                  </a>
+                  <FeedbackDialog
+                    trigger={
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent"
+                      >
+                        <Flag className="h-3.5 w-3.5 mr-1.5" />
+                        Found an error? Report this book.
+                      </Button>
+                    }
+                    pageUrl={typeof window !== 'undefined' ? window.location.href : undefined}
+                    defaultFeedbackType="content_issue"
+                    context={{
+                      bookId: book.id,
+                      bookTitle: book.title,
+                      bookAuthor: book.author,
+                      bookIsbn: book.isbn,
+                      warningsCount: warnings.length,
+                      analysisStatus: analysisStatus,
+                      metadataIssues: metadataIssues || undefined,
+                    }}
+                  />
                 </div>
               </div>
             </div>

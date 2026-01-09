@@ -5,7 +5,7 @@
  * Update this when deploying new versions.
  */
 
-export const APP_VERSION = "1.02.2"
+export const APP_VERSION = "1.03.0"
 export const APP_VERSION_LABEL = "Public Beta"
 export const APP_BUILD_DATE = "2026-01-09" // YYYY-MM-DD - Update on each deployment
 
@@ -29,6 +29,19 @@ export const APP_BUILD_ID = getBuildId()
 
 // Version history
 export const VERSION_HISTORY = [
+  {
+    version: "1.03.0",
+    label: "Public Beta",
+    date: "2026-01-09",
+    changes: [
+      "Added Quick Exit button for sensitive content (domestic violence, sexual assault)",
+      "Implemented state-based support resources (NSW, VIC, QLD, WA, SA, TAS, ACT, NT)",
+      "Enhanced feedback system with context prefilling and smart type detection",
+      "Expanded support resources: LGBTIQA+, substance use, grief, bullying, racism",
+      "Added comprehensive Australian support services for all warning categories",
+      "Improved feedback data capture with book context and technical metadata"
+    ]
+  },
   {
     version: "1.02.0",
     label: "Public Beta",

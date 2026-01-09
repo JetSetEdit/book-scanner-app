@@ -1,0 +1,137 @@
+# Cursor Rules for Book Scanner App
+
+## Project Overview
+This is a Next.js book scanning application that helps users discover content warnings and book information by scanning ISBNs. The app uses Supabase for the database and Vercel for deployment.
+
+## Key Technologies
+- **Framework**: Next.js 14+ (App Router)
+- **Database**: Supabase (PostgreSQL)
+- **Deployment**: Vercel
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS with shadcn/ui components
+
+## Important Patterns
+
+### Database Access
+- Use `@/lib/supabase/admin` for admin operations (service role key)
+- Use `@/lib/supabase/client` for client-side operations (anon key)
+- Always use Supabase MCP tools for database migrations and queries when available
+
+### API Routes
+- All API routes are in `app/api/` directory
+- Use `NextRequest` and `NextResponse` from `next/server`
+- Set `export const runtime = 'nodejs'` for API routes
+- Always validate input and handle errors gracefully
+
+### Components
+- Use shadcn/ui components from `@/components/ui/`
+- Client components use `"use client"` directive
+- Server components are default (no directive needed)
+- Use TypeScript interfaces for props
+
+### Feedback System
+
+#### Viewing Feedback Data
+The application has a comprehensive feedback system. To retrieve feedback:
+
+**Quick View Script:**
+```bash
+npx tsx scripts/view-feedback.ts [--status=pending] [--type=content_issue] [--limit=10] [--book-id=UUID]
+```
+
+**Using Supabase MCP:**
+```sql
+SELECT 
+  id,
+  book_title,
+  book_author,
+  isbn,
+  status,
+  metadata->>'feedback_type' as feedback_type,
+  metadata->>'message' as message,
+  app_version,
+  context_data
+FROM manual_handling_scans
+WHERE reason = 'user_feedback'
+ORDER BY created_at DESC;
+```
+
+**Check Queue Script:**
+```bash
+npx tsx scripts/check-queue.ts
+```
+
+#### Feedback Data Structure
+- Stored in `manual_handling_scans` table with `reason = 'user_feedback'`
+- Includes: book context, feedback details, context data (warnings count, analysis status), technical info (app version, user agent)
+- Full documentation: `docs/FEEDBACK_DATA_RETRIEVAL.md`
+- Quick reference: `docs/FEEDBACK_QUICK_REFERENCE.md`
+
+### Database Migrations
+- Use Supabase MCP `apply_migration` tool for schema changes
+- Migration files are in `supabase/migrations/`
+- Always test migrations on a branch first
+- Include rollback instructions in migration comments
+
+### Environment Variables
+- Required: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- Optional: `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GEMINI_DAILY_QUOTA_LIMIT`, `GEMINI_QUOTA_WARNING_THRESHOLD`
+- See `env.example` for all variables
+
+### Code Style
+- Use TypeScript strict mode
+- Prefer async/await over promises
+- Use descriptive variable names
+- Add JSDoc comments for complex functions
+- Follow existing patterns in the codebase
+
+### Testing
+- Test scripts are in `scripts/` directory
+- Use `npx tsx` to run TypeScript scripts
+- Always test database changes before deploying
+
+### Deployment
+- Main branch auto-deploys to Vercel
+- Environment variables must be set in Vercel dashboard
+- Database migrations run automatically via Supabase
+
+## Common Tasks
+
+### Adding a New API Endpoint
+1. Create file in `app/api/[route-name]/route.ts`
+2. Export `GET`, `POST`, etc. functions
+3. Use `supabaseAdmin` for database operations
+4. Return `NextResponse.json()` with appropriate status codes
+
+### Adding a New Database Table
+1. Create migration using Supabase MCP `apply_migration`
+2. Add TypeScript types in `types/supabase.ts` (run `npx supabase gen types typescript`)
+3. Update RLS policies if needed
+4. Document in relevant docs
+
+### Viewing User Feedback
+- Use `npx tsx scripts/view-feedback.ts` for detailed view
+- Use `npx tsx scripts/check-queue.ts` for quick overview
+- Use Supabase MCP for custom SQL queries
+- See `docs/FEEDBACK_DATA_RETRIEVAL.md` for full guide
+
+### Debugging
+- Check browser console for client-side errors
+- Check Vercel function logs for API errors
+- Use Supabase logs for database issues
+- Check `app/api/debug/` endpoints for debugging tools
+
+## File Organization
+- `app/` - Next.js app router pages and API routes
+- `components/` - React components
+- `lib/` - Utility functions and services
+- `scripts/` - Utility scripts for database operations
+- `supabase/migrations/` - Database migration files
+- `docs/` - Documentation files
+- `types/` - TypeScript type definitions
+
+## Important Notes
+- Always use Supabase MCP tools when available for database operations
+- Feedback data includes rich context (book info, warnings count, analysis status)
+- Use the feedback scripts to view and manage user feedback
+- Check documentation in `docs/` directory for detailed guides

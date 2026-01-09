@@ -162,6 +162,72 @@ curl -X POST /api/admin/complete-review \
   -d '{"bookId": "book-uuid-here"}'
 ```
 
+## User Feedback & Data Retrieval
+
+The application includes a comprehensive feedback system that captures user feedback with full context.
+
+### Viewing Feedback Data
+
+#### Quick View (Recommended)
+```bash
+# View all feedback (last 50)
+npx tsx scripts/view-feedback.ts
+
+# View only pending feedback
+npx tsx scripts/view-feedback.ts --status=pending
+
+# View specific feedback type
+npx tsx scripts/view-feedback.ts --type=content_issue
+
+# View feedback for a specific book
+npx tsx scripts/view-feedback.ts --book-id=YOUR_BOOK_ID
+
+# Limit results
+npx tsx scripts/view-feedback.ts --limit=10
+```
+
+#### Using Supabase MCP
+```sql
+-- Get all feedback with context
+SELECT 
+  id,
+  book_title,
+  book_author,
+  isbn,
+  status,
+  metadata->>'feedback_type' as feedback_type,
+  metadata->>'message' as message,
+  metadata->>'email' as email,
+  app_version,
+  context_data->>'warnings_count' as warnings_count,
+  context_data->>'analysis_status' as analysis_status,
+  created_at
+FROM manual_handling_scans
+WHERE reason = 'user_feedback'
+ORDER BY created_at DESC;
+```
+
+#### Check Queue Script
+```bash
+# View all feedback, analysis requests, and rate limit feedback
+npx tsx scripts/check-queue.ts
+```
+
+### Feedback Data Structure
+
+Feedback is stored in `manual_handling_scans` table with `reason = 'user_feedback'`. Each entry includes:
+
+- **Book Context**: `book_id`, `book_title`, `book_author`, `isbn`
+- **Feedback Details**: `feedback_type`, `message`, `email` (stored in `metadata` JSONB)
+- **Context Data**: `warnings_count`, `analysis_status`, `metadata_issues`, `pathname` (stored in `context_data` JSONB)
+- **Technical Info**: `app_version`, `user_agent`, `page_url`
+- **Status**: `status` (pending/in_progress/resolved/dismissed)
+
+### Documentation
+
+- **Full Guide**: See `docs/FEEDBACK_DATA_RETRIEVAL.md` for complete documentation
+- **Quick Reference**: See `docs/FEEDBACK_QUICK_REFERENCE.md` for common queries
+
 ## Contributing
 
 1. Fork the repository

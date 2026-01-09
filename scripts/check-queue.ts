@@ -89,12 +89,25 @@ async function main() {
     console.log(`   Found ${userFeedback.length} feedback entry(ies):\n`)
     userFeedback.forEach((fb, idx) => {
       const metadata = fb.metadata as any || {}
+      const contextData = (fb as any).context_data as any || {}
       const status = fb.status || 'pending'
       const createdAt = new Date(fb.created_at).toLocaleString()
       
       console.log(`   ${idx + 1}. ${metadata.feedback_type || 'Unknown Type'}`)
       console.log(`      Status: ${status}`)
       console.log(`      Submitted: ${createdAt}`)
+      
+      // Show book context if available
+      if ((fb as any).book_title) {
+        console.log(`      Book: "${(fb as any).book_title}"`)
+        if ((fb as any).book_author) {
+          console.log(`      Author: ${(fb as any).book_author}`)
+        }
+        if ((fb as any).isbn && (fb as any).isbn !== 'N/A') {
+          console.log(`      ISBN: ${(fb as any).isbn}`)
+        }
+      }
+      
       if (metadata.message) {
         const messagePreview = metadata.message.length > 100 
           ? metadata.message.substring(0, 100) + '...'
@@ -106,6 +119,15 @@ async function main() {
       }
       if (metadata.page_url) {
         console.log(`      Page: ${metadata.page_url}`)
+      }
+      if ((fb as any).app_version) {
+        console.log(`      App Version: ${(fb as any).app_version}`)
+      }
+      if (contextData.warnings_count !== null && contextData.warnings_count !== undefined) {
+        console.log(`      Warnings Count: ${contextData.warnings_count}`)
+      }
+      if (contextData.analysis_status) {
+        console.log(`      Analysis Status: ${contextData.analysis_status}`)
       }
       if (metadata.submission_count) {
         console.log(`      Submission Count: ${metadata.submission_count}`)

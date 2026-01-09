@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -28,7 +28,8 @@ import {
   Hash,
   Eye,
   EyeOff,
-  ChevronDown
+  ChevronDown,
+  LogOut
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
@@ -163,7 +164,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
   const [requestSent, setRequestSent] = useState(false)
-  
+  const [userState, setUserState] = useState<string | null>(null)
+  const [stateServices, setStateServices] = useState<any>(null)
+
   // Filter warnings based on trope mode
   const filteredWarnings = warnings.filter(warning => {
     const context = getWarningContext(warning.category_id, warning.subcategory_id, warning.description)
@@ -171,12 +174,104 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   })
   
   // Check for sensitive topics to show resources (use filtered warnings)
-  const showMentalHealthResources = filteredWarnings.some(w =>
-    ['mental_health', 'suicide', 'self_harm', 'abuse', 'substance_abuse'].includes(w.category) ||
-    (w.category_id && ['mental_health', 'substance_use_or_alcohol', 'emotional_abuse_or_toxic_relationships'].includes(w.category_id)) ||
+  const hasMentalHealth = filteredWarnings.some(w =>
+    ['mental_health', 'suicide', 'self_harm'].includes(w.category) ||
+    (w.category_id && [
+      'mental_health', 'disordered_eating', 'anxiety', 'depression', 'ptsd',
+      'self_harm', 'suicidal_ideation', 'suicide_minor', 'casual_suicidal_ideation',
+      'workplace_burnout', 'academic_pressure'
+    ].includes(w.category_id)) ||
     w.description.toLowerCase().includes('suicide') ||
-    w.description.toLowerCase().includes('depression')
+    w.description.toLowerCase().includes('depression') ||
+    w.description.toLowerCase().includes('self-harm') ||
+    w.description.toLowerCase().includes('self harm') ||
+    w.description.toLowerCase().includes('anxiety') ||
+    w.description.toLowerCase().includes('ptsd') ||
+    w.description.toLowerCase().includes('trauma') ||
+    w.description.toLowerCase().includes('eating disorder')
   );
+
+  const hasAbuseOrViolence = filteredWarnings.some(w =>
+    ['abuse', 'violence'].includes(w.category) ||
+    (w.category_id && [
+      'violence', 'emotional_abuse_or_toxic_relationships', 'bullying_or_social_cruelty',
+      'domestic_violence', 'physical_abuse', 'graphic_violence', 'violence_against_women', 
+      'violence_against_children', 'torture', 'kidnapping', 'human_trafficking',
+      'infanticide', 'stalking', 'grooming', 'financial_abuse'
+    ].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('domestic violence') ||
+    w.description.toLowerCase().includes('abuse') ||
+    w.description.toLowerCase().includes('assault') ||
+    w.description.toLowerCase().includes('torture') ||
+    w.description.toLowerCase().includes('kidnapping') ||
+    w.description.toLowerCase().includes('trafficking')
+  );
+
+  const hasSexualAssault = filteredWarnings.some(w =>
+    (w.category_id && ['sexual_violence', 'sexual_assault'].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('sexual assault') ||
+    w.description.toLowerCase().includes('rape') ||
+    w.description.toLowerCase().includes('sexual violence')
+  );
+
+  const hasLGBTIQAIssues = filteredWarnings.some(w =>
+    (w.category_id && ['discrimination', 'queerphobia', 'homophobia', 'transphobia', 'lesbophobia', 'biphobia', 'acephobia', 'misgendering'].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('queerphobia') ||
+    w.description.toLowerCase().includes('homophobia') ||
+    w.description.toLowerCase().includes('transphobia') ||
+    w.description.toLowerCase().includes('lgbt') ||
+    w.description.toLowerCase().includes('lgbtq') ||
+    w.description.toLowerCase().includes('lgbtqia') ||
+    w.description.toLowerCase().includes('queer') ||
+    w.description.toLowerCase().includes('gay') ||
+    w.description.toLowerCase().includes('lesbian') ||
+    w.description.toLowerCase().includes('transgender') ||
+    w.description.toLowerCase().includes('trans')
+  );
+
+  const hasSubstanceUse = filteredWarnings.some(w =>
+    ['substance_abuse'].includes(w.category) ||
+    (w.category_id && ['substance_use_or_alcohol'].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('addiction') ||
+    w.description.toLowerCase().includes('drug') ||
+    w.description.toLowerCase().includes('alcohol') ||
+    w.description.toLowerCase().includes('overdose') ||
+    w.description.toLowerCase().includes('substance')
+  );
+
+  const hasGrief = filteredWarnings.some(w =>
+    ['death'].includes(w.category) ||
+    (w.category_id && [
+      'death_or_grief', 'character_death', 'terminal_illness', 'grief',
+      'funeral_scenes', 'miscarriage', 'animal_death', 'grief_processing'
+    ].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('grief') ||
+    w.description.toLowerCase().includes('bereavement') ||
+    w.description.toLowerCase().includes('mourning') ||
+    w.description.toLowerCase().includes('funeral') ||
+    w.description.toLowerCase().includes('death') ||
+    w.description.toLowerCase().includes('terminal')
+  );
+
+  const hasBullying = filteredWarnings.some(w =>
+    (w.category_id && ['bullying_or_social_cruelty'].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('bullying') ||
+    w.description.toLowerCase().includes('hazing') ||
+    w.description.toLowerCase().includes('cyberbullying')
+  );
+
+  const hasRacism = filteredWarnings.some(w =>
+    (w.category_id && ['racism', 'cultural_appropriation', 'antisemitism', 'islamophobia'].includes(w.category_id)) ||
+    w.description.toLowerCase().includes('racism') ||
+    w.description.toLowerCase().includes('racial') ||
+    w.description.toLowerCase().includes('antisemitism') ||
+    w.description.toLowerCase().includes('islamophobia')
+  );
+
+  const showSupportResources = hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief || hasBullying || hasRacism;
+
+  // Show quick exit button for highly sensitive content (domestic violence, sexual assault, abuse)
+  const showQuickExit = hasAbuseOrViolence || hasSexualAssault;
 
   const handleRequestAnalysis = async () => {
     if (requestSent) return
@@ -318,26 +413,231 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   return (
     <TooltipProvider>
       <div className="space-y-16">
-      {showMentalHealthResources && (
-        <div className="bg-muted p-6 rounded-none border-l-2 border-border">
+      {/* Quick Exit Button - Floating for sensitive content */}
+      {showQuickExit && (
+        <div className="fixed top-4 right-4 z-50 md:top-6 md:right-6">
+          <Button
+            onClick={handleQuickExit}
+            variant="destructive"
+            size="sm"
+            className="shadow-lg hover:shadow-xl transition-all animate-in fade-in slide-in-from-top-2"
+            aria-label="Quick exit - leave this page immediately"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Quick Exit
+          </Button>
+        </div>
+      )}
+
+      {showSupportResources && (
+        <div className="bg-muted p-6 rounded-none border-l-2 border-border relative">
+          {/* Quick Exit Button - Inline for sensitive content */}
+          {showQuickExit && (
+            <div className="absolute top-4 right-4">
+              <Button
+                onClick={handleQuickExit}
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                aria-label="Quick exit - leave this page immediately"
+              >
+                <LogOut className="h-3 w-3 mr-1.5" />
+                Quick Exit
+              </Button>
+            </div>
+          )}
           <div className="flex items-start gap-4">
             <Phone className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
-            <div>
+            <div className="flex-1">
               <h3 className="font-bold text-foreground uppercase tracking-widest text-xs mb-2">Support Resources</h3>
               <p className="text-sm text-muted-foreground mb-4 leading-relaxed font-serif italic">
                 If the themes in this book are affecting you, help is available.
               </p>
-              <div className="flex flex-wrap gap-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
-                </a>
-                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
-                </a>
-                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
-                </a>
-              </div>
+              
+              {/* Mental Health Resources */}
+              {hasMentalHealth && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                    Mental Health & Crisis Support
+                    {userState && stateServices?.mentalHealth && (
+                      <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {/* State-specific services first */}
+                    {userState && stateServices?.mentalHealth && stateServices.mentalHealth.map((service: any, idx: number) => (
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      </a>
+                    ))}
+                    {/* National services */}
+                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
+                    </a>
+                    <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
+                    </a>
+                    <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
+                    </a>
+                    <a href="https://mensline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      MensLine <span className="text-muted-foreground/60 ml-1">1300 78 99 78</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Domestic Violence & Sexual Assault Resources */}
+              {(hasAbuseOrViolence || hasSexualAssault) && (
+                <div className={hasMentalHealth ? "border-t border-border pt-4" : ""}>
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                    Domestic Violence & Sexual Assault
+                    {userState && stateServices?.domesticViolence && (
+                      <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {/* State-specific services first */}
+                    {userState && stateServices?.domesticViolence && stateServices.domesticViolence.map((service: any, idx: number) => (
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      </a>
+                    ))}
+                    {/* National services */}
+                    <a href="https://www.1800respect.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      1800RESPECT <span className="text-muted-foreground/60 ml-1">1800 737 732</span>
+                    </a>
+                    <a href="https://www.dvconnect.org/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      DVConnect <span className="text-muted-foreground/60 ml-1">1800 811 811</span>
+                    </a>
+                    <a href="https://www.safesteps.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Safe Steps <span className="text-muted-foreground/60 ml-1">1800 015 188</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* LGBTIQA+ Support Resources */}
+              {hasLGBTIQAIssues && (
+                <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault) ? "border-t border-border pt-4" : ""}>
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                    LGBTIQA+ Support
+                    {userState && stateServices?.lgbtqia && (
+                      <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {/* State-specific services first */}
+                    {userState && stateServices?.lgbtqia && stateServices.lgbtqia.map((service: any, idx: number) => (
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      </a>
+                    ))}
+                    {/* National services */}
+                    <a href="https://qlife.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      QLife <span className="text-muted-foreground/60 ml-1">1800 184 527</span>
+                    </a>
+                    <a href="https://www.minus18.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Minus18 <span className="text-muted-foreground/60 ml-1">Youth Support</span>
+                    </a>
+                    <a href="https://switchboard.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Switchboard <span className="text-muted-foreground/60 ml-1">1800 184 527</span>
+                    </a>
+                    <a href="https://www.transhub.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      TransHub <span className="text-muted-foreground/60 ml-1">Resources</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Substance Use / Addiction Support */}
+              {hasSubstanceUse && (
+                <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues) ? "border-t border-border pt-4" : ""}>
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">
+                    Substance Use & Addiction
+                    {userState && stateServices?.substanceUse && (
+                      <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {/* State-specific services first */}
+                    {userState && stateServices?.substanceUse && stateServices.substanceUse.map((service: any, idx: number) => (
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      </a>
+                    ))}
+                    {/* National services */}
+                    <a href="https://adf.org.au/help-support/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Alcohol & Drug Foundation <span className="text-muted-foreground/60 ml-1">1300 85 85 84</span>
+                    </a>
+                    <a href="https://www.directline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      DirectLine <span className="text-muted-foreground/60 ml-1">1800 888 236</span>
+                    </a>
+                    <a href="https://www.counsellingonline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Counselling Online <span className="text-muted-foreground/60 ml-1">24/7 Support</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Grief & Bereavement Support */}
+              {hasGrief && (
+                <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse) ? "border-t border-border pt-4" : ""}>
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Grief & Bereavement</p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <a href="https://www.griefline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      GriefLine <span className="text-muted-foreground/60 ml-1">1300 845 745</span>
+                    </a>
+                    <a href="https://www.grief.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Australian Centre for Grief <span className="text-muted-foreground/60 ml-1">1800 642 066</span>
+                    </a>
+                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Bullying Support */}
+              {hasBullying && (
+                <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief) ? "border-t border-border pt-4" : ""}>
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Bullying Support</p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
+                    </a>
+                    <a href="https://www.esafety.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      eSafety <span className="text-muted-foreground/60 ml-1">Online Safety</span>
+                    </a>
+                    <a href="https://bullyingnoway.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Bullying No Way <span className="text-muted-foreground/60 ml-1">Resources</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Racism & Discrimination Support */}
+              {hasRacism && (
+                <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief || hasBullying) ? "border-t border-border pt-4" : ""}>
+                  <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Racism & Discrimination</p>
+                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <a href="https://humanrights.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Australian Human Rights <span className="text-muted-foreground/60 ml-1">1300 656 419</span>
+                    </a>
+                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
+                    </a>
+                    <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
+                      Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* General Support Note */}
+              <p className="text-[10px] text-muted-foreground/70 mt-4 italic">
+                All services are available 24/7. In an emergency, call 000.
+              </p>
             </div>
           </div>
         </div>
