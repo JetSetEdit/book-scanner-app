@@ -9,6 +9,102 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.8",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Improve Quick Exit styling and add user preference toggle",
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Remove redundant phrases in warning descriptions and add tooltips",
+      "Add missing handleQuickExit function to fix critical bug"
+    ],
+  },
+  {
+    version: "1.03.7",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Improve Quick Exit styling and add user preference toggle",
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Add missing handleQuickExit function to fix critical bug",
+      "Add missing comma in logAuditDecision call"
+    ],
+  },
+  {
+    version: "1.03.6",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Improve Quick Exit styling and add user preference toggle",
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Add missing handleQuickExit function to fix critical bug",
+      "Add missing comma in logAuditDecision call"
+    ],
+  },
+  {
+    version: "1.03.5",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Improve Quick Exit styling and add user preference toggle",
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Add missing handleQuickExit function to fix critical bug",
+      "Add missing comma in logAuditDecision call"
+    ],
+  },
+  {
+    version: "1.03.4",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Implement IP-based model assignment with Gemini quota tracking",
+      "Add missing handleQuickExit function to fix critical bug",
+      "Add missing comma in logAuditDecision call"
+    ],
+  },
+  {
+    version: "1.03.3",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Implement IP-based model assignment with Gemini quota tracking",
+      "Add missing handleQuickExit function to fix critical bug",
+      "Add missing comma in logAuditDecision call"
+    ],
+  },
+  {
+    version: "1.03.2",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "Auto-update changelog with pre-commit versioning",
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Implement IP-based model assignment with Gemini quota tracking",
+      "Add missing comma in logAuditDecision call",
+      "Escape quotes in changelog strings to fix build error"
+    ],
+  },
+  {
+    version: "1.03.1",
+    date: "2026-01-09",
+    title: "New features",
+    changes: [
+      "V1.03.0 - Quick Exit, state-based support resources, enhanced feedback system",
+      "Implement IP-based model assignment with Gemini quota tracking",
+      "Add missing comma in logAuditDecision call",
+      "Escape quotes in changelog strings to fix build error",
+      "Make git commands resilient for Vercel builds"
+    ],
+  },
+  {
     version: "1.01.118",
     date: "2026-01-08",
     title: "New feature",
