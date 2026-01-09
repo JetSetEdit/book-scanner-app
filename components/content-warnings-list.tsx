@@ -215,7 +215,11 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   );
 
   const hasLGBTIQAIssues = filteredWarnings.some(w =>
-    (w.category_id && ['discrimination', 'queerphobia', 'homophobia', 'transphobia', 'lesbophobia', 'biphobia', 'acephobia', 'misgendering'].includes(w.category_id)) ||
+    // Check for LGBTQIA+ specific discrimination subcategories
+    (w.category_id === 'discrimination' && w.subcategory_id && ['queerphobia', 'homophobia', 'transphobia', 'lesbophobia', 'biphobia', 'acephobia', 'misgendering'].includes(w.subcategory_id)) ||
+    // Check for standalone LGBTQIA+ category IDs (if they exist as top-level categories)
+    (w.category_id && ['queerphobia', 'homophobia', 'transphobia', 'lesbophobia', 'biphobia', 'acephobia', 'misgendering'].includes(w.category_id)) ||
+    // Fallback: check description for LGBTQIA+ keywords
     w.description.toLowerCase().includes('queerphobia') ||
     w.description.toLowerCase().includes('homophobia') ||
     w.description.toLowerCase().includes('transphobia') ||
