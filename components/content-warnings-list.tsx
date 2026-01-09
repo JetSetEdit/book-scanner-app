@@ -277,6 +277,34 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
     window.location.href = 'https://www.google.com'
   }
 
+  // Fetch user location and state-specific services
+  useEffect(() => {
+    if (!showSupportResources) return
+
+    // Fetch user location
+    fetch('/api/user-location')
+      .then(res => res.json())
+      .then(data => {
+        if (data.region && data.region !== 'Unknown') {
+          setUserState(data.region)
+          // Fetch state-specific services
+          return fetch(`/api/state-services?state=${data.region}`)
+            .then(res => res.json())
+            .then(services => {
+              if (services && !services.error) {
+                setStateServices(services)
+              }
+            })
+            .catch(err => {
+              console.error('Failed to fetch state services:', err)
+            })
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch user location:', err)
+      })
+  }, [showSupportResources])
+
   // Handle Escape key for quick exit
   useEffect(() => {
     if (!showQuickExit) return
