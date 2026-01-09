@@ -114,9 +114,17 @@ export function mapProgressToStage(message: string): ScanStage | null {
 
 /**
  * Gets the highest stage reached from a list of progress messages
+ * Returns a default stage if messages array is empty (for initial loading state)
  */
-export function getCurrentStage(messages: string[]): ScanStage | null {
-  if (messages.length === 0) return null
+export function getCurrentStage(messages: string[], isLoading: boolean = false): ScanStage | null {
+  // If no messages but we're loading, return default stage 1
+  if (messages.length === 0) {
+    return isLoading ? {
+      stage: 1,
+      displayText: 'Starting scan...',
+      icon: Search,
+    } : null
+  }
 
   // Check for ambiguous results first
   for (const message of messages) {

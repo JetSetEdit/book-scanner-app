@@ -189,19 +189,22 @@ function ScanTestPageContent() {
     if (forceRefreshFromUrl) {
       setForceRefresh(true)
     }
-    if (isbnParam && isbnParam.trim() && !loading && !result) {
+    // Only check if ISBN exists - don't check loading/result state as they may not be initialized yet
+    if (isbnParam && isbnParam.trim()) {
       const normalizedIsbn = isbnParam.trim()
       setIsbn(normalizedIsbn)
       setHasAutoScanned(true)
-      // Small delay to ensure component is fully mounted
+      console.log('[Auto-scan] Triggering scan for ISBN:', normalizedIsbn, 'mode:', scanModeParam)
+      // Small delay to ensure component is fully mounted and state is set
       const timeoutId = setTimeout(() => {
+        console.log('[Auto-scan] Executing performScan after timeout')
         performScan(
           normalizedIsbn,
           undefined,
           scanModeParam === 'quick' || scanModeParam === 'deep' ? scanModeParam : undefined,
           forceRefreshFromUrl ? true : undefined
         )
-      }, 300)
+      }, 500) // Increased timeout to ensure state is properly set
       return () => clearTimeout(timeoutId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -216,6 +219,7 @@ function ScanTestPageContent() {
     scanModeOverride?: 'quick' | 'deep',
     forceRefreshOverride?: boolean
   ) => {
+    console.log('[Scan] performScan called:', { isbnToScan, scanModeOverride, forceRefreshOverride })
     // Start timing
     const timer = startTiming()
     markStage('scan-initiated')
@@ -242,7 +246,10 @@ function ScanTestPageContent() {
       markStage('api-request-sent')
       
       // Add an initial (internal-style) status so the progress mapper can show a stage immediately
-      setStatusUpdates(prev => [...prev, "Validating ISBN and checking local database..."])
+      // This ensures progress indicators appear right away
+      const initialStatus = "Validating ISBN and checking local database..."
+      console.log('[Scan] Setting initial status update:', initialStatus)
+      setStatusUpdates(prev => [...prev, initialStatus])
         
         // Get user's timezone
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
@@ -990,7 +997,7 @@ function ScanTestPageContent() {
 
           {/* Enhanced Progress Display */}
           {(() => {
-            const currentStage = getCurrentStage(statusUpdates)
+            const currentStage = getCurrentStage(statusUpdates, loading)
             const shouldShowLoader = loading && currentStage !== null && !result && !candidates && !error
             
             if (!shouldShowLoader) return null
