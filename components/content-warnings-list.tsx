@@ -273,6 +273,26 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   // Show quick exit button for highly sensitive content (domestic violence, sexual assault, abuse)
   const showQuickExit = hasAbuseOrViolence || hasSexualAssault;
 
+  const handleQuickExit = () => {
+    window.location.href = 'https://www.google.com'
+  }
+
+  // Handle Escape key for quick exit
+  useEffect(() => {
+    if (!showQuickExit) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleQuickExit()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [showQuickExit])
+
   const handleRequestAnalysis = async () => {
     if (requestSent) return
     
