@@ -176,11 +176,15 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   // Check for sensitive topics to show resources (use filtered warnings)
   const hasMentalHealth = filteredWarnings.some(w =>
     ['mental_health', 'suicide', 'self_harm'].includes(w.category) ||
-    (w.category_id && [
-      'mental_health', 'disordered_eating', 'anxiety', 'depression', 'ptsd',
+    // Top-level category (any mental_health warning should show mental health resources)
+    w.category_id === 'mental_health' ||
+    // Mental health subcategories (disordered_eating, anxiety, depression, etc. are subcategories of 'mental_health')
+    (w.category_id === 'mental_health' && w.subcategory_id && [
+      'disordered_eating', 'anxiety', 'depression', 'ptsd',
       'self_harm', 'suicidal_ideation', 'suicide_minor', 'casual_suicidal_ideation',
       'workplace_burnout', 'academic_pressure'
-    ].includes(w.category_id)) ||
+    ].includes(w.subcategory_id)) ||
+    // Fallback: check description for keywords
     w.description.toLowerCase().includes('suicide') ||
     w.description.toLowerCase().includes('depression') ||
     w.description.toLowerCase().includes('self-harm') ||
@@ -193,12 +197,15 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
   const hasAbuseOrViolence = filteredWarnings.some(w =>
     ['abuse', 'violence'].includes(w.category) ||
-    (w.category_id && [
-      'violence', 'emotional_abuse_or_toxic_relationships', 'bullying_or_social_cruelty',
-      'domestic_violence', 'physical_abuse', 'graphic_violence', 'violence_against_women', 
-      'violence_against_children', 'torture', 'kidnapping', 'human_trafficking',
-      'infanticide', 'stalking', 'grooming', 'financial_abuse'
-    ].includes(w.category_id)) ||
+    // Top-level categories
+    (w.category_id && ['violence', 'emotional_abuse_or_toxic_relationships', 'bullying_or_social_cruelty'].includes(w.category_id)) ||
+    // Violence subcategories (domestic_violence, torture, etc. are subcategories of 'violence')
+    (w.category_id === 'violence' && w.subcategory_id && [
+      'domestic_violence', 'graphic_violence', 'violence_against_women', 
+      'violence_against_children', 'torture', 'kidnapping_confinement', 'human_trafficking',
+      'infanticide_or_intentional_child_harm', 'physical_violence'
+    ].includes(w.subcategory_id)) ||
+    // Fallback: check description for keywords
     w.description.toLowerCase().includes('domestic violence') ||
     w.description.toLowerCase().includes('abuse') ||
     w.description.toLowerCase().includes('assault') ||
@@ -208,7 +215,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   );
 
   const hasSexualAssault = filteredWarnings.some(w =>
-    (w.category_id && ['sexual_violence', 'sexual_assault'].includes(w.category_id)) ||
+    // sexual_violence is a subcategory of 'sexual_content'
+    (w.category_id === 'sexual_content' && w.subcategory_id === 'sexual_violence') ||
+    // Fallback: check description for keywords
     w.description.toLowerCase().includes('sexual assault') ||
     w.description.toLowerCase().includes('rape') ||
     w.description.toLowerCase().includes('sexual violence')
@@ -245,10 +254,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
   const hasGrief = filteredWarnings.some(w =>
     ['death'].includes(w.category) ||
-    (w.category_id && [
-      'death_or_grief', 'character_death', 'terminal_illness', 'grief',
-      'funeral_scenes', 'miscarriage', 'animal_death', 'grief_processing'
-    ].includes(w.category_id)) ||
+    // Top-level category (any death_or_grief warning should show grief resources)
+    w.category_id === 'death_or_grief' ||
+    // Fallback: check description for keywords
     w.description.toLowerCase().includes('grief') ||
     w.description.toLowerCase().includes('bereavement') ||
     w.description.toLowerCase().includes('mourning') ||
@@ -265,7 +273,11 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   );
 
   const hasRacism = filteredWarnings.some(w =>
-    (w.category_id && ['racism', 'cultural_appropriation', 'antisemitism', 'islamophobia'].includes(w.category_id)) ||
+    // racism, cultural_appropriation, antisemitism, islamophobia are subcategories of 'discrimination'
+    (w.category_id === 'discrimination' && w.subcategory_id && [
+      'racism', 'cultural_appropriation', 'antisemitism', 'islamophobia'
+    ].includes(w.subcategory_id)) ||
+    // Fallback: check description for keywords
     w.description.toLowerCase().includes('racism') ||
     w.description.toLowerCase().includes('racial') ||
     w.description.toLowerCase().includes('antisemitism') ||
