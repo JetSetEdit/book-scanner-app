@@ -521,48 +521,149 @@ export async function processIsbnScan(
         }
       }
       
-      // CRITICAL: Always use the scanned ISBN, not what the API returned
-      // This ensures we never save a book with a different ISBN than what was scanned
-      const dbWriteStart = performance.now()
-      const { data: newBook, error: insertError } = await supabaseAdmin
-        .from('books')
-        .insert({
-          isbn: cleanIsbn, // Always use the scanned ISBN
-          title: bookData.title,
-          author: bookData.author || null,
-          cover_url: validatedCoverUrl, // Use validated cover (null if placeholder)
-          description: bookData.description || null,
-          publisher: bookData.publisher || null,
-          published_date: bookData.published_date || null,
-          page_count: bookData.page_count || null,
-          categories: bookData.categories || null,
-          last_synced_at: new Date().toISOString(), // CRITICAL: Set sync date for staleness checking
-        })
-        .select()
-        .single()
-      timings.dbWrites += performance.now() - dbWriteStart
+      // Check for existing book with same title/author (different ISBN = different edition)
+      // This prevents duplicate entries for the same book with different ISBNs
+      const duplicateCheckStart = performance.now()
+      let existingBookByTitle: Book | null = null
       
-      if (bookData.cover_url && !validatedCoverUrl) {
-        onProgress?.({
-          action: 'Cover validation rejected placeholder image',
-          result: 'Cover URL was rejected as placeholder, tried alternative sources but none found',
-          timestamp: performance.now()
-        });
+      if (bookData.title && bookData.author) {
+        const { data: duplicateBooks, error: duplicateError } = await supabaseAdmin
+          .from('books')
+          .select('*')
+          .eq('title', bookData.title.trim())
+          .eq('author', bookData.author.trim())
+          .limit(1)
+          .maybeSingle()
+        
+        if (!duplicateError && duplicateBooks) {
+          existingBookByTitle = duplicateBooks
+          console.log(`[Deduplication] Found existing book with same title/author: "${duplicateBooks.title}" (ISBN: ${duplicateBooks.isbn}, ID: ${duplicateBooks.id})`)
+          onProgress?.(`Found existing entry for "${bookData.title}". Using existing book record...`)
+        }
       }
-      
-      // Store metadata issues for later use in audit log
-      if (Object.keys(metadataIssues).length > 0) {
-        storedMetadataIssues = metadataIssues
-      }
+      timings.dbLookup += performance.now() - duplicateCheckStart
 
-      if (insertError) {
-        console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
-        throw insertError
-      }
+      // If we found an existing book with same title/author, use it instead of creating a duplicate
+      if (existingBookByTitle) {
+        console.log(`[Deduplication] Using existing book ID: ${existingBookByTitle.id} instead of creating duplicate`)
+        currentBook = existingBookByTitle
+        bookId = existingBookByTitle.id
+        
+        // Delete old AI-generated warnings to prevent duplicates when rescanning
+        // This ensures fresh analysis without accumulating duplicate warnings
+        onProgress?.('Cleaning up old warnings for fresh analysis...')
+        const { error: deleteWarningsError } = await supabaseAdmin
+          .from('content_warnings')
+          .delete()
+          .eq('book_id', existingBookByTitle.id)
+          .eq('source', 'ai_generated')
+        
+        if (deleteWarningsError) {
+          console.error('[Deduplication] Failed to delete old warnings:', deleteWarningsError)
+          // Don't throw - continue with scan
+        } else {
+          console.log('[Deduplication] Deleted old AI-generated warnings to prevent duplicates')
+        }
+        
+        // Update the existing book's metadata if it's missing or stale
+        const needsUpdate = !existingBookByTitle.description || 
+                           !existingBookByTitle.cover_url || 
+                           (existingBookByTitle.last_synced_at && isStale(existingBookByTitle.last_synced_at))
+        
+        if (needsUpdate) {
+          onProgress?.('Updating existing book metadata...')
+          const updateData: any = {
+            last_synced_at: new Date().toISOString()
+          }
+          
+          // Only update if we have better data
+          if (!existingBookByTitle.description && bookData.description) {
+            updateData.description = bookData.description
+          }
+          if (!existingBookByTitle.cover_url && validatedCoverUrl) {
+            updateData.cover_url = validatedCoverUrl
+          }
+          if (!existingBookByTitle.publisher && bookData.publisher) {
+            updateData.publisher = bookData.publisher
+          }
+          if (!existingBookByTitle.published_date && bookData.published_date) {
+            updateData.published_date = bookData.published_date
+          }
+          if (!existingBookByTitle.page_count && bookData.page_count) {
+            updateData.page_count = bookData.page_count
+          }
+          
+          if (Object.keys(updateData).length > 1) { // More than just last_synced_at
+            const updateStart = performance.now()
+            const { error: updateError } = await supabaseAdmin
+              .from('books')
+              .update(updateData)
+              .eq('id', existingBookByTitle.id)
+            
+            timings.dbWrites += performance.now() - updateStart
+            
+            if (updateError) {
+              console.error('[Deduplication] Error updating existing book:', updateError)
+              // Don't throw - continue with existing book data
+            } else {
+              // Refresh the book data
+              const { data: updatedBook } = await supabaseAdmin
+                .from('books')
+                .select('*')
+                .eq('id', existingBookByTitle.id)
+                .single()
+              
+              if (updatedBook) {
+                currentBook = updatedBook
+              }
+            }
+          }
+        }
+      } else {
+        // No duplicate found, create new book
+        // CRITICAL: Always use the scanned ISBN, not what the API returned
+        // This ensures we never save a book with a different ISBN than what was scanned
+        const dbWriteStart = performance.now()
+        const { data: newBook, error: insertError } = await supabaseAdmin
+          .from('books')
+          .insert({
+            isbn: cleanIsbn, // Always use the scanned ISBN
+            title: bookData.title,
+            author: bookData.author || null,
+            cover_url: validatedCoverUrl, // Use validated cover (null if placeholder)
+            description: bookData.description || null,
+            publisher: bookData.publisher || null,
+            published_date: bookData.published_date || null,
+            page_count: bookData.page_count || null,
+            categories: bookData.categories || null,
+            last_synced_at: new Date().toISOString(), // CRITICAL: Set sync date for staleness checking
+          })
+          .select()
+          .single()
+        timings.dbWrites += performance.now() - dbWriteStart
+        
+        if (bookData.cover_url && !validatedCoverUrl) {
+          onProgress?.({
+            action: 'Cover validation rejected placeholder image',
+            result: 'Cover URL was rejected as placeholder, tried alternative sources but none found',
+            timestamp: performance.now()
+          });
+        }
+        
+        // Store metadata issues for later use in audit log
+        if (Object.keys(metadataIssues).length > 0) {
+          storedMetadataIssues = metadataIssues
+        }
 
-      console.log('New book created with ID:', newBook.id)
-      currentBook = newBook
-      bookId = newBook.id
+        if (insertError) {
+          console.error('Error creating new book:', JSON.stringify(insertError, null, 2))
+          throw insertError
+        }
+
+        console.log('New book created with ID:', newBook.id)
+        currentBook = newBook
+        bookId = newBook.id
+      }
     }
   } else {
     bookId = currentBook.id

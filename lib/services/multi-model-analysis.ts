@@ -149,14 +149,15 @@ function selectRelevantCategories(metadata: BookMetadata): string[] {
   
   // Category keyword mappings (keywords that suggest a category is relevant)
   const categoryKeywords: Record<string, string[]> = {
-    'mental_health': ['anxiety', 'depression', 'ptsd', 'trauma', 'suicide', 'self-harm', 'eating disorder', 'panic', 'mental health', 'psychological', 'grief', 'loss', 'mourning'],
-    'violence': ['violence', 'violent', 'murder', 'killing', 'death', 'war', 'combat', 'weapon', 'assault', 'attack', 'torture', 'abuse', 'domestic violence'],
-    'sexual_content': ['romance', 'romantic', 'sexual', 'sex', 'explicit', 'spicy', 'steamy', 'intimate', 'passion', 'desire', 'lust', 'erotic', 'love scene'],
-    'abuse': ['abuse', 'abusive', 'gaslighting', 'manipulation', 'toxic', 'controlling', 'harassment', 'stalking', 'bullying'],
-    'death_or_grief': ['death', 'dying', 'died', 'grief', 'mourning', 'loss', 'funeral', 'bereavement', 'suicide', 'killed'],
-    'family_dynamics': ['family', 'parent', 'divorce', 'separation', 'sibling', 'child', 'parental', 'marriage', 'relationship'],
-    'substance_use_or_alcohol': ['alcohol', 'drinking', 'drug', 'substance', 'addiction', 'addict', 'rehab', 'sober', 'intoxicated'],
-    'discrimination': ['racism', 'discrimination', 'prejudice', 'bigotry', 'hate', 'bias', 'stereotype', 'marginalized'],
+    'mental_health': ['anxiety', 'depression', 'ptsd', 'trauma', 'suicide', 'self-harm', 'eating disorder', 'panic', 'mental health', 'psychological', 'burnout', 'stress'],
+    'violence': ['violence', 'violent', 'murder', 'killing', 'war', 'combat', 'weapon', 'assault', 'attack', 'torture', 'domestic violence', 'battle', 'fight'],
+    'sexual_content': ['romance', 'romantic', 'sexual', 'sex', 'explicit', 'spicy', 'steamy', 'intimate', 'passion', 'desire', 'lust', 'erotic', 'love scene', 'heat', 'spice'],
+    'emotional_abuse_or_toxic_relationships': ['abuse', 'abusive', 'gaslighting', 'manipulation', 'toxic', 'controlling', 'harassment', 'stalking', 'bullying', 'emotional abuse'],
+    'death_or_grief': ['death', 'dying', 'died', 'grief', 'mourning', 'loss', 'funeral', 'bereavement', 'suicide', 'killed', 'dead'],
+    'family_dynamics': ['family', 'parent', 'divorce', 'separation', 'sibling', 'child', 'parental', 'marriage', 'relationship', 'mother', 'father'],
+    'substance_use_or_alcohol': ['alcohol', 'drinking', 'drug', 'substance', 'addiction', 'addict', 'rehab', 'sober', 'intoxicated', 'drunk', 'cocaine', 'heroin'],
+    'discrimination': ['racism', 'discrimination', 'prejudice', 'bigotry', 'hate', 'bias', 'stereotype', 'marginalized', 'homophobia', 'transphobia'],
+    'bullying_or_social_cruelty': ['bullying', 'hazing', 'humiliation', 'social pressure', 'peer pressure', 'ostracized', 'excluded'],
   }
   
   // Score each category based on keyword matches
