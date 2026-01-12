@@ -480,13 +480,14 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       <div className="space-y-16">
       {/* Quick Exit Button - Floating for sensitive content */}
       {showQuickExit && (
-        <div className="fixed top-4 right-4 z-50 md:top-6 md:right-6">
+        <div className="fixed top-4 right-4 z-50 md:top-6 md:right-6 pointer-events-auto">
           <Button
             onClick={handleQuickExit}
             variant="outline"
             size="sm"
             className="bg-background/95 backdrop-blur-sm border-border/50 shadow-md hover:shadow-lg hover:border-destructive/50 hover:text-destructive transition-all animate-in fade-in slide-in-from-top-2 text-xs font-medium"
             aria-label="Quick exit - leave this page immediately"
+            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
           >
             <LogOut className="h-3.5 w-3.5 mr-1.5" />
             Quick Exit

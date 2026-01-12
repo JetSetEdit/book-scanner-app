@@ -195,6 +195,9 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: hidden;
+    /* Improve touch responsiveness on iOS */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
   }
 
   /* Smooth theme transitions - prevents flashbang effect */
@@ -206,5 +209,13 @@
                 border-color 0.3s ease,
                 fill 0.3s ease,
                 stroke 0.3s ease;
+  }
+
+  /* Mobile touch improvements */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 }

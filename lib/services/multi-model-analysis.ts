@@ -140,16 +140,76 @@ Context Modifiers (add nuance):
 `
 }
 
+/**
+ * Dynamically select relevant categories based on book metadata
+ * Analyzes description, title, and author to predict likely content warnings
+ */
+function selectRelevantCategories(metadata: BookMetadata): string[] {
+  const text = `${metadata.title} ${metadata.author} ${metadata.description}`.toLowerCase()
+  
+  // Category keyword mappings (keywords that suggest a category is relevant)
+  const categoryKeywords: Record<string, string[]> = {
+    'mental_health': ['anxiety', 'depression', 'ptsd', 'trauma', 'suicide', 'self-harm', 'eating disorder', 'panic', 'mental health', 'psychological', 'grief', 'loss', 'mourning'],
+    'violence': ['violence', 'violent', 'murder', 'killing', 'death', 'war', 'combat', 'weapon', 'assault', 'attack', 'torture', 'abuse', 'domestic violence'],
+    'sexual_content': ['romance', 'romantic', 'sexual', 'sex', 'explicit', 'spicy', 'steamy', 'intimate', 'passion', 'desire', 'lust', 'erotic', 'love scene'],
+    'abuse': ['abuse', 'abusive', 'gaslighting', 'manipulation', 'toxic', 'controlling', 'harassment', 'stalking', 'bullying'],
+    'death_or_grief': ['death', 'dying', 'died', 'grief', 'mourning', 'loss', 'funeral', 'bereavement', 'suicide', 'killed'],
+    'family_dynamics': ['family', 'parent', 'divorce', 'separation', 'sibling', 'child', 'parental', 'marriage', 'relationship'],
+    'substance_use_or_alcohol': ['alcohol', 'drinking', 'drug', 'substance', 'addiction', 'addict', 'rehab', 'sober', 'intoxicated'],
+    'discrimination': ['racism', 'discrimination', 'prejudice', 'bigotry', 'hate', 'bias', 'stereotype', 'marginalized'],
+  }
+  
+  // Score each category based on keyword matches
+  const categoryScores = new Map<string, number>()
+  
+  for (const [categoryId, keywords] of Object.entries(categoryKeywords)) {
+    const score = keywords.reduce((acc, keyword) => {
+      // Count occurrences (case-insensitive)
+      const regex = new RegExp(keyword, 'gi')
+      const matches = text.match(regex)
+      return acc + (matches ? matches.length : 0)
+    }, 0)
+    categoryScores.set(categoryId, score)
+  }
+  
+  // Get top 5 categories by score
+  const sortedCategories = Array.from(categoryScores.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([categoryId]) => categoryId)
+  
+  // If we have good matches (score > 0), use those
+  if (sortedCategories.length > 0 && categoryScores.get(sortedCategories[0])! > 0) {
+    return sortedCategories.map(catId => {
+      const category = WARNING_CATEGORIES.find(c => c.id === catId)
+      return category?.userLabel || catId
+    })
+  }
+  
+  // Fallback: Use a rotating selection based on book title hash for variety
+  // This ensures different books show different categories even if description is minimal
+  let hash = 0
+  for (let i = 0; i < metadata.title.length; i++) {
+    hash = ((hash << 5) - hash) + metadata.title.charCodeAt(i)
+    hash = hash & hash // Convert to 32-bit integer
+  }
+  const startIndex = Math.abs(hash) % Math.max(1, WARNING_CATEGORIES.length - 4)
+  
+  return WARNING_CATEGORIES
+    .slice(startIndex, startIndex + 5)
+    .map(cat => cat.userLabel)
+}
+
 async function analyzeWithOpenAI(
   metadata: BookMetadata,
   onProgress?: ProgressCallback,
   model?: string,
   options?: AnalysisOptions
 ): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
-  // Generate dynamic category list from taxonomy
-  const categoryLabels = WARNING_CATEGORIES
-    .map(cat => cat.userLabel.toLowerCase())
-    .slice(0, 5) // Show top 5 categories
+  // Generate dynamic category list based on book content
+  const relevantCategories = selectRelevantCategories(metadata)
+  const categoryLabels = relevantCategories
+    .map(label => label.toLowerCase())
     .join(', ')
   onProgress?.(`⏳ Checking for: ${categoryLabels}...`)
 

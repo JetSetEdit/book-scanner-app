@@ -225,9 +225,15 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     .map(w => typeof w.impact === 'number' && !isNaN(w.impact) ? w.impact : 0)
     .filter(impact => impact >= 0)
   
-  const maxImpact = validImpacts.length > 0 
-    ? Math.max(...validImpacts, 0)
-    : 0
+  // Calculate maxImpact with additional safety checks
+  let maxImpact: number = 0
+  if (validImpacts.length > 0) {
+    const calculatedMax = Math.max(...validImpacts, 0)
+    // Ensure maxImpact is always a valid number (handle edge cases like -Infinity or NaN)
+    maxImpact = typeof calculatedMax === 'number' && !isNaN(calculatedMax) && isFinite(calculatedMax)
+      ? calculatedMax
+      : 0
+  }
   const topWarning = warningImpacts.find(w => w.impact === maxImpact)
 
   // Pre-compute MA15+ fallback conditions
