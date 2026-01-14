@@ -24,10 +24,17 @@ import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
 import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
 import { RateLimitFeedbackDialog } from "@/components/rate-limit-feedback-dialog"
 
+import { ScanningAnimation } from "@/components/scanning-animation"
+
 // Helper function to format status messages for display
 function formatStatusMessage(message: string): string {
   // Remove emojis
   let cleaned = message.replace(/📖|📝|🔍|🤖|⏳|✅|❌|⚠️|💡|📋|🔄|📥|🌐|💾|📚|📄|🚀/g, '').trim()
+  
+  // Extract categories if present in "Checking for: ..."
+  if (message.match(/Checking for:/i)) {
+    return 'analyzing_categories'
+  }
   
   // Convert technical messages to user-friendly ones
   const replacements: [RegExp, string][] = [
@@ -1045,7 +1052,14 @@ function ScanTestPageContent() {
                   </div>
                   
                   {/* Current Status Message */}
-                  {cleanMessage && (
+                  {cleanMessage === 'analyzing_categories' ? (
+                    <div className="pt-3 border-t border-border/50">
+                      <ScanningAnimation 
+                        isAnalyzing={true} 
+                        categories={latestMessage.replace(/.*Checking for:/i, '').split(',').map(s => s.trim()).filter(Boolean)} 
+                      />
+                    </div>
+                  ) : cleanMessage && (
                     <div className="pt-3 border-t border-border/50">
                       <p className="text-sm text-muted-foreground">
                         <span className="font-medium text-foreground">Current step:</span> {cleanMessage}

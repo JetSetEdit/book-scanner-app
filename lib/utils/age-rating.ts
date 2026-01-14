@@ -165,7 +165,8 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     'abuse': 'themes',
     'emotional_abuse_or_toxic_relationships': 'themes',
     'death_or_grief': 'themes',
-    'family_dynamics': 'themes'
+    'family_dynamics': 'themes',
+    'tropes': 'themes'
   }
 
   const keyElements: string[] = []

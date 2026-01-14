@@ -321,6 +321,54 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityScore: 6,
         severityScoreOrigin: 'hand_tuned_v1'
       },
+      {
+        id: 'praise_kink',
+        userLabel: 'Praise Kink',
+        shortDescription: 'Sexual gratification from receiving praise or "good girl/boy" affirmation.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'degradation_kink',
+        userLabel: 'Degradation Kink',
+        shortDescription: 'Sexual gratification from verbal humiliation or degradation.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'public_sex',
+        userLabel: 'Public Sex / Risk of Discovery',
+        shortDescription: 'Sexual acts in public or semi-public places, or fear/thrill of being caught.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'group_sex',
+        userLabel: 'Group Sex / Threesome',
+        shortDescription: 'Sexual acts involving more than two participants.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 7,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'monster_romance',
+        userLabel: 'Monster Romance / Anatomy',
+        shortDescription: 'Sexual content involving non-human partners or anatomy.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'size_difference',
+        userLabel: 'Size Difference Kink',
+        shortDescription: 'Sexual focus on significant physical size difference between partners.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
       // Sexual Shaming & Language
       {
         id: 'slut_shaming',
@@ -1254,6 +1302,94 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
         defaultSeverityHint: 'mild',
         defaultSeverityScore: 4,
         severityScoreOrigin: 'hand_tuned_v1'}
+    ]
+  },
+  {
+    id: 'tropes',
+    userLabel: 'Tropes & Genres',
+    shortDescription: 'Common book tropes, narrative devices, and subgenres (often used in romance/BookTok contexts).',
+    legacyCategory: 'other',
+    subcategories: [
+      {
+        id: 'enemies_to_lovers',
+        userLabel: 'Enemies to Lovers',
+        shortDescription: 'Characters start as enemies or rivals and develop romantic feelings. Can involve conflict, tension, and hostility.',
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'bully_romance',
+        userLabel: 'Bully Romance',
+        shortDescription: 'Romance involving bullying dynamics between love interests. Often overlaps with toxic relationships.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'dark_romance',
+        userLabel: 'Dark Romance',
+        shortDescription: 'Romance genre featuring darker themes, morally grey characters, or taboo content.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'mafia_romance',
+        userLabel: 'Mafia / Organized Crime Romance',
+        shortDescription: 'Romance set in the world of organized crime. Often involves violence and crime themes.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'stalker_romance',
+        userLabel: 'Stalker Romance',
+        shortDescription: 'Romance involving stalking behaviors framed as romantic or obsessive devotion.',
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'kidnapping_romance',
+        userLabel: 'Captive / Kidnapping Romance',
+        shortDescription: 'Romance involving kidnapping, captivity, or Stockholm syndrome themes.',
+        defaultSeverityHint: 'severe',
+        defaultSeverityScore: 8,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'omegaverse',
+        userLabel: 'Omegaverse / Dynamics',
+        shortDescription: 'Genre involving biological hierarchies (Alpha/Beta/Omega), often with breeding/heat cycles.',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 6,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'age_gap',
+        userLabel: 'Age Gap',
+        shortDescription: 'Romance with significant age difference between partners.',
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 4,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'why_choose',
+        userLabel: 'Why Choose / Reverse Harem',
+        shortDescription: 'Romance where a protagonist has multiple simultaneous love interests (polyamorous dynamic).',
+        defaultSeverityHint: 'moderate',
+        defaultSeverityScore: 5,
+        severityScoreOrigin: 'hand_tuned_v1'
+      },
+      {
+        id: 'other_tropes',
+        userLabel: 'Other Tropes',
+        shortDescription: 'Other specific tropes not covered by the main categories.',
+        defaultSeverityHint: 'mild',
+        defaultSeverityScore: 3,
+        severityScoreOrigin: 'hand_tuned_v1'
+      }
     ]
   },
   {

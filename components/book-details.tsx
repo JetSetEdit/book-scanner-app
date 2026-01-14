@@ -1,6 +1,7 @@
 "use client"
 
 import { ContentWarningsList } from "@/components/content-warnings-list"
+import { BooktokWarningsSummary } from "@/components/booktok-warnings-summary"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -680,6 +681,11 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                     {generateSummary(warnings)}
                   </p>
                 </div>
+              )}
+
+              {/* NEW: BookTok Style Summary Panel */}
+              {warnings && warnings.length > 0 && (
+                <BooktokWarningsSummary warnings={warnings} />
               )}
 
               <ContentWarningsList

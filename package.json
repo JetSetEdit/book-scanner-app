@@ -8,6 +8,7 @@
     "lint": "next lint",
     "test": "vitest",
     "start": "next start",
+    "taxonomy:sync": "npx tsx scripts/generate-taxonomy-csv.ts",
     "version:increment": "tsx scripts/increment-version.ts",
     "predeploy": "npm run version:increment"
   },
@@ -52,6 +53,7 @@
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
+    "framer-motion": "^12.26.2",
     "geist": "^1.3.1",
     "html5-qrcode": "^2.3.8",
     "input-otp": "1.4.1",

@@ -130,10 +130,84 @@ export const AGE_ESCALATION_WEIGHTS: EscalationWeight[] = [
     weight: 0.9,
     reasoning: 'Sexual violence always requires R18+'
   },
+  // Specific Kinks
+  {
+    category: 'sexual_content',
+    subcategory: 'group_sex',
+    weight: 0.65,
+    reasoning: 'Group sex typically indicates higher maturity'
+  },
+  {
+    category: 'sexual_content',
+    subcategory: 'public_sex',
+    weight: 0.6,
+    reasoning: 'Public sex typically indicates higher maturity'
+  },
+  {
+    category: 'sexual_content',
+    subcategory: 'degradation_kink',
+    weight: 0.65,
+    reasoning: 'Degradation kink themes require maturity'
+  },
+  {
+    category: 'sexual_content',
+    subcategory: 'monster_romance',
+    weight: 0.6,
+    reasoning: 'Monster romance often involves explicit/unconventional themes'
+  },
   {
     category: 'sexual_content',
     weight: 0.5, // Default for sexual content
     reasoning: 'Sexual content typically requires MA15+'
+  },
+
+  // Tropes - Variable escalation
+  {
+    category: 'tropes',
+    subcategory: 'stalker_romance',
+    weight: 0.75,
+    reasoning: 'Stalker romance involves serious/criminal themes framed as romance'
+  },
+  {
+    category: 'tropes',
+    subcategory: 'kidnapping_romance',
+    weight: 0.75,
+    reasoning: 'Captive/kidnapping themes involve serious criminal acts'
+  },
+  {
+    category: 'tropes',
+    subcategory: 'dark_romance',
+    weight: 0.6,
+    reasoning: 'Dark romance implies mature/taboo themes'
+  },
+  {
+    category: 'tropes',
+    subcategory: 'bully_romance',
+    weight: 0.55,
+    reasoning: 'Bullying dynamics require maturity'
+  },
+  {
+    category: 'tropes',
+    subcategory: 'mafia_romance',
+    weight: 0.6,
+    reasoning: 'Organized crime themes imply violence/mature content'
+  },
+  {
+    category: 'tropes',
+    subcategory: 'omegaverse',
+    weight: 0.6,
+    reasoning: 'Omegaverse dynamics often involve biological essentialism/dub-con themes'
+  },
+  {
+    category: 'tropes',
+    subcategory: 'why_choose',
+    weight: 0.55,
+    reasoning: 'Polyamorous/reverse harem dynamics require maturity'
+  },
+  {
+    category: 'tropes',
+    weight: 0.45, // Default for tropes (e.g. enemies-to-lovers, age gap)
+    reasoning: 'Tropes generally map to moderate themes'
   },
 
   // Abuse - Medium to High escalation

@@ -1,20 +1,63 @@
-/**
- * Severity Computation Logic
- * 
- * Computes severity from signals rather than using static labels.
- * This makes the system consistent across books and explainable.
- */
-
 import { SeveritySignals } from '../config/taxonomy-context';
 import { PresenceType, DetailLevel } from '../config/taxonomy-v2';
+import { getDynamicSeverityScore } from '../config/taxonomy-service';
 
 /**
  * Compute severity from signals
+ * UPDATED: Uses dynamic scoring from RLHF overrides
  */
 export function computeSeverityFromSignals(
   signals: SeveritySignals,
-  defaultSeverityHint?: 'mild' | 'moderate' | 'severe'
+  categoryId: string,
+  subcategoryId: string
 ): 'mild' | 'moderate' | 'severe' {
+  // 1. Calculate Base Evidence Score (0-1) from analysis
+  // (frequency, explicitness, proximity, etc.)
+  const evidenceScore = calculateEvidenceScore(signals);
+
+  // 2. Get Baseline Severity (0-10) from Taxonomy/DB
+  // This represents "How bad is this topic generally?"
+  // If subcategoryId is missing or incomplete (e.g. from tests), it will fallback safely.
+  const baselineScore = getDynamicSeverityScore(categoryId, subcategoryId);
+  const normalizedBaseline = baselineScore / 10.0;
+
+  // 3. Combine: Evidence modulates the Baseline
+  // Formula: Final = Baseline * EvidenceMultiplier
+  // High evidence (1.0) -> 100% of Baseline severity
+  // Low evidence (0.2) -> 60% of Baseline severity (damped, but floor raised)
+  // New multiplier: 0.6 + (evidenceScore * 0.4)
+  // This ensures even weak evidence of a severe topic retains 60% of its severity.
+  const evidenceMultiplier = 0.6 + (evidenceScore * 0.4);
+  
+  let finalScore = normalizedBaseline * evidenceMultiplier;
+
+  // 4. Specific Floors for High-Risk Categories
+  // Ensure "referenced" instances of severe topics don't drop to "mild".
+  const severeTopics = [
+    'sexual_content.sexual_violence',
+    'mental_health.suicidal_ideation',
+    'violence.infanticide_or_intentional_child_harm',
+    'violence.torture',
+    'violence.human_trafficking'
+  ];
+  
+  const fullId = `${categoryId}.${subcategoryId}`;
+  if (severeTopics.includes(fullId) && finalScore < 0.5) {
+    // Force at least moderate (0.55+) for these topics if any evidence exists
+    finalScore = 0.55; 
+  }
+
+  // Map to labels
+  // Adjusted thresholds for safer categorization
+  if (finalScore < 0.35) return 'mild';
+  if (finalScore < 0.70) return 'moderate';
+  return 'severe';
+}
+
+/**
+ * Helper to calculate raw evidence score (0-1)
+ */
+export function calculateEvidenceScore(signals: SeveritySignals): number {
   // Base score from frequency and explicitness
   const baseScore = (signals.frequency * 0.3) + (signals.explicitness * 0.4);
 
@@ -27,30 +70,8 @@ export function computeSeverityFromSignals(
   // Intensity markers add to severity
   const intensityBonus = Math.min(signals.intensity_markers.length * 0.1, 0.3);
 
-  const finalScore = (baseScore * proximityMultiplier * centralityMultiplier) + intensityBonus;
-
-  // Normalize to 0-1
-  let normalizedScore = Math.min(finalScore, 1.0);
-
-  // Apply default severity floor
-  if (defaultSeverityHint === 'severe') {
-    // Severe topics (e.g., Kidnapping, Sexual Violence) should rarely be mild.
-    // If evidence exists, it warrants at least Moderate severity.
-    if (normalizedScore < 0.35) normalizedScore = 0.35;
-
-    // If it's a severe topic and present on-page, force boost towards severe
-    if (signals.proximity > 0.6 && normalizedScore < 0.6) {
-      normalizedScore = 0.65; // Borderline severe
-    }
-  } else if (defaultSeverityHint === 'moderate') {
-    // Moderate topics should vary, but rarely be effectively zero.
-    if (normalizedScore < 0.15) normalizedScore = 0.15;
-  }
-
-  // Map to severity levels
-  if (normalizedScore < 0.35) return 'mild';
-  if (normalizedScore < 0.70) return 'moderate';
-  return 'severe';
+  const rawScore = (baseScore * proximityMultiplier * centralityMultiplier) + intensityBonus;
+  return Math.min(rawScore, 1.0);
 }
 
 /**
@@ -163,5 +184,3 @@ export function buildSeveritySignals(
     intensity_markers,
   };
 }
-
-

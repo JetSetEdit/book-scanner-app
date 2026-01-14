@@ -1,126 +1,159 @@
-Category ID,Category Name,Subcategory ID,Subcategory Name,Default Severity,Description
-mental_health,Mental Health,disordered_eating,Disordered Eating,moderate,Disordered eating; eating disorders; body image issues.
-mental_health,Mental Health,anxiety,Anxiety,mild,Anxiety; panic attacks; stress; anxiety disorders.
-mental_health,Mental Health,depression,Depression,moderate,Depression; mood disorders; depressive episodes.
-mental_health,Mental Health,ptsd,PTSD / Trauma,moderate,Post-traumatic stress disorder; trauma; traumatic experiences.
-mental_health,Mental Health,self_harm,Self-Harm,severe,Self-harm behaviors; cutting; non-suicidal self-injury.
-mental_health,Mental Health,suicidal_ideation,Suicidal Ideation,severe,Suicidal thoughts; attempts; detailed descriptions of suicide.
-mental_health,Mental Health,other_mental_health,Other Mental Health,mild,Other mental health themes not covered by specific subcategories.
-sexual_content,Sexual Content,explicit_sexual_content,Explicit Sexual Content,moderate,Explicit sexual scenes; graphic sexual descriptions.
-sexual_content,Sexual Content,sexual_violence,Sexual Violence,severe,Sexual assault; rape; non-consensual sexual content.
-sexual_content,Sexual Content,intense_romance,Intense Romance / Spice,mild,Intense romantic/sexual tension; steamy scenes; explicit romance/spice content. Note: Emotional romantic tension alone may not require a warning.
-sexual_content,Sexual Content,sexual_themes,Sexual Themes,mild,Sexual themes; discussions; references (non-explicit).
-sexual_content,Sexual Content,power_imbalance,Power Imbalance,moderate,Sexual or romantic dynamics involving authority; dependency; or unequal power (e.g.; boss/employee; teacher/student; age gaps).
-sexual_content,Sexual Content,consent_ambiguity,Ambiguous or Non-Explicit Consent (Dub-Con),severe,Consent is unclear; negotiated implicitly; or framed as resistance/desire tension. Also known as "Dub-Con" in dark romance.
-sexual_content,Sexual Content,cnc,Consensual Non-Consent (CNC),severe,Consensual non-consent; CNC play; or negotiated non-consent scenarios. Distinct from actual non-consent.
-sexual_content,Sexual Content,somnophilia,Somnophilia / Sleep Play,severe,Non-consensual or dub-consensual sexual acts while one partner is sleeping or unconscious.
-sexual_content,Sexual Content,coercion_pressure,Sexual Coercion / Pressure,severe,Emotional pressure; manipulation; or obligation leading to sexual activity.
-sexual_content,Sexual Content,degradation_humiliation,Degradation / Humiliation,moderate,Sexual content involving humiliation; degradation; or verbal diminishment.
-sexual_content,Sexual Content,possessive_dynamics,Possessive or Obsessive Dynamics,moderate,Sexual or romantic framing involving ownership; obsession; or control.
-sexual_content,Sexual Content,bdsm_themes,BDSM Themes,moderate,Power exchange; dominance/submission; or restraint themes.
-sexual_content,Sexual Content,roleplay,Sexual Roleplay,mild,Sexual roleplay scenarios as part of intimacy.
-sexual_content,Sexual Content,exhibitionism_voyeurism,Exhibitionism / Voyeurism,moderate,Sexual content involving being watched or watching.
-sexual_content,Sexual Content,taboo_fetish_themes,Taboo or Fetish Themes,moderate,Fetish-focused sexual framing outside mainstream romance norms.
-sexual_content,Sexual Content,breeding_kink,Breeding Kink,moderate,Sexual focus on impregnation; breeding; or pregnancy as kink. Distinct from actual pregnancy/childbirth.
-sexual_content,Sexual Content,knife_play,Knife Play / Blood Play,severe,Sexualized use of knives; blood play; or weapon play in sexual contexts.
-sexual_content,Sexual Content,primal_play,Primal Play,moderate,Hunting/chasing dynamics; primal kink; or "touch her and you die" tropes in sexual/romantic contexts.
-sexual_content,Sexual Content,slut_shaming,Sexual Shaming Language,moderate,Language that shames or devalues characters for sexual behaviour.
-sexual_content,Sexual Content,purity_culture,Purity / Virginity Framing,mild,Sexual value tied to virginity; purity; or sexual restraint.
-sexual_content,Sexual Content,misogynistic_sexual_language,Gendered Sexual Degradation,severe,Sexually degrading language targeting women or gendered characters.
-sexual_content,Sexual Content,other_sexual_content,Other Sexual Content,mild,Other sexual content not covered by specific subcategories.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,gaslighting,Gaslighting,moderate,Gaslighting; psychological manipulation; making someone question their reality.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,manipulation,Manipulation,moderate,Manipulative behavior; emotional manipulation; coercive control.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,controlling_behavior,Controlling Behavior,moderate,Controlling relationships; possessiveness; isolation.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,toxic_friendships,Toxic Friendships,mild,Toxic friendships; unhealthy social dynamics; peer pressure.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,cheating,Cheating,mild,Infidelity; cheating in relationships; betrayal.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,emotional_abuse,Emotional Abuse,moderate,Emotional abuse; verbal abuse; psychological abuse.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,stalking,Stalking,severe,Stalking; obsessive following; or unwanted surveillance.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,financial_abuse,Financial Abuse,moderate,Financial abuse; economic control; or financial manipulation.
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,grooming,Grooming,severe,Grooming; predatory behavior; or manipulation of vulnerable individuals (often in age-gap or power imbalance contexts).
-emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,other_toxic_relationships,Other Toxic Relationships,mild,Other toxic relationship dynamics not covered by specific subcategories.
-bullying_or_social_cruelty,Bullying / Social Cruelty,bullying,Bullying,moderate,Bullying; harassment; intimidation.
-bullying_or_social_cruelty,Bullying / Social Cruelty,hazing,Hazing,moderate,Hazing; initiation rituals; forced participation.
-bullying_or_social_cruelty,Bullying / Social Cruelty,public_humiliation,Public Humiliation,moderate,Public humiliation; shaming; embarrassment.
-bullying_or_social_cruelty,Bullying / Social Cruelty,social_pressure,Social Pressure,mild,Intense social pressure; peer pressure; conformity pressure.
-bullying_or_social_cruelty,Bullying / Social Cruelty,other_social_cruelty,Other Social Cruelty,mild,Other forms of social cruelty not covered by specific subcategories.
-violence,Violence,physical_violence,Physical Violence,moderate,Physical fighting; combat; brawls; physical altercations.
-violence,Violence,graphic_violence,Graphic Violence,severe,Graphic violence; gore; detailed violence; blood.
-violence,Violence,weapons,Weapons,moderate,Weapons; gun violence; knife violence; weapon use.
-violence,Violence,school_shootings,School Shootings / Mass Violence,severe,School shootings; mass shootings; or mass violence events.
-violence,Violence,war,War,severe,War; military violence; battle scenes; combat.
-violence,Violence,domestic_violence,Domestic Violence,severe,Domestic violence; intimate partner violence; family violence.
-violence,Violence,torture,Torture,severe,Torture; extreme violence; prolonged suffering.
-violence,Violence,kidnapping_confinement,Kidnapping / Confinement,severe,Kidnapping; abduction; confinement; being held against will; captivity.
-violence,Violence,human_trafficking,Human Trafficking,severe,Human trafficking; sex trafficking; or forced servitude. Distinct from general kidnapping.
-violence,Violence,cannibalism,Cannibalism,severe,Cannibalism; eating human flesh; or cannibalistic themes.
-violence,Violence,violence_against_children,Violence Against Children,severe,Violence directed at children; child abuse; harm to minors.
-violence,Violence,animal_cruelty,Animal Cruelty,severe,Animal cruelty; harm to animals; animal death; pet death.
-violence,Violence,police_brutality,Police Brutality / State Violence,severe,Police brutality; state violence; or systemic violence by authorities.
-violence,Violence,other_violence,Other Violence,moderate,Other forms of violence not covered by specific subcategories.
-substance_use_or_alcohol,Substance Use,alcohol,Alcohol,mild,Alcohol consumption; drinking; alcohol abuse.
-substance_use_or_alcohol,Substance Use,drug_use,Drug Use,moderate,Drug use; drug abuse; illegal substances.
-substance_use_or_alcohol,Substance Use,addiction,Addiction,moderate,Addiction; substance dependence; substance use disorder.
-substance_use_or_alcohol,Substance Use,overdose,Overdose,severe,Overdose; drug-related medical emergencies; poisoning.
-substance_use_or_alcohol,Substance Use,other_substance_use,Other Substance Use,mild,Other substance-related content not covered by specific subcategories.
-death_or_grief,Death / Grief,character_death,Character Death,moderate,Character deaths; on-page deaths; death scenes.
-death_or_grief,Death / Grief,terminal_illness,Terminal Illness,severe,Terminal illness; dying characters; end-of-life care.
-death_or_grief,Death / Grief,grief,Grief,moderate,Grief; mourning; loss; bereavement.
-death_or_grief,Death / Grief,funeral_scenes,Funeral Scenes,mild,Funeral scenes; death rituals; memorial services.
-death_or_grief,Death / Grief,near_death,Near Death,severe,Near-death experiences; life-threatening situations.
-death_or_grief,Death / Grief,past_death,Past Death,mild,Past deaths (discussed but not shown); historical deaths.
-death_or_grief,Death / Grief,miscarriage_abortion,Miscarriage / Abortion,severe,Miscarriage; stillbirth; abortion; pregnancy loss.
-death_or_grief,Death / Grief,death_animals,Animal Death,severe,Animal death; pet death; or harm to animals.
-death_or_grief,Death / Grief,divorce,Divorce / Separation,moderate,Divorce; separation; or relationship breakdown.
-death_or_grief,Death / Grief,grief_processing,Grief Processing,moderate,Detailed grief processing; mourning; or loss processing.
-death_or_grief,Death / Grief,other_death_grief,Other Death / Grief,mild,Other death/grief-related content not covered by specific subcategories.
-discrimination,Discrimination,racism,Racism,severe,Racism; racial discrimination; racial slurs.
-discrimination,Discrimination,sexism,Sexism,moderate,Sexism; gender discrimination; misogyny; misandry.
-discrimination,Discrimination,homophobia,Homophobia,severe,Homophobia; anti-LGBTQ+ content; discrimination against gay/lesbian people.
-discrimination,Discrimination,transphobia,Transphobia,severe,Transphobia; anti-trans content; discrimination against transgender people.
-discrimination,Discrimination,acephobia,Acephobia,moderate,Discrimination against asexual people; invalidation of asexuality; or pressure to be sexual.
-discrimination,Discrimination,lesbophobia,Lesbophobia,severe,Discrimination specifically against lesbians or lesbian relationships.
-discrimination,Discrimination,biphobia,Biphobia,moderate,Discrimination against bisexual people; biphobic stereotypes; or invalidation of bisexuality.
-discrimination,Discrimination,misgendering,Misgendering / Deadnaming,severe,Misgendering; deadnaming; or use of incorrect pronouns for transgender or non-binary characters.
-discrimination,Discrimination,queerphobia,Queerphobia,severe,General anti-queer sentiment; queerphobic language; or discrimination against LGBTQ+ people.
-discrimination,Discrimination,religious_discrimination,Religious Discrimination,moderate,Religious discrimination; religious intolerance; religious persecution.
-discrimination,Discrimination,ableism,Ableism,moderate,Ableism; discrimination against disabilities; disability slurs.
-discrimination,Discrimination,cultural_appropriation,Cultural Appropriation / Colonial Themes,moderate,Cultural appropriation; colonial themes; exploitation of Indigenous or marginalized cultures; or problematic representation of cultural groups.
-discrimination,Discrimination,antisemitism,Antisemitism,severe,Antisemitism; anti-Jewish discrimination; or Jewish stereotypes.
-discrimination,Discrimination,islamophobia,Islamophobia,severe,Islamophobia; anti-Muslim discrimination; or Muslim stereotypes.
-discrimination,Discrimination,fatphobia,Fatphobia / Body Shaming,moderate,Discrimination based on weight; body shaming; anti-fat bias; or cruelty toward fat characters.
-discrimination,Discrimination,classism,Classism / Poverty,moderate,Discrimination based on class; extreme poverty; homelessness; or economic status discrimination.
-discrimination,Discrimination,other_discrimination,Other Discrimination,moderate,Other forms of discrimination not covered by specific subcategories.
-language,Coarse Language,strong_language,Strong Language,mild,Strong language; profanity; swearing.
-language,Coarse Language,slurs,Slurs,severe,Slurs; hate speech; derogatory language.
-language,Coarse Language,other_language,Other Language,mild,Other language-related content not covered by specific subcategories.
-phobias,Phobias / Specific Fears,snakes,Snakes / Serpents,mild,Snakes; serpents; or snake-like creatures.
-phobias,Phobias / Specific Fears,spiders,Spiders / Arachnids,mild,Spiders; arachnids; or spider-like creatures.
-phobias,Phobias / Specific Fears,needles,Needles / Medical Procedures,moderate,Needles; injections; medical procedures; or blood draws.
-phobias,Phobias / Specific Fears,heights,Heights / Falling,mild,Heights; falling; vertigo; or high places.
-phobias,Phobias / Specific Fears,water,Water / Drowning,moderate,Water; drowning; deep water; or aquaphobia triggers.
-phobias,Phobias / Specific Fears,enclosed_spaces,Enclosed Spaces / Claustrophobia,moderate,Enclosed spaces; claustrophobia; being trapped; or confinement.
-phobias,Phobias / Specific Fears,darkness,Darkness / Nyctophobia,mild,Darkness; being in the dark; or fear of the dark.
-phobias,Phobias / Specific Fears,blood,Blood / Hemophobia,moderate,Blood; gore; or blood-related medical content.
-phobias,Phobias / Specific Fears,vomiting,Vomiting / Emetophobia,mild,Vomiting; nausea; or scenes depicting sickness.
-phobias,Phobias / Specific Fears,trypophobia,Trypophobia,mild,Clusters of small holes; patterns; or trypophobia triggers.
-phobias,Phobias / Specific Fears,dental_trauma,Dental Trauma,moderate,Dental procedures; teeth falling out; pulling teeth; or dental gore.
-phobias,Phobias / Specific Fears,other_phobias,Other Phobias,mild,Other specific phobias or fear triggers not covered above.
-medical_health,Medical / Health,medical_procedures,Medical Procedures,moderate,Surgery; medical procedures; hospital scenes; or medical trauma.
-medical_health,Medical / Health,infertility,Infertility / Pregnancy Loss,severe,Infertility; miscarriage; stillbirth; or pregnancy loss.
-medical_health,Medical / Health,chronic_illness,Chronic Illness,moderate,Chronic illness; disability; or long-term health conditions.
-medical_health,Medical / Health,cancer,Cancer,severe,Cancer; cancer treatment; or cancer-related illness.
-medical_health,Medical / Health,body_horror,Body Horror,severe,Body horror; extreme body modification; or graphic body-related content.
-medical_health,Medical / Health,pregnancy_childbirth,Pregnancy / Childbirth,moderate,Pregnancy; childbirth; pregnancy complications; or pregnancy-related trauma.
-medical_health,Medical / Health,other_medical,Other Medical / Health,moderate,Other medical or health-related content not covered above.
-religious_cult,Religious / Cult Content,cult_content,Cult Dynamics,moderate,Cult dynamics; indoctrination; or cult manipulation.
-religious_cult,Religious / Cult Content,religious_trauma,Religious Trauma,moderate,Religious trauma; religious abuse; or religious-based harm.
-religious_cult,Religious / Cult Content,occult,Occult / Supernatural,mild,Occult themes; supernatural elements; or dark magic.
-religious_cult,Religious / Cult Content,excommunication,Excommunication / Religious Exclusion,moderate,Excommunication; religious exclusion; or religious shunning.
-religious_cult,Religious / Cult Content,other_religious_cult,Other Religious / Cult,mild,Other religious or cult-related content not covered above.
-family_dynamics,Family Dynamics,parental_abandonment,Parental Abandonment,moderate,Parental abandonment; estrangement; or parents leaving.
-family_dynamics,Family Dynamics,foster_care_adoption,Foster Care / Adoption Trauma,moderate,Foster care trauma; adoption breakdown; or displacement of children.
-family_dynamics,Family Dynamics,incest_taboo,Incest / Pseudo-Incest,severe,Incest; pseudo-incest (step-siblings); or blood relation sexual/romantic content.
-family_dynamics,Family Dynamics,other_family_dynamics,Other Family Dynamics,mild,Other family-related trauma or dynamics not covered above.
-other,Other,natural_disasters,Natural Disasters,moderate,Natural disasters; environmental trauma; or climate-related events.
-other,Other,accidents,Car Accidents / Crashes,moderate,Car crashes; plane crashes; or severe vehicle accidents.
-other,Other,other,Other,mild,Other potentially triggering content.
+Full ID,Category ID,Category Name,Subcategory ID,Subcategory Name,Default Severity,Default Score,Description
+mental_health.disordered_eating,mental_health,Mental Health,disordered_eating,Disordered Eating,moderate,6,"Disordered eating, eating disorders, body image issues."
+mental_health.weight_loss_dieting,mental_health,Mental Health,weight_loss_dieting,Weight Loss / Dieting Focus,moderate,4,"Chronic diet talk, weight loss focus, ""makeover"" plots, or dieting narratives. Distinct from disordered eating but may be triggering for ED-sensitive readers. Keywords: makeover, diet culture, clean eating."
+mental_health.anxiety,mental_health,Mental Health,anxiety,Anxiety,moderate,7,"Anxiety, panic attacks, stress, anxiety disorders."
+mental_health.depression,mental_health,Mental Health,depression,Depression,moderate,6,"Depression, mood disorders, depressive episodes."
+mental_health.ptsd,mental_health,Mental Health,ptsd,PTSD / Trauma,moderate,7,"Post-traumatic stress disorder, trauma, traumatic experiences."
+mental_health.self_harm,mental_health,Mental Health,self_harm,Self-Harm,moderate,9,"Self-harm behaviors, cutting, non-suicidal self-injury."
+mental_health.suicidal_ideation,mental_health,Mental Health,suicidal_ideation,Suicidal Ideation,moderate,9,"Suicidal thoughts, attempts, detailed descriptions of suicide."
+mental_health.suicide_minor,mental_health,Mental Health,suicide_minor,Suicide of a Minor,moderate,10,Suicide or suicidal ideation involving a child or minor character.
+mental_health.casual_suicidal_ideation,mental_health,Mental Health,casual_suicidal_ideation,Casual Suicidal Ideation / Jokes,moderate,4,"Non-graphic but repeated ""jokes"" or casual references to suicide, self-harm, or death wishes. Less severe than acute suicidal content but may still be triggering."
+mental_health.workplace_burnout,mental_health,Mental Health,workplace_burnout,Workplace Burnout / Toxic Workplace,moderate,5,"Workplace burnout, toxic work environments, overwork, or professional stress. May include exploitation, harassment, or unsafe working conditions."
+mental_health.academic_pressure,mental_health,Mental Health,academic_pressure,Academic Pressure / Exam Stress,moderate,5,"Academic pressure, exam stress, academic competition, or intense educational pressure. May include academic failure, grade anxiety, or competitive academic environments."
+mental_health.other_mental_health,mental_health,Mental Health,other_mental_health,Other Mental Health,moderate,4,Other mental health themes not covered by specific subcategories.
+sexual_content.explicit_sexual_content,sexual_content,Sexual Content,explicit_sexual_content,Explicit Sexual Content,moderate,6,"Explicit sexual scenes, graphic sexual descriptions."
+sexual_content.sexual_violence,sexual_content,Sexual Content,sexual_violence,Sexual Violence,moderate,10,"Sexual assault, rape, non-consensual sexual content."
+sexual_content.intense_romance,sexual_content,Sexual Content,intense_romance,Intense Romance / Spice,moderate,4,"Intense romantic/sexual tension, steamy scenes, explicit romance/spice content. Note: Emotional romantic tension alone may not require a warning."
+sexual_content.sexual_themes,sexual_content,Sexual Content,sexual_themes,Sexual Themes,moderate,3,"Sexual themes, discussions, references (non-explicit)."
+sexual_content.infidelity_cheating,sexual_content,Sexual Content,infidelity_cheating,Infidelity / Cheating,moderate,4,"Infidelity, cheating in relationships, or sexual/romantic betrayal. Also see Emotional Abuse category for relationship dynamics."
+sexual_content.pornography_sex_work,sexual_content,Sexual Content,pornography_sex_work,Pornography / Sex Work,moderate,6,"Explicit pornography, sex work representation, or sexual content industry themes."
+sexual_content.power_imbalance,sexual_content,Sexual Content,power_imbalance,Power Imbalance,moderate,7,"Sexual or romantic dynamics involving authority, dependency, or unequal power (e.g., boss/employee, teacher/student, age gaps)."
+sexual_content.consent_ambiguity,sexual_content,Sexual Content,consent_ambiguity,Ambiguous or Non-Explicit Consent (Dub-Con),moderate,8,"Consent is unclear, negotiated implicitly, or framed as resistance/desire tension. Also known as ""Dub-Con"" in dark romance."
+sexual_content.cnc,sexual_content,Sexual Content,cnc,Consensual Non-Consent (CNC),moderate,8,"Consensual non-consent, CNC play, or negotiated non-consent scenarios. Distinct from actual non-consent."
+sexual_content.somnophilia,sexual_content,Sexual Content,somnophilia,Somnophilia / Sleep Play,moderate,9,Non-consensual or dub-consensual sexual acts while one partner is sleeping or unconscious.
+sexual_content.coercion_pressure,sexual_content,Sexual Content,coercion_pressure,Sexual Coercion / Pressure,moderate,9,"Emotional pressure, manipulation, or obligation leading to sexual activity."
+sexual_content.degradation_humiliation,sexual_content,Sexual Content,degradation_humiliation,Degradation / Humiliation,moderate,6,"Sexual content involving humiliation, degradation, or verbal diminishment."
+sexual_content.possessive_dynamics,sexual_content,Sexual Content,possessive_dynamics,Possessive or Obsessive Dynamics,moderate,6,"Sexual or romantic framing involving ownership, obsession, or control."
+sexual_content.bdsm_themes,sexual_content,Sexual Content,bdsm_themes,BDSM Themes,moderate,6,"Power exchange, dominance/submission, or restraint themes."
+sexual_content.roleplay,sexual_content,Sexual Content,roleplay,Sexual Roleplay,moderate,3,Sexual roleplay scenarios as part of intimacy.
+sexual_content.exhibitionism_voyeurism,sexual_content,Sexual Content,exhibitionism_voyeurism,Exhibitionism / Voyeurism,moderate,5,Sexual content involving being watched or watching.
+sexual_content.taboo_fetish_themes,sexual_content,Sexual Content,taboo_fetish_themes,Taboo or Fetish Themes,moderate,6,Fetish-focused sexual framing outside mainstream romance norms.
+sexual_content.breeding_kink,sexual_content,Sexual Content,breeding_kink,Breeding Kink,moderate,5,"Sexual focus on impregnation, breeding, or pregnancy as kink. Distinct from actual pregnancy/childbirth."
+sexual_content.knife_play,sexual_content,Sexual Content,knife_play,Knife Play / Blood Play,moderate,9,"Sexualized use of knives, blood play, or weapon play in sexual contexts."
+sexual_content.primal_play,sexual_content,Sexual Content,primal_play,Primal Play,moderate,6,"Hunting/chasing dynamics, primal kink, or ""touch her and you die"" tropes in sexual/romantic contexts."
+sexual_content.praise_kink,sexual_content,Sexual Content,praise_kink,Praise Kink,moderate,5,"Sexual gratification from receiving praise or ""good girl/boy"" affirmation."
+sexual_content.degradation_kink,sexual_content,Sexual Content,degradation_kink,Degradation Kink,moderate,6,Sexual gratification from verbal humiliation or degradation.
+sexual_content.public_sex,sexual_content,Sexual Content,public_sex,Public Sex / Risk of Discovery,moderate,6,"Sexual acts in public or semi-public places, or fear/thrill of being caught."
+sexual_content.group_sex,sexual_content,Sexual Content,group_sex,Group Sex / Threesome,moderate,7,Sexual acts involving more than two participants.
+sexual_content.monster_romance,sexual_content,Sexual Content,monster_romance,Monster Romance / Anatomy,moderate,6,Sexual content involving non-human partners or anatomy.
+sexual_content.size_difference,sexual_content,Sexual Content,size_difference,Size Difference Kink,moderate,5,Sexual focus on significant physical size difference between partners.
+sexual_content.slut_shaming,sexual_content,Sexual Content,slut_shaming,Sexual Shaming Language,moderate,6,Language that shames or devalues characters for sexual behaviour.
+sexual_content.purity_culture,sexual_content,Sexual Content,purity_culture,Purity / Virginity Framing,moderate,4,"Sexual value tied to virginity, purity, or sexual restraint."
+sexual_content.misogynistic_sexual_language,sexual_content,Sexual Content,misogynistic_sexual_language,Gendered Sexual Degradation,moderate,9,Sexually degrading language targeting women or gendered characters.
+sexual_content.other_sexual_content,sexual_content,Sexual Content,other_sexual_content,Other Sexual Content,moderate,4,Other sexual content not covered by specific subcategories.
+emotional_abuse_or_toxic_relationships.gaslighting,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,gaslighting,Gaslighting,moderate,6,"Gaslighting, psychological manipulation, making someone question their reality."
+emotional_abuse_or_toxic_relationships.manipulation,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,manipulation,Manipulation,moderate,7,"Manipulative behavior, emotional manipulation, coercive control."
+emotional_abuse_or_toxic_relationships.controlling_behavior,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,controlling_behavior,Controlling Behavior,moderate,7,"Controlling relationships, possessiveness, isolation."
+emotional_abuse_or_toxic_relationships.toxic_friendships,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,toxic_friendships,Toxic Friendships,mild,4,"Toxic friendships, unhealthy social dynamics, peer pressure."
+emotional_abuse_or_toxic_relationships.cheating,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,cheating,Cheating,mild,4,"Infidelity, cheating in relationships, betrayal."
+emotional_abuse_or_toxic_relationships.emotional_abuse,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,emotional_abuse,Emotional Abuse,moderate,7,"Emotional abuse, verbal abuse, psychological abuse."
+emotional_abuse_or_toxic_relationships.stalking,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,stalking,Stalking,severe,9,"Stalking, obsessive following, or unwanted surveillance."
+emotional_abuse_or_toxic_relationships.financial_abuse,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,financial_abuse,Financial Abuse,moderate,6,"Financial abuse, economic control, or financial manipulation."
+emotional_abuse_or_toxic_relationships.grooming,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,grooming,Grooming,severe,9,"Grooming, predatory behavior, or manipulation of vulnerable individuals (often in age-gap or power imbalance contexts)."
+emotional_abuse_or_toxic_relationships.other_toxic_relationships,emotional_abuse_or_toxic_relationships,Emotional Abuse / Toxic Relationships,other_toxic_relationships,Other Toxic Relationships,mild,4,Other toxic relationship dynamics not covered by specific subcategories.
+bullying_or_social_cruelty.bullying,bullying_or_social_cruelty,Bullying / Social Cruelty,bullying,Bullying,moderate,6,"Bullying, harassment, intimidation."
+bullying_or_social_cruelty.hazing,bullying_or_social_cruelty,Bullying / Social Cruelty,hazing,Hazing,moderate,6,"Hazing, initiation rituals, forced participation."
+bullying_or_social_cruelty.public_humiliation,bullying_or_social_cruelty,Bullying / Social Cruelty,public_humiliation,Public Humiliation,moderate,6,"Public humiliation, shaming, embarrassment."
+bullying_or_social_cruelty.social_pressure,bullying_or_social_cruelty,Bullying / Social Cruelty,social_pressure,Social Pressure,mild,4,"Intense social pressure, peer pressure, conformity pressure."
+bullying_or_social_cruelty.other_social_cruelty,bullying_or_social_cruelty,Bullying / Social Cruelty,other_social_cruelty,Other Social Cruelty,mild,4,Other forms of social cruelty not covered by specific subcategories.
+violence.physical_violence,violence,Violence,physical_violence,Physical Violence,moderate,6,"Physical fighting, combat, brawls, physical altercations."
+violence.graphic_violence,violence,Violence,graphic_violence,Graphic Violence,severe,9,"Graphic violence, gore, detailed violence, blood."
+violence.weapons,violence,Violence,weapons,Weapons,moderate,6,"Weapons, gun violence, knife violence, weapon use."
+violence.school_shootings,violence,Violence,school_shootings,School Shootings / Mass Violence,severe,10,"School shootings, mass shootings, or mass violence events."
+violence.war,violence,Violence,war,War,severe,8,"War, military violence, battle scenes, combat."
+violence.domestic_violence,violence,Violence,domestic_violence,Domestic Violence,severe,9,"Domestic violence, intimate partner violence, family violence."
+violence.torture,violence,Violence,torture,Torture,severe,10,"Torture, extreme violence, prolonged suffering."
+violence.kidnapping_confinement,violence,Violence,kidnapping_confinement,Kidnapping / Confinement,severe,8,"Kidnapping, abduction, confinement, being held against will, captivity."
+violence.infanticide_or_intentional_child_harm,violence,Violence,infanticide_or_intentional_child_harm,Infanticide / Intentional Harm to a Child,severe,10,"Infanticide, attempted murder of a newborn/child, or intentional harm targeting infants/children (distinct from accidental harm or general peril)."
+violence.human_trafficking,violence,Violence,human_trafficking,Human Trafficking,severe,10,"Human trafficking, sex trafficking, or forced servitude. Distinct from general kidnapping."
+violence.cannibalism,violence,Violence,cannibalism,Cannibalism,severe,10,"Cannibalism, eating human flesh, or cannibalistic themes."
+violence.violence_against_children,violence,Violence,violence_against_children,Violence Against Children,severe,9,"Violence directed at children, child abuse, harm to minors. Implicitly covers suicidal content involving minors (see also: suicide_minor for explicit tagging)."
+violence.crime_non_violent,violence,Violence,crime_non_violent,Non-Violent Crime / Prison,mild,4,"General crime content: robbery, non-violent crime, prison/jail settings, interrogations, or criminal justice system themes. May be tagged even when violence is mild. Keywords: heist, robbery, prison setting, courtroom drama."
+violence.animal_cruelty,violence,Violence,animal_cruelty,Animal Cruelty,severe,8,"Animal cruelty, harm to animals, animal death, pet death."
+violence.police_brutality,violence,Violence,police_brutality,Police Brutality / State Violence,severe,9,"Police brutality, state violence, or systemic violence by authorities."
+violence.other_violence,violence,Violence,other_violence,Other Violence,moderate,5,Other forms of violence not covered by specific subcategories.
+substance_use_or_alcohol.alcohol,substance_use_or_alcohol,Substance Use,alcohol,Alcohol,mild,3,"Alcohol consumption, drinking, alcohol abuse."
+substance_use_or_alcohol.drug_use,substance_use_or_alcohol,Substance Use,drug_use,Drug Use,moderate,6,"Drug use, drug abuse, illegal substances."
+substance_use_or_alcohol.addiction,substance_use_or_alcohol,Substance Use,addiction,Addiction,moderate,6,"Addiction, substance dependence, substance use disorder."
+substance_use_or_alcohol.overdose,substance_use_or_alcohol,Substance Use,overdose,Overdose,severe,9,"Overdose, drug-related medical emergencies, poisoning."
+substance_use_or_alcohol.other_substance_use,substance_use_or_alcohol,Substance Use,other_substance_use,Other Substance Use,mild,4,Other substance-related content not covered by specific subcategories.
+death_or_grief.character_death,death_or_grief,Death / Grief,character_death,Character Death,moderate,6,"Character deaths, on-page deaths, death scenes."
+death_or_grief.terminal_illness,death_or_grief,Death / Grief,terminal_illness,Terminal Illness,severe,8,"Terminal illness, dying characters, end-of-life care."
+death_or_grief.grief,death_or_grief,Death / Grief,grief,Grief,moderate,6,"Grief, mourning, loss, bereavement."
+death_or_grief.funeral_scenes,death_or_grief,Death / Grief,funeral_scenes,Funeral Scenes,mild,3,"Funeral scenes, death rituals, memorial services."
+death_or_grief.near_death,death_or_grief,Death / Grief,near_death,Near Death,severe,8,"Near-death experiences, life-threatening situations."
+death_or_grief.past_death,death_or_grief,Death / Grief,past_death,Past Death,mild,3,"Past deaths (discussed but not shown), historical deaths."
+death_or_grief.miscarriage_abortion,death_or_grief,Death / Grief,miscarriage_abortion,Miscarriage / Abortion,severe,9,"Miscarriage, stillbirth, abortion, pregnancy loss."
+death_or_grief.death_animals,death_or_grief,Death / Grief,death_animals,Animal Death,severe,7,"Animal death, pet death, or harm to animals."
+death_or_grief.grief_processing,death_or_grief,Death / Grief,grief_processing,Grief Processing,moderate,6,"Detailed grief processing, mourning, or loss processing."
+death_or_grief.other_death_grief,death_or_grief,Death / Grief,other_death_grief,Other Death / Grief,mild,4,Other death/grief-related content not covered by specific subcategories.
+discrimination.racism,discrimination,Discrimination,racism,Racism,severe,9,"Racism, racial discrimination, racial slurs."
+discrimination.sexism,discrimination,Discrimination,sexism,Sexism,moderate,6,"Sexism, gender discrimination, misogyny, misandry."
+discrimination.homophobia,discrimination,Discrimination,homophobia,Homophobia,severe,9,"Homophobia, anti-LGBTQ+ content, discrimination against gay/lesbian people."
+discrimination.transphobia,discrimination,Discrimination,transphobia,Transphobia,severe,9,"Transphobia, anti-trans content, discrimination against transgender people."
+discrimination.acephobia,discrimination,Discrimination,acephobia,Acephobia,moderate,6,"Discrimination against asexual people, invalidation of asexuality, or pressure to be sexual."
+discrimination.lesbophobia,discrimination,Discrimination,lesbophobia,Lesbophobia,severe,9,Discrimination specifically against lesbians or lesbian relationships.
+discrimination.biphobia,discrimination,Discrimination,biphobia,Biphobia,moderate,6,"Discrimination against bisexual people, biphobic stereotypes, or invalidation of bisexuality."
+discrimination.misgendering,discrimination,Discrimination,misgendering,Misgendering / Deadnaming,severe,9,"Misgendering, deadnaming, or use of incorrect pronouns for transgender or non-binary characters."
+discrimination.queerphobia,discrimination,Discrimination,queerphobia,Queerphobia,severe,9,"General anti-queer sentiment, queerphobic language, or discrimination against LGBTQ+ people."
+discrimination.religious_discrimination,discrimination,Discrimination,religious_discrimination,Religious Discrimination,moderate,6,"Religious discrimination, religious intolerance, religious persecution."
+discrimination.ableism,discrimination,Discrimination,ableism,Ableism,moderate,6,"Ableism, discrimination against disabilities, disability slurs."
+discrimination.cultural_appropriation,discrimination,Discrimination,cultural_appropriation,Cultural Appropriation / Colonial Themes,moderate,6,"Cultural appropriation, colonial themes, exploitation of Indigenous or marginalized cultures, or problematic representation of cultural groups."
+discrimination.antisemitism,discrimination,Discrimination,antisemitism,Antisemitism,severe,9,"Antisemitism, anti-Jewish discrimination, or Jewish stereotypes."
+discrimination.islamophobia,discrimination,Discrimination,islamophobia,Islamophobia,severe,9,"Islamophobia, anti-Muslim discrimination, or Muslim stereotypes."
+discrimination.fatphobia,discrimination,Discrimination,fatphobia,Fatphobia / Body Shaming,moderate,6,"Discrimination based on weight, body shaming, anti-fat bias, or cruelty toward fat characters."
+discrimination.classism,discrimination,Discrimination,classism,Classism / Poverty,moderate,6,"Discrimination based on class, extreme poverty, homelessness, or economic status discrimination."
+discrimination.economic_collapse,discrimination,Discrimination,economic_collapse,Economic Collapse / Eviction / Job Loss,moderate,6,"Economic collapse, eviction, foreclosure, job loss, or sudden economic hardship. Distinct from chronic poverty. Keywords: recession, foreclosure, redundancy, layoffs."
+discrimination.queer_joy_identity,discrimination,Discrimination,queer_joy_identity,Queer Joy / Identity Focus,moderate,3,"Non-triggering identity flags: coming out arcs, transition journeys, or positive LGBTQ+ identity exploration. Not discrimination, but identity-focused content that some readers seek or avoid. Keywords: coming out arc, transition journey, found family (queer)."
+discrimination.religious_joy_identity,discrimination,Discrimination,religious_joy_identity,Religious Joy / Positive Identity,moderate,3,"Non-triggering identity flags: positive religious identity exploration, faith journeys, or affirming religious content. Not discrimination, but identity-focused content that some readers seek or avoid. Keywords: faith journey, religious community, spiritual growth."
+discrimination.other_discrimination,discrimination,Discrimination,other_discrimination,Other Discrimination,moderate,6,Other forms of discrimination not covered by specific subcategories.
+language.strong_language,language,Coarse Language,strong_language,Strong Language,mild,3,"Strong language, profanity, swearing."
+language.slurs,language,Coarse Language,slurs,Slurs,severe,9,"Slurs, hate speech, derogatory language."
+language.other_language,language,Coarse Language,other_language,Other Language,mild,3,Other language-related content not covered by specific subcategories.
+phobias.snakes,phobias,Phobias / Specific Fears,snakes,Snakes / Serpents,mild,3,"Snakes, serpents, or snake-like creatures."
+phobias.spiders,phobias,Phobias / Specific Fears,spiders,Spiders / Arachnids,mild,3,"Spiders, arachnids, or spider-like creatures."
+phobias.needles,phobias,Phobias / Specific Fears,needles,Needles / Medical Procedures,moderate,5,"Needles, injections, medical procedures, or blood draws."
+phobias.heights,phobias,Phobias / Specific Fears,heights,Heights / Falling,mild,3,"Heights, falling, vertigo, or high places."
+phobias.water,phobias,Phobias / Specific Fears,water,Water / Drowning,moderate,5,"Water, drowning, deep water, or aquaphobia triggers."
+phobias.enclosed_spaces,phobias,Phobias / Specific Fears,enclosed_spaces,Enclosed Spaces / Claustrophobia,moderate,5,"Enclosed spaces, claustrophobia, being trapped, or confinement."
+phobias.darkness,phobias,Phobias / Specific Fears,darkness,Darkness / Nyctophobia,mild,3,"Darkness, being in the dark, or fear of the dark."
+phobias.blood,phobias,Phobias / Specific Fears,blood,Blood / Hemophobia,moderate,5,"Blood, gore, or blood-related medical content."
+phobias.vomiting,phobias,Phobias / Specific Fears,vomiting,Vomiting / Emetophobia,mild,3,"Vomiting, nausea, or scenes depicting sickness."
+phobias.trypophobia,phobias,Phobias / Specific Fears,trypophobia,Trypophobia,mild,3,"Clusters of small holes, patterns, or trypophobia triggers."
+phobias.dental_trauma,phobias,Phobias / Specific Fears,dental_trauma,Dental Trauma,moderate,5,"Dental procedures, teeth falling out, pulling teeth, or dental gore."
+phobias.other_phobias,phobias,Phobias / Specific Fears,other_phobias,Other Phobias,mild,3,Other specific phobias or fear triggers not covered above.
+medical_health.medical_procedures,medical_health,Medical / Health,medical_procedures,Medical Procedures,moderate,6,"Surgery, medical procedures, hospital scenes, or medical trauma."
+medical_health.medical_detail_procedural,medical_health,Medical / Health,medical_detail_procedural,Medical Detail / Procedural,mild,3,Non-graphic surgery or medical procedures without trauma focus. Clinical or procedural medical content.
+medical_health.plastic_surgery_cosmetic,medical_health,Medical / Health,plastic_surgery_cosmetic,Plastic Surgery / Cosmetic Procedures,mild,4,"Plastic surgery, cosmetic procedures, or elective body modification. Distinct from body horror and general medical trauma."
+medical_health.pandemics_contagion,medical_health,Medical / Health,pandemics_contagion,Pandemics / Contagion,moderate,6,"Pandemics, plague, outbreaks, contagion narratives, or infectious disease themes. Common post-2020 trigger. Keywords: plague, outbreak, virus, lockdown."
+medical_health.infertility,medical_health,Medical / Health,infertility,Infertility,moderate,7,"Infertility, long-term lack of conception, or inability to conceive. Distinct from pregnancy loss."
+medical_health.pregnancy_loss,medical_health,Medical / Health,pregnancy_loss,Pregnancy Loss,severe,9,"Miscarriage, stillbirth, or pregnancy loss. Distinct from infertility (long-term conception issues)."
+medical_health.chronic_illness,medical_health,Medical / Health,chronic_illness,Chronic Illness,moderate,6,"Chronic illness, disability, or long-term health conditions."
+medical_health.cancer,medical_health,Medical / Health,cancer,Cancer,severe,8,"Cancer, cancer treatment, or cancer-related illness."
+medical_health.body_horror,medical_health,Medical / Health,body_horror,Body Horror,severe,9,"Body horror, extreme body modification, or graphic body-related content."
+medical_health.pregnancy_childbirth,medical_health,Medical / Health,pregnancy_childbirth,Pregnancy / Childbirth,moderate,6,"Pregnancy, childbirth, pregnancy complications, or pregnancy-related trauma."
+medical_health.other_medical,medical_health,Medical / Health,other_medical,Other Medical / Health,moderate,5,Other medical or health-related content not covered above.
+religious_cult.cult_content,religious_cult,Religious / Cult Content,cult_content,Cult Dynamics,moderate,6,"Cult dynamics, indoctrination, or cult manipulation."
+religious_cult.religious_trauma,religious_cult,Religious / Cult Content,religious_trauma,Religious Trauma,moderate,7,"Religious trauma, religious abuse, or religious-based harm."
+religious_cult.occult,religious_cult,Religious / Cult Content,occult,Occult / Supernatural,mild,4,"Occult themes, supernatural elements, or dark magic."
+religious_cult.excommunication,religious_cult,Religious / Cult Content,excommunication,Excommunication / Religious Exclusion,moderate,6,"Excommunication, religious exclusion, or religious shunning."
+religious_cult.other_religious_cult,religious_cult,Religious / Cult Content,other_religious_cult,Other Religious / Cult,mild,4,Other religious or cult-related content not covered above.
+family_dynamics.parental_abandonment,family_dynamics,Family Dynamics,parental_abandonment,Parental Abandonment,moderate,6,"Parental abandonment, estrangement, or parents leaving."
+family_dynamics.foster_care_adoption,family_dynamics,Family Dynamics,foster_care_adoption,Foster Care / Adoption Trauma,moderate,7,"Foster care trauma, adoption breakdown, or displacement of children."
+family_dynamics.divorce,family_dynamics,Family Dynamics,divorce,Divorce / Separation,moderate,5,"Divorce, separation, or relationship breakdown. Moved from Death / Grief to better reflect family dynamics context."
+family_dynamics.deception_or_secrets,family_dynamics,Family Dynamics,deception_or_secrets,Deception / Secrets,mild,4,"Deception, lying, or secret-keeping involving friends or family (e.g., hiding relationship status, lying to friends, keeping secrets from loved ones)."
+family_dynamics.incest_taboo,family_dynamics,Family Dynamics,incest_taboo,Incest / Pseudo-Incest,severe,10,"Incest, pseudo-incest (step-siblings), or blood relation sexual/romantic content."
+family_dynamics.other_family_dynamics,family_dynamics,Family Dynamics,other_family_dynamics,Other Family Dynamics,mild,4,Other family-related trauma or dynamics not covered above.
+tropes.enemies_to_lovers,tropes,Tropes & Genres,enemies_to_lovers,Enemies to Lovers,mild,3,"Characters start as enemies or rivals and develop romantic feelings. Can involve conflict, tension, and hostility."
+tropes.bully_romance,tropes,Tropes & Genres,bully_romance,Bully Romance,moderate,6,Romance involving bullying dynamics between love interests. Often overlaps with toxic relationships.
+tropes.dark_romance,tropes,Tropes & Genres,dark_romance,Dark Romance,moderate,6,"Romance genre featuring darker themes, morally grey characters, or taboo content."
+tropes.mafia_romance,tropes,Tropes & Genres,mafia_romance,Mafia / Organized Crime Romance,moderate,6,Romance set in the world of organized crime. Often involves violence and crime themes.
+tropes.stalker_romance,tropes,Tropes & Genres,stalker_romance,Stalker Romance,severe,8,Romance involving stalking behaviors framed as romantic or obsessive devotion.
+tropes.kidnapping_romance,tropes,Tropes & Genres,kidnapping_romance,Captive / Kidnapping Romance,severe,8,"Romance involving kidnapping, captivity, or Stockholm syndrome themes."
+tropes.omegaverse,tropes,Tropes & Genres,omegaverse,Omegaverse / Dynamics,moderate,6,"Genre involving biological hierarchies (Alpha/Beta/Omega), often with breeding/heat cycles."
+tropes.age_gap,tropes,Tropes & Genres,age_gap,Age Gap,mild,4,Romance with significant age difference between partners.
+tropes.why_choose,tropes,Tropes & Genres,why_choose,Why Choose / Reverse Harem,moderate,5,Romance where a protagonist has multiple simultaneous love interests (polyamorous dynamic).
+tropes.other_tropes,tropes,Tropes & Genres,other_tropes,Other Tropes,mild,3,Other specific tropes not covered by the main categories.
+other.natural_disasters,other,Other,natural_disasters,Natural Disasters,moderate,3,"Natural disasters, environmental trauma, or climate-related events."
+other.accidents,other,Other,accidents,Car Accidents / Crashes,moderate,5,"Car crashes, plane crashes, or severe vehicle accidents."
+other.other,other,Other,other,Other,mild,3,Other potentially triggering content.

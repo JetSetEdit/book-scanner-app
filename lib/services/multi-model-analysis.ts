@@ -158,6 +158,7 @@ function selectRelevantCategories(metadata: BookMetadata): string[] {
     'substance_use_or_alcohol': ['alcohol', 'drinking', 'drug', 'substance', 'addiction', 'addict', 'rehab', 'sober', 'intoxicated', 'drunk', 'cocaine', 'heroin'],
     'discrimination': ['racism', 'discrimination', 'prejudice', 'bigotry', 'hate', 'bias', 'stereotype', 'marginalized', 'homophobia', 'transphobia'],
     'bullying_or_social_cruelty': ['bullying', 'hazing', 'humiliation', 'social pressure', 'peer pressure', 'ostracized', 'excluded'],
+    'tropes': ['enemies to lovers', 'bully romance', 'dark romance', 'mafia', 'stalker', 'kidnapping', 'captive', 'omegaverse', 'age gap', 'reverse harem', 'why choose', 'harem', 'grumpy sunshine', 'forbidden love'],
   }
   
   // Score each category based on keyword matches
@@ -950,7 +951,9 @@ function processWarnings(
     })
 
     // Compute severity from signals
-    const severity = computeSeverityFromSignals(signals, defaultSeverityHint)
+    const categoryId = w.subcategory_id?.split('.')[0] || 'unknown';
+    const subIdPart = w.subcategory_id?.split('.')[1] || 'unknown';
+    const severity = computeSeverityFromSignals(signals, categoryId, subIdPart)
 
     // Validate sexual violence if applicable
     let subcategoryId = w.subcategory_id
