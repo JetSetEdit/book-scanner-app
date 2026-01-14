@@ -62,6 +62,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   const descriptionRef = useRef<HTMLDivElement>(null)
   const [fullHeight, setFullHeight] = useState<number | null>(null)
+  const [focusWarningId, setFocusWarningId] = useState<string | null>(null)
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -98,6 +99,14 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
       setFullHeight(height)
     }
   }, [isDescriptionExpanded, book.description])
+
+  const handleWarningClick = (warning: any) => {
+    // Just set the ID, let ContentWarningsList handle expansion and scrolling
+    setFocusWarningId(warning.subcategory_id || warning.id)
+    
+    // Reset after a delay so it can be clicked again
+    setTimeout(() => setFocusWarningId(null), 1000)
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans selection:bg-foreground selection:text-background">
@@ -486,122 +495,10 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               </div>
               )}
               
-              {/* Heads Up Summary with Major Warnings */}
-              {(() => {
-                if (!warnings || warnings.length === 0) return null
-                
-                // Get user-friendly labels for subcategories
-                const getSubcategoryLabel = (subcategoryId: string | null | undefined): string => {
-                  if (!subcategoryId) return ''
-                  
-                  try {
-                    const parts = subcategoryId.split('.')
-                    if (parts.length === 2) {
-                      const sub = getSubcategoryById(parts[0], parts[1])
-                      if (sub) return sub.userLabel
-                    }
-                  } catch (e) {
-                    // Fallback to formatting the ID
-                  }
-                  
-                  // Fallback: format the subcategory ID nicely
-                  // Handle special cases like PTSD
-                  const formatted = subcategoryId
-                    .split('_')
-                    .map(word => {
-                      // Keep acronyms uppercase (PTSD, etc.)
-                      if (word.toUpperCase() === word && word.length <= 5) {
-                        return word.toUpperCase()
-                      }
-                      return word.charAt(0).toUpperCase() + word.slice(1)
-                    })
-                    .join(' ')
-                  
-                  // Fix common acronyms
-                  return formatted
-                    .replace(/\bPtsd\b/gi, 'PTSD')
-                    .replace(/\bPtsd\b/g, 'PTSD')
-                }
-                
-                // Get severe warnings first, then moderate
-                const severeWarnings = warnings.filter((w: any) => w.severity === 'severe')
-                const moderateWarnings = warnings.filter((w: any) => w.severity === 'moderate')
-                
-                // Get top worst warnings (prioritize severe, then by confidence)
-                const worstWarnings = [...severeWarnings, ...moderateWarnings]
-                  .sort((a: any, b: any) => {
-                    // First sort by severity (severe > moderate)
-                    if (a.severity !== b.severity) {
-                      return a.severity === 'severe' ? -1 : 1
-                    }
-                    // Then by confidence score
-                    const aScore = a.confidence_score || 0
-                    const bScore = b.confidence_score || 0
-                    return bScore - aScore
-                  })
-                  .slice(0, 5) // Get top 5 for the list
-                
-                if (worstWarnings.length === 0) return null
-                
-                // Build warning labels with anchor IDs
-                const warningLabels = worstWarnings.map((w: any) => {
-                  const label = getSubcategoryLabel(w.subcategory_id)
-                  const anchorId = w.subcategory_id 
-                    ? `warning-${w.subcategory_id.replace(/[^a-zA-Z0-9]/g, '-')}`
-                    : `warning-${w.id}`
-                  return {
-                    label: label || w.description.split('.')[0].substring(0, 30).trim(),
-                    anchorId
-                  }
-                })
-                
-                // Get top warnings for tags (up to 5)
-                const topWarnings = warningLabels.slice(0, 5)
-                const severityLevel = severeWarnings.length > 0 ? 'severe' : 'moderate'
-                
-                if (topWarnings.length === 0) return null
-                
-                // Function to scroll to warning
-                const scrollToWarning = (anchorId: string) => {
-                  const element = document.getElementById(anchorId)
-                  if (element) {
-                    element.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                    // Add a subtle highlight effect
-                    element.classList.add('ring-2', 'ring-primary', 'ring-offset-2')
-                    setTimeout(() => {
-                      element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2')
-                    }, 2000)
-                  }
-                }
-                
-                return (
-                  <div className="mb-6 p-4 bg-muted/30 border border-border rounded-lg max-w-2xl mx-auto">
-                    <p className="text-sm text-foreground leading-relaxed mb-3">
-                      <span className="font-semibold">Heads up:</span> This book contains {severityLevel} content warnings.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {topWarnings.map((warning, index) => (
-                        <Badge 
-                          key={index}
-                          variant="secondary"
-                          className="text-xs font-medium cursor-pointer hover:bg-secondary/80 transition-colors"
-                          onClick={() => scrollToWarning(warning.anchorId)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              scrollToWarning(warning.anchorId)
-                            }
-                          }}
-                        >
-                          {warning.label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })()}
+              {/* Quick Glance Summary */}
+              {warnings && warnings.length > 0 && (
+                <BooktokWarningsSummary warnings={warnings} onWarningClick={handleWarningClick} />
+              )}
               
               {/* Age Rating - Prominent Display for Parents */}
               {(() => {
@@ -683,10 +580,6 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 </div>
               )}
 
-              {/* NEW: BookTok Style Summary Panel */}
-              {warnings && warnings.length > 0 && (
-                <BooktokWarningsSummary warnings={warnings} />
-              )}
 
               <ContentWarningsList
                 warnings={warnings}
@@ -694,6 +587,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 analysisStatus={analysisStatus}
                 isbn={book.isbn}
                 noWarningsReasoning={noWarningsReasoning}
+                focusWarningId={focusWarningId}
               />
 
               {/* Feedback / Report Section */}

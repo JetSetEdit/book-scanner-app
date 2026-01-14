@@ -68,6 +68,7 @@ interface ContentWarningsListProps {
   analysisStatus?: 'complete' | 'unknown'
   isbn?: string // ISBN for analysis requests
   noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
+  focusWarningId?: string | null
 }
 
 const categoryLabels: Record<string, string> = {
@@ -160,12 +161,60 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId }: ContentWarningsListProps) {
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
   const [requestSent, setRequestSent] = useState(false)
   const [userState, setUserState] = useState<string | null>(null)
   const [stateServices, setStateServices] = useState<any>(null)
+  const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
+
+  // Handle focus request
+  useEffect(() => {
+    if (!focusWarningId) return
+
+    // Find the warning to get its category
+    const warning = warnings.find(w => w.id === focusWarningId || w.subcategory_id === focusWarningId) || 
+                   warnings.find(w => {
+                     // Check if focusWarningId is an anchor ID format (warning-...)
+                     const anchorId = w.subcategory_id 
+                       ? `warning-${w.subcategory_id.replace(/[^a-zA-Z0-9]/g, '-')}`
+                       : `warning-${w.id}`
+                     return anchorId === focusWarningId || w.subcategory_id === focusWarningId
+                   })
+
+    if (warning) {
+      const categoryId = warning.category_id || 'other'
+      
+      // Open the category
+      setOpenCategories(prev => ({
+        ...prev,
+        [categoryId]: true
+      }))
+
+      // Scroll to element after a delay to allow expansion animation (standard duration is ~300ms)
+      setTimeout(() => {
+        const anchorId = warning.subcategory_id 
+          ? `warning-${warning.subcategory_id.replace(/[^a-zA-Z0-9]/g, '-')}`
+          : `warning-${warning.id}`
+        
+        const element = document.getElementById(anchorId)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          
+          // Add a graceful highlight effect
+          // rounded-xl softens the edges, bg-primary/10 gives a gentle spotlight
+          // We use negative margin and padding to create a bubble effect without shifting content
+          element.classList.add('bg-primary/10', 'rounded-2xl', '-mx-4', 'px-4', 'transition-all', 'duration-1000')
+          
+          setTimeout(() => {
+            // Fade out
+            element.classList.remove('bg-primary/10', 'rounded-2xl', '-mx-4', 'px-4')
+          }, 2000)
+        }
+      }, 350)
+    }
+  }, [focusWarningId, warnings])
   
   // Filter warnings based on trope mode
   const filteredWarnings = warnings.filter(warning => {
@@ -743,7 +792,11 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
           <div className="space-y-2">
             {groupWarningsByCategory(standardAiWarnings).map((group) => (
-              <Collapsible key={group.category} defaultOpen={false}>
+              <Collapsible 
+                key={group.category} 
+                open={openCategories[group.category] || false}
+                onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
+              >
                 <CollapsibleTrigger className="w-full flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left">
                   <div className="flex items-center gap-3">
                     <CategoryIcon
@@ -785,7 +838,11 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
           <div className="space-y-2">
             {groupWarningsByCategory(communityWarnings).map((group) => (
-              <Collapsible key={group.category} defaultOpen={false}>
+              <Collapsible 
+                key={group.category} 
+                open={openCategories[group.category] || false}
+                onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
+              >
                 <CollapsibleTrigger className="w-full flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left">
                   <div className="flex items-center gap-3">
                     <CategoryIcon
