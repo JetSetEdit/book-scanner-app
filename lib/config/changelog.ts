@@ -9,6 +9,14 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.13",
+    date: "2026-01-14",
+    title: "New feature",
+    changes: [
+      "User-facing changes (uncommitted changes detected)"
+    ],
+  },
+  {
     version: "1.03.12",
     date: "2026-01-14",
     title: "New feature",
