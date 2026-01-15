@@ -1,13 +1,14 @@
 import fs from 'fs';
 import path from 'path';
-import { WARNING_CATEGORIES, getSeverityScore, type WarningSubcategory } from '../lib/config/taxonomy-v2';
+import { WARNING_CATEGORIES, getSeverityScore, WarningSubcategory } from '../lib/config/taxonomy-v2';
 
-// Define headers with combined ID first for easy lookup
+// 1. Define Headers
 const CSV_HEADER = 'Full ID,Category ID,Category Name,Subcategory ID,Subcategory Name,Default Severity,Default Score,Description';
 
-function escapeCsv(field: string | number | undefined): string {
+function escapeCsv(field: string | number | undefined | null): string {
   if (field === undefined || field === null) return '';
   const stringField = String(field);
+  // If field contains comma, quote, or newline, wrap in quotes and escape internal quotes
   if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
     return `"${stringField.replace(/"/g, '""')}"`;
   }
@@ -18,25 +19,26 @@ function generateCsv() {
   const rows = [CSV_HEADER];
   let count = 0;
 
-  console.log('🔄 Generating TAXONOMY.csv from source of truth...');
+  console.log('🔄 Generating TAXONOMY.csv from source of truth (lib/config/taxonomy-v2.ts)...');
 
+  // 2. Iterate and Build Rows
   for (const cat of WARNING_CATEGORIES) {
+    // Process subcategories
     for (const sub of cat.subcategories) {
-      // 1. Calculate Score (handles the fallback logic from hints)
+      // Combined Key
+      const fullId = `${cat.id}.${sub.id}`;
+      
+      // Get score (using helper which handles defaults)
       const score = getSeverityScore(sub);
       
-      // 2. Build Combined ID
-      const fullId = `${cat.id}.${sub.id}`;
-
-      // 3. Construct Row
       const row = [
         escapeCsv(fullId),
         escapeCsv(cat.id),
         escapeCsv(cat.userLabel),
         escapeCsv(sub.id),
         escapeCsv(sub.userLabel),
-        escapeCsv(sub.defaultSeverityHint), // e.g. 'severe'
-        escapeCsv(score),                   // e.g. 9
+        escapeCsv(sub.defaultSeverityHint || cat.defaultSeverityHint || ''),
+        escapeCsv(score),
         escapeCsv(sub.shortDescription)
       ].join(',');
 
@@ -45,6 +47,7 @@ function generateCsv() {
     }
   }
 
+  // 3. Write File
   const outputPath = path.join(process.cwd(), 'TAXONOMY.csv');
   try {
     fs.writeFileSync(outputPath, rows.join('\n'));

@@ -79,12 +79,28 @@ export async function grantAccess(countryCode: string) {
 }
 
 export async function getSupportedCountries() {
-  const { data } = await supabaseAdmin
-    .from('country_quotas')
-    .select('country_code, country_name, allowed_count')
-    .eq('is_enabled', true)
-    .neq('country_code', 'AU') // Don't show AU in the list as they skip this page
-    .order('country_name')
-  
-  return data || []
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('country_quotas')
+      .select('country_code, country_name, allowed_count')
+      .eq('is_enabled', true)
+      .neq('country_code', 'AU') // Don't show AU in the list as they skip this page
+      .order('country_name')
+    
+    if (error) {
+      console.error('Error fetching supported countries:', error)
+      // Fallback data if table doesn't exist or other DB error
+      return [
+        { country_code: 'US', country_name: 'United States', allowed_count: 100 },
+        { country_code: 'GB', country_name: 'United Kingdom', allowed_count: 50 },
+        { country_code: 'CA', country_name: 'Canada', allowed_count: 50 },
+        { country_code: 'NZ', country_name: 'New Zealand', allowed_count: 50 },
+      ]
+    }
+    
+    return data || []
+  } catch (err) {
+    console.error('Unexpected error in getSupportedCountries:', err)
+    return []
+  }
 }

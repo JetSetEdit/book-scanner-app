@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { usePathname } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
@@ -12,11 +13,15 @@ export function BetaOnboardingModal() {
   const [isOpen, setIsOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const hasCheckedRef = useRef(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     // Prevent double-checking in React Strict Mode
     if (hasCheckedRef.current) return
     hasCheckedRef.current = true
+
+    // Don't show modal on the Welcome page (access gate)
+    if (pathname === '/welcome') return
 
     setMounted(true)
     // Check if user has already accepted
@@ -24,7 +29,7 @@ export function BetaOnboardingModal() {
     if (!hasAccepted) {
       setIsOpen(true)
     }
-  }, [])
+  }, [pathname])
 
   const handleAccept = async () => {
     const consentData = {
