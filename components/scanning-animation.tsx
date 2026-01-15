@@ -23,7 +23,7 @@ export function ScanningAnimation({ categories = DEFAULT_CATEGORIES, isAnalyzing
 
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % categories.length)
-    }, 150) // Fast flip (150ms)
+    }, 800) // Slower flip (800ms) for readability
 
     return () => clearInterval(interval)
   }, [isAnalyzing, categories.length])
@@ -39,7 +39,7 @@ export function ScanningAnimation({ categories = DEFAULT_CATEGORIES, isAnalyzing
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -20, opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.4 }}
             className="absolute inset-0 font-bold text-primary uppercase tracking-wider"
           >
             {categories[index]}
