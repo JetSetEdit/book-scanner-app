@@ -117,15 +117,8 @@ export async function grantAccess(countryCode: string) {
       // Continue anyway - access was granted in DB
     }
 
-    // 5. Redirect (this throws to perform redirect, so it must be last)
-    try {
-      redirect('/')
-    } catch (redirectErr: any) {
-      // redirect() throws to perform redirect, so if we catch it, something went wrong
-      // But we should still return success since access was granted
-      console.error('Redirect error (this may be normal):', redirectErr)
-      return { success: true, message: 'Access granted. Please refresh the page.' }
-    }
+    // 5. Redirect (this throws NEXT_REDIRECT to perform redirect - don't catch it)
+    redirect('/')
   } catch (err: any) {
     // Catch any unexpected errors
     console.error('Unexpected error in grantAccess:', err)

@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.22",
+    date: "2026-01-15",
+    title: "New features",
+    changes: [
+      "Replace geo-block with country-based waitlist/access gate",
+      "Merge Quick Glance/Heads Up panels and refine UI interactions (v1.03.14)",
+      "Add Black Joy recommendation engine, annotation extractor, and bulk enrichment scripts (v1.03.13)",
+      "Implement RLHF severity tuning, BookTok UI summary, and scanning animation",
+      "Add comprehensive error handling for welcome page",
+      "Add robust error handling for welcome page database queries"
+    ],
+  },
+  {
     version: "1.03.21",
     date: "2026-01-15",
     title: "New features",
