@@ -45,9 +45,23 @@ export function AccessGateForm({ countries }: { countries: Country[] }) {
       return
     }
 
-    const result = await grantAccess(country)
-    if (result?.error) {
-      toast.error(result.error)
+    try {
+      const result = await grantAccess(country)
+      if (result?.error) {
+        toast.error(result.error)
+      } else if (result?.success) {
+        // Access granted but redirect didn't work, refresh the page
+        toast.success(result.message || 'Access granted!')
+        setTimeout(() => {
+          window.location.href = '/'
+        }, 1000)
+      } else {
+        // If no error and no explicit success, assume redirect happened
+        // (redirect() throws, so we won't reach here normally)
+      }
+    } catch (err: any) {
+      console.error('Form submission error:', err)
+      toast.error('An error occurred. Please try again.')
     }
   }
 

@@ -6,76 +6,131 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
 
 export async function grantAccess(countryCode: string) {
-  // 1. Get IP address for rate limiting / uniqueness
-  const headersList = headers()
-  const ip = headersList.get('x-forwarded-for') || 'unknown'
-  const userAgent = headersList.get('user-agent') || 'unknown'
+  try {
+    // Validate input
+    if (!countryCode || typeof countryCode !== 'string') {
+      return { error: 'Invalid country code provided.' }
+    }
 
-  // 2. Check Quota
-  // First get the limit
-  const { data: quotaData, error: quotaError } = await supabaseAdmin
-    .from('country_quotas')
-    .select('allowed_count, is_enabled')
-    .eq('country_code', countryCode)
-    .single()
+    // 1. Get IP address for rate limiting / uniqueness
+    let ip = 'unknown'
+    let userAgent = 'unknown'
+    try {
+      const headersList = headers()
+      ip = headersList.get('x-forwarded-for') || 'unknown'
+      userAgent = headersList.get('user-agent') || 'unknown'
+    } catch (err) {
+      console.warn('Could not read headers:', err)
+      // Continue with defaults
+    }
 
-  if (quotaError || !quotaData) {
-    // If country not found in explicit quota list, maybe allow with default strict limit?
-    // Or return error. For now, strict: only allow supported countries.
-    return { error: 'Country not supported for beta access yet.' }
+    // Check if Supabase is configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase not configured, cannot grant access')
+      return { error: 'System configuration error. Please try again later.' }
+    }
+
+    // 2. Check Quota
+    // First get the limit
+    const { data: quotaData, error: quotaError } = await supabaseAdmin
+      .from('country_quotas')
+      .select('allowed_count, is_enabled')
+      .eq('country_code', countryCode)
+      .single()
+
+    if (quotaError || !quotaData) {
+      console.error('Quota check error:', quotaError)
+      return { error: 'Country not supported for beta access yet.' }
+    }
+
+    if (!quotaData.is_enabled) {
+      return { error: 'Access for this country is currently paused.' }
+    }
+
+    // Count current grants
+    const { count, error: countError } = await supabaseAdmin
+      .from('access_grants')
+      .select('*', { count: 'exact', head: true })
+      .eq('country_code', countryCode)
+
+    if (countError) {
+      console.error('Count error:', countError)
+      return { error: 'System error checking capacity.' }
+    }
+
+    const currentCount = count || 0
+
+    if (currentCount >= quotaData.allowed_count) {
+      return { error: `Beta capacity for ${countryCode} is full (${currentCount}/${quotaData.allowed_count}). Please try again later.` }
+    }
+
+    // 3. Grant Access
+    const { error: insertError } = await supabaseAdmin
+      .from('access_grants')
+      .insert({
+        country_code: countryCode,
+        ip_address: ip,
+        user_agent: userAgent
+      })
+
+    if (insertError) {
+      console.error('Error granting access:', insertError)
+      // Check if it's a duplicate (user already has access)
+      if (insertError.code === '23505') { // PostgreSQL unique constraint violation
+        // User already has access, just set the cookie and redirect
+        try {
+          cookies().set('subtext_access_granted', 'true', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            maxAge: 60 * 60 * 24 * 30,
+            path: '/',
+          })
+          cookies().set('subtext_user_country', countryCode, {
+            maxAge: 60 * 60 * 24 * 30,
+            path: '/',
+          })
+          redirect('/')
+        } catch (redirectErr) {
+          return { error: 'Access already granted. Please refresh the page.' }
+        }
+      }
+      return { error: 'Failed to register access. Please try again.' }
+    }
+
+    // 4. Set Cookie
+    try {
+      // Set a long-lived cookie
+      cookies().set('subtext_access_granted', 'true', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: '/',
+      })
+      
+      // Also set a country cookie for personalization
+      cookies().set('subtext_user_country', countryCode, {
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      })
+    } catch (cookieErr) {
+      console.error('Error setting cookies:', cookieErr)
+      // Continue anyway - access was granted in DB
+    }
+
+    // 5. Redirect (this throws to perform redirect, so it must be last)
+    try {
+      redirect('/')
+    } catch (redirectErr: any) {
+      // redirect() throws to perform redirect, so if we catch it, something went wrong
+      // But we should still return success since access was granted
+      console.error('Redirect error (this may be normal):', redirectErr)
+      return { success: true, message: 'Access granted. Please refresh the page.' }
+    }
+  } catch (err: any) {
+    // Catch any unexpected errors
+    console.error('Unexpected error in grantAccess:', err)
+    return { error: 'An unexpected error occurred. Please try again later.' }
   }
-
-  if (!quotaData.is_enabled) {
-    return { error: 'Access for this country is currently paused.' }
-  }
-
-  // Count current grants
-  const { count, error: countError } = await supabaseAdmin
-    .from('access_grants')
-    .select('*', { count: 'exact', head: true })
-    .eq('country_code', countryCode)
-
-  if (countError) {
-    return { error: 'System error checking capacity.' }
-  }
-
-  const currentCount = count || 0
-
-  if (currentCount >= quotaData.allowed_count) {
-    return { error: `Beta capacity for ${countryCode} is full (${currentCount}/${quotaData.allowed_count}). Please try again later.` }
-  }
-
-  // 3. Grant Access
-  const { error: insertError } = await supabaseAdmin
-    .from('access_grants')
-    .insert({
-      country_code: countryCode,
-      ip_address: ip,
-      user_agent: userAgent
-    })
-
-  if (insertError) {
-    console.error('Error granting access:', insertError)
-    return { error: 'Failed to register access.' }
-  }
-
-  // 4. Set Cookie
-  // Set a long-lived cookie
-  cookies().set('subtext_access_granted', 'true', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-    path: '/',
-  })
-  
-  // Also set a country cookie for personalization
-  cookies().set('subtext_user_country', countryCode, {
-    maxAge: 60 * 60 * 24 * 30,
-    path: '/',
-  })
-
-  // 5. Redirect
-  redirect('/')
 }
 
 // Fallback countries data - always available
