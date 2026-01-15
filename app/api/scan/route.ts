@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
             : (Number.isFinite(QUICK_SCAN_COST) && QUICK_SCAN_COST > 0 ? QUICK_SCAN_COST : 1)
         
         // Check rate limit before processing
+        const hasVipPass = req.cookies.has('subtext_vip')
         const clientIP = getClientIP(req);
-        const allowlisted = isIpAllowlisted(clientIP)
+        const allowlisted = isIpAllowlisted(clientIP) || hasVipPass
         const baseStatus = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
         const rateLimit = allowlisted
           ? {

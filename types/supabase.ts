@@ -228,6 +228,24 @@ export interface Database {
         }
         Relationships: []
       }
+      vip_codes: {
+        Row: {
+          code: string
+          is_used: boolean
+          created_at: string
+        }
+        Insert: {
+          code: string
+          is_used?: boolean
+          created_at?: string
+        }
+        Update: {
+          code?: string
+          is_used?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
       ai_audit_logs: {
         Row: {
           id: string
