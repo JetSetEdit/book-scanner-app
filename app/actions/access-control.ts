@@ -80,6 +80,18 @@ export async function grantAccess(countryCode: string) {
 
 export async function getSupportedCountries() {
   try {
+    // Check if Supabase is configured
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Supabase environment variables not configured')
+      // Return fallback data
+      return [
+        { country_code: 'US', country_name: 'United States', allowed_count: 100 },
+        { country_code: 'GB', country_name: 'United Kingdom', allowed_count: 50 },
+        { country_code: 'CA', country_name: 'Canada', allowed_count: 50 },
+        { country_code: 'NZ', country_name: 'New Zealand', allowed_count: 50 },
+      ]
+    }
+
     const { data, error } = await supabaseAdmin
       .from('country_quotas')
       .select('country_code, country_name, allowed_count')
@@ -98,9 +110,26 @@ export async function getSupportedCountries() {
       ]
     }
     
-    return data || []
+    // If no data returned, use fallback
+    if (!data || data.length === 0) {
+      console.warn('No countries found in database, using fallback')
+      return [
+        { country_code: 'US', country_name: 'United States', allowed_count: 100 },
+        { country_code: 'GB', country_name: 'United Kingdom', allowed_count: 50 },
+        { country_code: 'CA', country_name: 'Canada', allowed_count: 50 },
+        { country_code: 'NZ', country_name: 'New Zealand', allowed_count: 50 },
+      ]
+    }
+    
+    return data
   } catch (err) {
     console.error('Unexpected error in getSupportedCountries:', err)
-    return []
+    // Always return fallback data on any error
+    return [
+      { country_code: 'US', country_name: 'United States', allowed_count: 100 },
+      { country_code: 'GB', country_name: 'United Kingdom', allowed_count: 50 },
+      { country_code: 'CA', country_name: 'Canada', allowed_count: 50 },
+      { country_code: 'NZ', country_name: 'New Zealand', allowed_count: 50 },
+    ]
   }
 }

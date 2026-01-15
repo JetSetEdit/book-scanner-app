@@ -51,6 +51,20 @@ export function AccessGateForm({ countries }: { countries: Country[] }) {
     }
   }
 
+  // If no countries available, show a message
+  if (!countries || countries.length === 0) {
+    return (
+      <div className="space-y-4 mt-8">
+        <p className="text-sm text-[#6B6B6B]">
+          We're currently setting up access for international users. Please check back soon.
+        </p>
+        <p className="text-xs text-[#6B6B6B]">
+          If you're in Australia, you should have automatic access. Please try refreshing the page.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <form action={clientAction} className="space-y-6 mt-8">
       <div className="space-y-2 text-left">

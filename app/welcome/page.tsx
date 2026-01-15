@@ -8,7 +8,19 @@ export const metadata: Metadata = {
 }
 
 export default async function WelcomePage() {
-  const countries = await getSupportedCountries()
+  let countries
+  try {
+    countries = await getSupportedCountries()
+  } catch (error) {
+    console.error('Error loading countries in welcome page:', error)
+    // Fallback to empty array - the form will handle it gracefully
+    countries = []
+  }
+
+  // Ensure countries is always an array
+  if (!Array.isArray(countries)) {
+    countries = []
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F9F7F1] text-[#2C2416] font-sans">
