@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIsbnScan } from '@/lib/services/scan-service';
-import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted, isCountryExemptFromRateLimit, shouldAssignGemini } from '@/lib/utils/rate-limiter';
+import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted, shouldAssignGemini } from '@/lib/utils/rate-limiter';
 
 export const runtime = 'nodejs';
 
@@ -28,13 +28,9 @@ export async function POST(req: NextRequest) {
         
         // Check rate limit before processing
         const clientIP = getClientIP(req);
-        const country = req.geo?.country || req.headers.get('x-vercel-ip-country');
-        const allowlisted = isIpAllowlisted(clientIP);
-        const countryExempt = isCountryExemptFromRateLimit(country);
-        const exemptFromRateLimit = allowlisted || countryExempt;
-        
+        const allowlisted = isIpAllowlisted(clientIP)
         const baseStatus = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
-        const rateLimit = exemptFromRateLimit
+        const rateLimit = allowlisted
           ? {
               ...baseStatus,
               allowed: true,
@@ -144,9 +140,11 @@ export async function POST(req: NextRequest) {
                   modelAssignment
                 )
 
-                // Increment rate limit only after successful scan (skip for exempt countries/IPs)
-                if (result.success && !exemptFromRateLimit) {
+                // Increment rate limit only after successful scan
+                if (result.success) {
+                  if (!allowlisted) {
                     incrementRateLimitBy(clientIP, timezone, scanCost)
+                  }
                 }
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
@@ -163,10 +161,10 @@ export async function POST(req: NextRequest) {
                   ...result,
                   rateLimit: {
                     limit: SCAN_CREDITS_PER_DAY,
-                    remaining: exemptFromRateLimit ? SCAN_CREDITS_PER_DAY : updatedRateLimit.remaining,
+                    remaining: allowlisted ? SCAN_CREDITS_PER_DAY : updatedRateLimit.remaining,
                     resetAt: updatedRateLimit.resetAt,
                     cost: scanCost,
-                    unlimited: exemptFromRateLimit,
+                    unlimited: allowlisted,
                   }
                 }
                 
