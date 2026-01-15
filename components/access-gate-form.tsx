@@ -48,6 +48,7 @@ export function AccessGateForm({ countries }: { countries: Country[] }) {
     try {
       const result = await grantAccess(country)
       if (result?.error) {
+        console.error('grantAccess returned error:', result.error)
         toast.error(result.error)
       } else if (result?.success) {
         // Access granted but redirect didn't work, refresh the page
@@ -58,10 +59,27 @@ export function AccessGateForm({ countries }: { countries: Country[] }) {
       } else {
         // If no error and no explicit success, assume redirect happened
         // (redirect() throws, so we won't reach here normally)
+        // But if we do, the redirect should have happened
+        console.log('grantAccess completed without error or success - redirect should have happened')
       }
     } catch (err: any) {
-      console.error('Form submission error:', err)
-      toast.error('An error occurred. Please try again.')
+      console.error('Form submission error:', {
+        message: err?.message,
+        stack: err?.stack,
+        name: err?.name,
+        digest: err?.digest,
+        fullError: err
+      })
+      
+      // Check if it's a redirect error (which is actually success)
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) {
+        // This is actually a redirect - it's working!
+        console.log('Redirect error caught (this is normal):', err.digest)
+        // The redirect will happen automatically, no need to show error
+        return
+      }
+      
+      toast.error(`An error occurred: ${err?.message || 'Unknown error'}. Please check the console for details.`)
     }
   }
 

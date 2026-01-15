@@ -121,8 +121,22 @@ export async function grantAccess(countryCode: string) {
     redirect('/')
   } catch (err: any) {
     // Catch any unexpected errors
-    console.error('Unexpected error in grantAccess:', err)
-    return { error: 'An unexpected error occurred. Please try again later.' }
+    // Note: redirect() throws NEXT_REDIRECT which should not be caught here
+    // But if we do catch it, we need to re-throw it
+    if (err?.digest?.startsWith('NEXT_REDIRECT')) {
+      // This is a redirect - re-throw it so Next.js can handle it
+      throw err
+    }
+    
+    console.error('Unexpected error in grantAccess:', {
+      message: err?.message,
+      stack: err?.stack,
+      name: err?.name,
+      code: err?.code,
+      digest: err?.digest,
+      fullError: err
+    })
+    return { error: `An unexpected error occurred: ${err?.message || 'Unknown error'}. Please try again later.` }
   }
 }
 
