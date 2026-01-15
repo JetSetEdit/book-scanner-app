@@ -2,7 +2,7 @@
 // IMPORTANT:
 // - Use network-first for navigations to avoid stale UI after deploys.
 // - Keep cache name bumpable to force cleanup when needed.
-const CACHE_NAME = 'subtext-v2'
+const CACHE_NAME = 'subtext-v3'
 const STATIC_ASSETS = [
   '/logo.png',
   '/manifest.json',
