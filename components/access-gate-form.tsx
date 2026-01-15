@@ -35,8 +35,8 @@ function SubmitButton() {
   )
 }
 
-export function AccessGateForm({ countries, defaultCountry }: { countries: Country[]; defaultCountry?: string }) {
-  const [selectedCountry, setSelectedCountry] = useState<string>(defaultCountry || '')
+export function AccessGateForm({ countries }: { countries: Country[] }) {
+  const [selectedCountry, setSelectedCountry] = useState<string>('')
 
   async function clientAction(formData: FormData) {
     const country = formData.get('country') as string
@@ -103,7 +103,7 @@ export function AccessGateForm({ countries, defaultCountry }: { countries: Count
         <label htmlFor="country" className="text-sm font-medium text-[#4A4A4A]">
           Select your location
         </label>
-        <Select name="country" value={selectedCountry} onValueChange={setSelectedCountry} required>
+        <Select name="country" onValueChange={setSelectedCountry} required>
           <SelectTrigger className="w-full bg-white border-[#E8E5DF]">
             <SelectValue placeholder="Select a country..." />
           </SelectTrigger>

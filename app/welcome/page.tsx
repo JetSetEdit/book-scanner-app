@@ -1,32 +1,13 @@
 import { getSupportedCountries } from '@/app/actions/access-control'
 import { AccessGateForm } from '@/components/access-gate-form'
 import { Metadata } from 'next'
-import { headers } from 'next/headers'
 
 export const metadata: Metadata = {
   title: 'Welcome to Subtext',
   robots: 'noindex, nofollow',
 }
 
-export default async function WelcomePage({
-  searchParams,
-}: {
-  searchParams?: Promise<{ 'test-country'?: string }> | { 'test-country'?: string }
-}) {
-  // Get detected country from URL param or headers
-  let testCountry: string | undefined
-  try {
-    const params = searchParams instanceof Promise ? await searchParams : searchParams
-    testCountry = params?.['test-country']
-  } catch (err) {
-    console.warn('Error reading searchParams:', err)
-    // Continue without test country
-  }
-  
-  const headersList = headers()
-  const detectedCountry = testCountry || 
-    headersList.get('x-vercel-ip-country') || 
-    null
+export default async function WelcomePage() {
   // Use fallback countries by default - will be overridden if DB query succeeds
   let countries = [
     { country_code: 'US', country_name: 'United States', allowed_count: 100 },
@@ -102,7 +83,7 @@ export default async function WelcomePage({
           </p>
         </div>
 
-        <AccessGateForm countries={countries} defaultCountry={detectedCountry || undefined} />
+        <AccessGateForm countries={countries} />
       </div>
     </div>
   )
