@@ -144,11 +144,9 @@ export async function POST(req: NextRequest) {
                   modelAssignment
                 )
 
-                // Increment rate limit only after successful scan
-                if (result.success) {
-                  if (!allowlisted) {
+                // Increment rate limit only after successful scan (skip for exempt countries/IPs)
+                if (result.success && !exemptFromRateLimit) {
                     incrementRateLimitBy(clientIP, timezone, scanCost)
-                  }
                 }
 
                 console.log(`[Scan API] Scan completed: success=${result.success}, warnings=${result.contentWarningsGenerated ? 'yes' : 'no'}`)
