@@ -42,6 +42,16 @@ export function isIpAllowlisted(ip: string): boolean {
   return allowlist.size > 0 && allowlist.has(ip)
 }
 
+/**
+ * Check if a country should be exempt from rate limiting.
+ * Australia (AU) is the primary market and should have unlimited scans.
+ */
+export function isCountryExemptFromRateLimit(country: string | null | undefined): boolean {
+  if (!country) return false
+  // Australia is the primary market - no rate limits
+  return country === 'AU'
+}
+
 // Clean up old entries every hour
 setInterval(() => {
   const now = Date.now()

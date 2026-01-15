@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processIsbnScan } from '@/lib/services/scan-service';
-import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted, shouldAssignGemini } from '@/lib/utils/rate-limiter';
+import { getClientIP, checkRateLimit, checkRateLimitWithCost, incrementRateLimitBy, isIpAllowlisted, isCountryExemptFromRateLimit, shouldAssignGemini } from '@/lib/utils/rate-limiter';
 
 export const runtime = 'nodejs';
 
@@ -28,9 +28,13 @@ export async function POST(req: NextRequest) {
         
         // Check rate limit before processing
         const clientIP = getClientIP(req);
-        const allowlisted = isIpAllowlisted(clientIP)
+        const country = req.geo?.country || req.headers.get('x-vercel-ip-country');
+        const allowlisted = isIpAllowlisted(clientIP);
+        const countryExempt = isCountryExemptFromRateLimit(country);
+        const exemptFromRateLimit = allowlisted || countryExempt;
+        
         const baseStatus = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
-        const rateLimit = allowlisted
+        const rateLimit = exemptFromRateLimit
           ? {
               ...baseStatus,
               allowed: true,
@@ -161,10 +165,10 @@ export async function POST(req: NextRequest) {
                   ...result,
                   rateLimit: {
                     limit: SCAN_CREDITS_PER_DAY,
-                    remaining: allowlisted ? SCAN_CREDITS_PER_DAY : updatedRateLimit.remaining,
+                    remaining: exemptFromRateLimit ? SCAN_CREDITS_PER_DAY : updatedRateLimit.remaining,
                     resetAt: updatedRateLimit.resetAt,
                     cost: scanCost,
-                    unlimited: allowlisted,
+                    unlimited: exemptFromRateLimit,
                   }
                 }
                 
