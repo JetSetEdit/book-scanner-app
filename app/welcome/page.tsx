@@ -8,18 +8,22 @@ export const metadata: Metadata = {
 }
 
 export default async function WelcomePage() {
-  let countries
-  try {
-    countries = await getSupportedCountries()
-  } catch (error) {
-    console.error('Error loading countries in welcome page:', error)
-    // Fallback to empty array - the form will handle it gracefully
-    countries = []
-  }
+  // Use fallback countries by default - will be overridden if DB query succeeds
+  let countries = [
+    { country_code: 'US', country_name: 'United States', allowed_count: 100 },
+    { country_code: 'GB', country_name: 'United Kingdom', allowed_count: 50 },
+    { country_code: 'CA', country_name: 'Canada', allowed_count: 50 },
+    { country_code: 'NZ', country_name: 'New Zealand', allowed_count: 50 },
+  ]
 
-  // Ensure countries is always an array
-  if (!Array.isArray(countries)) {
-    countries = []
+  try {
+    const dbCountries = await getSupportedCountries()
+    if (Array.isArray(dbCountries) && dbCountries.length > 0) {
+      countries = dbCountries
+    }
+  } catch (error: any) {
+    // Silently use fallback - error already logged in getSupportedCountries
+    console.error('Welcome page: Error loading countries, using fallback:', error?.message || error)
   }
 
   return (
