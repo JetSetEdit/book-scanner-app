@@ -11,12 +11,19 @@ export const metadata: Metadata = {
 export default async function WelcomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ 'test-country'?: string }>
+  searchParams?: Promise<{ 'test-country'?: string }> | { 'test-country'?: string }
 }) {
   // Get detected country from URL param or headers
-  const params = await searchParams
+  let testCountry: string | undefined
+  try {
+    const params = searchParams instanceof Promise ? await searchParams : searchParams
+    testCountry = params?.['test-country']
+  } catch (err) {
+    console.warn('Error reading searchParams:', err)
+    // Continue without test country
+  }
+  
   const headersList = headers()
-  const testCountry = params?.['test-country']
   const detectedCountry = testCountry || 
     headersList.get('x-vercel-ip-country') || 
     null
