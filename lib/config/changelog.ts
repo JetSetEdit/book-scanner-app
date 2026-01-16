@@ -9,6 +9,18 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.33",
+    date: "2026-01-16",
+    title: "Content Warning Accuracy Improvements",
+    changes: [
+      "Enforce severity floors: 'Severe' minimum for Rape, Suicide, Torture, Domestic Violence",
+      "Source Cleanup: Block noisy web domains (Reddit, Paste, etc.) to prevent hallucinations",
+      "Thriller Tuning: Improved detection of Alcoholism and Suicide in mystery/thriller genres",
+      "Add one-time use VIP invite system",
+      "Internal: Added BENCHMARK_REPORT_v1.03.31.md"
+    ],
+  },
+  {
     version: "1.03.32",
     date: "2026-01-16",
     title: "Content Warning Accuracy Improvements",
