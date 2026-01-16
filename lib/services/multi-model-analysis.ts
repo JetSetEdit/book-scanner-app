@@ -409,6 +409,14 @@ Instructions:
      * This ensures readers are informed that the book contains romantic/relationship content, regardless of whether specific tropes or conflicts are mentioned
      * Only skip this if the book is clearly NOT a romance (e.g., non-fiction, thriller without romance subplot, etc.)
 
+2e. GENRE AWARENESS FOR THRILLERS/MYSTERY/PSYCHOLOGICAL FICTION:
+   - **CRITICAL**: Psychological thrillers often euphemize severe triggers like "Suicide" or "Alcoholism" as "demons of the past" or "coping mechanisms".
+   - You MUST explicitly check for:
+     * **Suicide / Self-Harm**: Look for "tragedy", "loss of a child", "jump", "guilt", "what she did". If the plot revolves around a character's death that isn't clearly murder, suspect suicide.
+     * **Alcoholism / Addiction**: Look for "drinking to forget", "wine", "pills", "medication", "unreliable narrator". If a character's drinking is mentioned as a coping mechanism, flag as "substance_use_or_alcohol.alcohol" with MODERATE or SEVERE severity (not mild).
+     * **Domestic Abuse**: Look for "controlling husband", "perfect marriage", "walking on eggshells". Flag as "emotional_abuse_or_toxic_relationships" or "violence.domestic_violence".
+   - **SEVERITY RULE**: If a thriller involves a dead body, a missing person, or a "brutal" crime, the Violence severity is likely MODERATE or SEVERE, never Mild.
+
 3. For sexual content, carefully distinguish using this decision rubric:
 
    **DECISION RUBRIC: explicit_sexual_content vs intense_romance**
@@ -916,6 +924,48 @@ function updateReasoningForSeverity(
   return updatedReasoning
 }
 
+/**
+ * Enforce minimum severity levels for critical triggers
+ * Implements "Safety Floor" logic from benchmark findings
+ */
+function enforceSeverityFloors(
+  warning: EnhancedContentWarning
+): EnhancedContentWarning {
+  const severeKeywords = [
+    'rape', 
+    'sexual assault', 
+    'suicide', 
+    'torture', 
+    'domestic violence', 
+    'infanticide', 
+    'child abuse', 
+    'self-harm',
+    'self harm'
+  ]
+  
+  const text = (warning.description + ' ' + (warning.reasoning || '')).toLowerCase()
+  
+  // Check for severe keywords
+  const hasSevereKeyword = severeKeywords.some(kw => text.includes(kw))
+  
+  if (hasSevereKeyword && warning.severity !== 'severe') {
+    // Upgrade severity
+    const upgraded: EnhancedContentWarning = { ...warning, severity: 'severe' }
+    
+    // Update description text to match new severity (e.g. "Moderate themes of..." -> "Strong themes of...")
+    upgraded.description = updateDescriptionForSeverity(upgraded.description, 'severe')
+    
+    // Append note to reasoning
+    if (upgraded.reasoning) {
+      upgraded.reasoning += ' (Severity automatically upgraded due to critical trigger keywords).'
+    }
+    
+    return upgraded
+  }
+  
+  return warning
+}
+
 function processWarnings(
   rawWarnings: any[],
   source: 'openai' | 'gemini'
@@ -1036,7 +1086,7 @@ function processWarnings(
       signals
     )
 
-    acc.push({
+    const warningObj = {
       subcategory_id: subcategoryId,
       severity,
       modifiers: (w.context_modifiers || []) as ContextModifier[],
@@ -1048,7 +1098,10 @@ function processWarnings(
       description: updatedDescription, // Use updated description that matches computed severity
       reasoning: updatedReasoning, // Use updated reasoning that matches computed severity
       model_source: source, // Track which model generated this warning
-    })
+    } as EnhancedContentWarning
+
+    // Apply severity floors before adding
+    acc.push(enforceSeverityFloors(warningObj))
 
     return acc;
   }, [])

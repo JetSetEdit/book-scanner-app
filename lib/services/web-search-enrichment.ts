@@ -103,15 +103,20 @@ Return a compact bullet list.`
       return { enrichedContext: null, source: null, foundContentWarnings: false }
     }
 
-    // Filter out retailer websites
-    const retailerIndicators = [
+    // Filter out retailer websites and low-quality user-generated content
+    const blockedDomains = [
+      // Retailers
       'amazon.com', 'qbd.com.au', 'booktopia.com.au', 'barnesandnoble.com',
-      'waterstones.com', 'indigo.ca'
+      'waterstones.com', 'indigo.ca', 'books.google.com',
+      // Noisy UGC / Social Media (high hallucination risk)
+      'reddit.com', 'pinterest.com', 'tumblr.com', 'twitter.com', 'x.com',
+      'facebook.com', 'instagram.com', 'tiktok.com', 'youtube.com',
+      'pastemagazine.com', 'buzzfeed.com', 'screenrant.com'
     ]
 
     const safeResults = searchResults.filter(result => {
       const link = result.link.toLowerCase()
-      return !retailerIndicators.some(indicator => link.includes(indicator))
+      return !blockedDomains.some(indicator => link.includes(indicator))
     })
 
     if (safeResults.length === 0) {
