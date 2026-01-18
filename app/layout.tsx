@@ -49,11 +49,29 @@ export const viewport = {
   themeColor: '#FDFBF7',
 }
 
-export default function RootLayout({
+import { headers, cookies } from 'next/headers'
+import { isIpAllowlisted } from '@/lib/utils/rate-limiter'
+
+// ... imports
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const headerList = await headers()
+  const cookieStore = await cookies()
+  
+  // Get IP for Admin check
+  const forwarded = headerList.get('x-forwarded-for')
+  const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
+  const isAdmin = isIpAllowlisted(ip)
+  
+  // Get Cookie for VIP check
+  const isVip = cookieStore.has('subtext_vip')
+  
+  const userMode = isAdmin ? 'admin' : (isVip ? 'vip' : 'regular')
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${libreBaskerville.variable} flex flex-col min-h-screen`}>
@@ -63,7 +81,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
-          <Navbar />
+          <Navbar userMode={userMode} />
           <main className="flex-1 pb-16 md:pb-0">
             {children}
           </main>

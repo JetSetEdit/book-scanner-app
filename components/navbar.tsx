@@ -50,23 +50,24 @@ function isDevMode(): boolean {
   )
 }
 
-export function Navbar() {
+export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 'regular' }) {
   const pathname = usePathname()
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
-  const [showAuditTrail, setShowAuditTrail] = useState(false)
-  const [showRefreshButton, setShowRefreshButton] = useState(false)
-  const [showSeverityScore, setShowSeverityScore] = useState(false)
-  const [showAdminControls, setShowAdminControls] = useState(false)
+  
+  // ...
 
   useEffect(() => {
     setMounted(true)
-    setIsDev(isDevMode())
+    // Dev mode is active if Admin IP OR Localhost
+    const isLocalhost = isDevMode()
+    setIsDev(userMode === 'admin' || isLocalhost)
+    
     // Load dev settings from localStorage
-    if (isDevMode()) {
-      const savedAudit = localStorage.getItem('dev-show-audit-trail')
+    if (userMode === 'admin' || isLocalhost) {
+      // ...
       setShowAuditTrail(savedAudit === 'true')
       const savedRefresh = localStorage.getItem('dev-show-refresh-button')
       setShowRefreshButton(savedRefresh === 'true')
@@ -184,8 +185,25 @@ export function Navbar() {
               )}
 
               {/* Always-visible version badge (helps confirm deploy + caching state) */}
-              <Popover>
-                <PopoverTrigger asChild>
+              <div className="flex items-center gap-2">
+                {userMode === 'vip' && (
+                  <Badge 
+                    variant="outline" 
+                    className="font-mono text-[10px] bg-amber-50 text-amber-700 border-amber-200"
+                  >
+                    VIP
+                  </Badge>
+                )}
+                {userMode === 'admin' && (
+                  <Badge 
+                    variant="outline" 
+                    className="font-mono text-[10px] bg-purple-50 text-purple-700 border-purple-200 hidden sm:inline-flex"
+                  >
+                    ADMIN
+                  </Badge>
+                )}
+                <Popover>
+                  <PopoverTrigger asChild>
                   <button type="button" className="ml-1">
                     <Badge
                       variant="outline"
