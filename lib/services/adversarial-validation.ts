@@ -90,6 +90,9 @@ async function openaiCritiquesGemini(
 Book Description:
 ${metadata.description}
 
+**EXCEPTION FOR CANONICAL TEXTS**:
+If the book is a literary classic (e.g. Jasper Jones, To Kill a Mockingbird), warnings inferred from "Canon Knowledge" (literary consensus) are VALID even if not explicitly in the blurb. Do NOT critique them as "unsupported" if they match the book's known themes (Suicide, Racism, Police Misconduct).
+
 Taxonomy:
 ${taxonomyContext}
 
@@ -194,6 +197,9 @@ async function geminiCritiquesOpenAI(
 
 Book Description:
 ${metadata.description}
+
+**EXCEPTION FOR CANONICAL TEXTS**:
+If the book is a literary classic (e.g. Jasper Jones, To Kill a Mockingbird), warnings inferred from "Canon Knowledge" (literary consensus) are VALID even if not explicitly in the blurb. Do NOT critique them as "unsupported" if they match the book's known themes (Suicide, Racism, Police Misconduct).
 
 Taxonomy:
 ${taxonomyContext}

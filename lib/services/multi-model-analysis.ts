@@ -10,6 +10,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { WARNING_CATEGORIES, TAXONOMY_VERSION, MODEL_VERSION, getSubcategoryById } from '../config/taxonomy-v2'
 
 import { ContextModifier, EvidenceSpan, EnhancedContentWarning, SeveritySignals } from '../config/taxonomy-context'
+import { isCanonicalBook } from '../utils/canon-books'
 import { buildSeveritySignals, computeSeverityFromSignals } from '../utils/severity-computation'
 import { isActualSexualViolence } from '../utils/sexual-violence-evaluation'
 import { createClient } from '@supabase/supabase-js'
@@ -206,7 +207,8 @@ async function analyzeWithOpenAI(
   metadata: BookMetadata,
   onProgress?: ProgressCallback,
   model?: string,
-  options?: AnalysisOptions
+  options?: AnalysisOptions,
+  isCanonical: boolean = false
 ): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
   // Generate dynamic category list based on book content
   const relevantCategories = selectRelevantCategories(metadata)
@@ -246,6 +248,7 @@ Book Information:
 - Title: ${metadata.title}
 - Author: ${metadata.author}
 - ISBN: ${metadata.isbn}
+- Is Canonical: ${isCanonical ? 'YES' : 'NO'}
 
 Description:
 ${metadata.description}
@@ -255,6 +258,20 @@ ${taxonomyContext}
 ${modifiersList}
 
 Instructions:
+0. **PRIORITY EXCEPTION: CANON KNOWLEDGE (Literary Classics)**
+   - **CHECK "Is Canonical" FIELD ABOVE**: If "Is Canonical: YES", you MUST apply this exception.
+   - **EXCEPTION TO "NO ASSUMPTIONS" RULE**: For these canonical books (e.g. Jasper Jones, To Kill a Mockingbird), you MAY use established literary consensus to identify central themes that are implied but euphemized in publisher descriptions.
+   - Allowed inferred themes (High confidence based on broad literary consensus ONLY):
+     * **Suicide / Self-Harm**
+     * **Racism / Discrimination**
+     * **Police Misconduct / Institutional Abuse** (Includes: police brutality, corrupt policing, abuse of authority, institutional injustice by police)
+   - **STRICT PROHIBITION**: Do NOT infer **Sexual Abuse** or **Sexual Violence** based on canon knowledge alone. These must be explicitly supported by the provided text or enrichment context.
+   - **CONSTRAINT**: If you infer a warning based on canon knowledge rather than the provided text:
+     * Set **"evidence_source": "canon"** in the JSON output.
+     * You MUST have high confidence based on broad literary consensus.
+     * In reasoning, explain based on established literary consensus (e.g. "Inferred based on established literary consensus regarding [Theme]").
+     * Do NOT try to force a textual justification if the blurb is vague. Be honest: source is canon.
+
 1. For each content warning found, provide:
    - subcategory_id (format: category.subcategory, e.g., "violence.graphic_violence")
    - description: Write a clear, specific advisory description in the style of the Australian Classification Board (classification.gov.au). Use standardized terminology: "Strong [content type]", "Moderate [content type]", "Mild [content type]", or "[Content type] themes". Be direct and avoid euphemism. Describe the nature and intensity (impact) of the content clearly.
@@ -417,18 +434,6 @@ Instructions:
      * **Domestic Abuse**: Look for "controlling husband", "perfect marriage", "walking on eggshells". Flag as "emotional_abuse_or_toxic_relationships" or "violence.domestic_violence".
    - **SEVERITY RULE**: If a thriller involves a dead body, a missing person, or a "brutal" crime, the Violence severity is likely MODERATE or SEVERE, never Mild.
 
-2f. CANON KNOWLEDGE INFERENCE (Literary Fiction / Classics):
-   - **EXCEPTION TO "NO ASSUMPTIONS" RULE**: If the book is a widely studied literary text, curriculum-listed work, or award-winning novel (e.g., "Jasper Jones", "To Kill a Mockingbird", "The Great Gatsby"), you MAY use established literary consensus to identify central themes that are implied but euphemized in publisher descriptions.
-   - Allowed inferred themes (High confidence based on broad literary consensus ONLY):
-     * **Suicide / Self-Harm**
-     * **Racism / Discrimination**
-     * **Police Misconduct / Institutional Abuse**
-   - **STRICT PROHIBITION**: Do NOT infer **Sexual Abuse** or **Sexual Violence** based on canon knowledge. These must be explicitly supported by the provided text or enrichment context.
-   - **CONSTRAINT**: If you infer a warning based on canon knowledge rather than the provided text:
-     * You MUST have high confidence based on broad literary consensus.
-     * You MUST explicitly state in the reasoning: "Inferred based on established literary consensus (canon knowledge)."
-     * Do NOT use this for recent releases, genre fiction, or lesser-known books; stick to the text for those.
-
 3. For sexual content, carefully distinguish using this decision rubric:
 
    **DECISION RUBRIC: explicit_sexual_content vs intense_romance**
@@ -487,7 +492,8 @@ Instructions:
       "frequency_hint": "theme",
       "centrality_hint": "central",
       "is_spoiler": false,
-      "reasoning": "Detailed explanation of why this warning was assigned...",
+      "evidence_source": "text", // "text" (default) or "canon" (if inferred from literary consensus)
+      "reasoning": "Detailed explanation...",
       "evidence": [
         {
           "source": "text",
@@ -607,7 +613,8 @@ DESCRIPTION FORMAT (Australian Classification Board style):
 async function analyzeWithGemini(
   metadata: BookMetadata,
   onProgress?: ProgressCallback,
-  options?: AnalysisOptions
+  options?: AnalysisOptions,
+  isCanonical: boolean = false
 ): Promise<EnhancedContentWarning[]> {
   onProgress?.('Analyzing with Gemini...')
 
@@ -627,6 +634,7 @@ Book Information:
 - Title: ${metadata.title}
 - Author: ${metadata.author}
 - ISBN: ${metadata.isbn}
+- Is Canonical: ${isCanonical ? 'YES' : 'NO'}
 
 Description:
 ${metadata.description}
@@ -636,6 +644,20 @@ ${taxonomyContext}
 ${modifiersList}
 
 Instructions:
+0. **PRIORITY EXCEPTION: CANON KNOWLEDGE (Literary Classics)**
+   - **CHECK "Is Canonical" FIELD ABOVE**: If "Is Canonical: YES", you MUST apply this exception.
+   - **EXCEPTION TO "NO ASSUMPTIONS" RULE**: For these canonical books (e.g. Jasper Jones, To Kill a Mockingbird), you MAY use established literary consensus to identify central themes that are implied but euphemized in publisher descriptions.
+   - Allowed inferred themes (High confidence based on broad literary consensus ONLY):
+     * **Suicide / Self-Harm**
+     * **Racism / Discrimination**
+     * **Police Misconduct / Institutional Abuse** (Includes: police brutality, corrupt policing, abuse of authority, institutional injustice by police)
+   - **STRICT PROHIBITION**: Do NOT infer **Sexual Abuse** or **Sexual Violence** based on canon knowledge alone. These must be explicitly supported by the provided text or enrichment context.
+   - **CONSTRAINT**: If you infer a warning based on canon knowledge rather than the provided text:
+     * Set **"evidence_source": "canon"** in the JSON output.
+     * You MUST have high confidence based on broad literary consensus.
+     * In reasoning, explain based on established literary consensus (e.g. "Inferred based on established literary consensus regarding [Theme]").
+     * Do NOT try to force a textual justification if the blurb is vague. Be honest: source is canon.
+
 1. For each content warning found, provide:
    - subcategory_id (format: category.subcategory)
    - description: Write a clear, specific advisory description in the style of the Australian Classification Board (classification.gov.au). Use standardized terminology: "Strong [content type]", "Moderate [content type]", "Mild [content type]", or "[Content type] themes". Be direct and avoid euphemism. Describe the nature and intensity of the content clearly.
@@ -687,17 +709,6 @@ Instructions:
      * Depression, "darkness", "numbness", or "brain fog"
      * Burnout, feeling overwhelmed, or emotional collapse
    - If these are present, flag them as "mental_health.mental_health_struggles" (or appropriate category) with "mild" or "moderate" severity depending on intensity.
-
-5. CANON KNOWLEDGE INFERENCE (Literary Fiction / Classics):
-   - **EXCEPTION TO "NO ASSUMPTIONS" RULE**: If the book is a widely studied literary text, curriculum-listed work, or award-winning novel, you MAY use established literary consensus to identify central themes that are implied but euphemized in publisher descriptions.
-   - Allowed inferred themes (High confidence based on broad literary consensus ONLY):
-     * **Suicide / Self-Harm**
-     * **Racism / Discrimination**
-     * **Police Misconduct / Institutional Abuse**
-   - **STRICT PROHIBITION**: Do NOT infer **Sexual Abuse** or **Sexual Violence** based on canon knowledge. These must be explicitly supported by the provided text.
-   - **CONSTRAINT**: If you infer a warning based on canon knowledge:
-     * You MUST explicitly state in the reasoning: "Inferred based on established literary consensus (canon knowledge)."
-     * Do NOT use this for recent releases or genre fiction; stick to the text for those.
 
 6. Spoiler detection: Mark is_spoiler=true if the warning reveals:
    - Character deaths or major character outcomes
@@ -1120,6 +1131,7 @@ function processWarnings(
       other_note: w.other_note, // Preserve AI-provided other_note if available
       description: updatedDescription, // Use updated description that matches computed severity
       reasoning: updatedReasoning, // Use updated reasoning that matches computed severity
+      evidence_source: (w.evidence_source === 'canon' || w.evidence_source === 'text') ? w.evidence_source : undefined,
       model_source: source, // Track which model generated this warning
     } as EnhancedContentWarning
 
@@ -1158,7 +1170,8 @@ async function verifyUniqueWarnings(
   uniqueWarnings: EnhancedContentWarning[],
   metadata: BookMetadata,
   verifierModel: 'openai' | 'gemini',
-  onProgress?: ProgressCallback
+  onProgress?: ProgressCallback,
+  isCanonical: boolean = false
 ): Promise<{
   verified: EnhancedContentWarning[]
   metrics: VerificationMetrics
@@ -1205,6 +1218,7 @@ Book Information:
 - Title: ${metadata.title}
 - Author: ${metadata.author}
 - ISBN: ${metadata.isbn}
+- Is Canonical: ${isCanonical ? 'YES' : 'NO'}
 
 Description:
 ${metadata.description}
@@ -1216,8 +1230,11 @@ Unique Warnings to Verify:
 ${warningsList}
 
 Instructions:
+**EXCEPTION FOR CANONICAL TEXTS (Is Canonical: YES)**:
+If the book is canonical, accept warnings based on "Canon Knowledge" even if the provided evidence excerpt is weak or generic, provided the warning matches the book's known themes (Suicide, Racism, Police Misconduct).
+
 For each warning, determine:
-1. Does the evidence support this warning? (Check if the evidence excerpt actually supports the claimed subcategory)
+1. Does the evidence support this warning? (Check if the evidence excerpt actually supports the claimed subcategory, OR if it's a valid Canon Knowledge inference)
 2. Is the subcategory_id correct? (Verify it matches the taxonomy and the evidence)
 3. Is the severity appropriate? (mild/moderate/severe based on detail_level, presence, etc.)
 4. Should this warning be included? (include if valid, drop if false positive or unsupported)
@@ -1647,6 +1664,7 @@ export async function analyzeBookWithMultiModel(
   }
 
   const effectiveMetadata = applyDescriptionTruncation(metadata, effectiveOptions.maxDescriptionChars)
+  const isCanonical = isCanonicalBook(metadata.title, metadata.author)
 
   // Run both OpenAI and Gemini in parallel for cross-validation
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
@@ -1655,11 +1673,11 @@ export async function analyzeBookWithMultiModel(
   
   // Run enabled models in parallel (when both enabled)
   const openaiPromise = effectiveOptions.enableOpenAI
-    ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions)
+    ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
     : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
 
   const geminiPromise = effectiveOptions.enableGemini
-    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions).catch(err => {
+    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical).catch(err => {
         // Gemini failures are non-fatal - log and continue with OpenAI only
         console.warn('[Multi-Model] Gemini analysis failed, continuing:', err)
         return []
@@ -1738,7 +1756,8 @@ export async function analyzeBookWithMultiModel(
       allUniqueWarnings,
       effectiveMetadata,
       verifierModel,
-      onProgress
+      onProgress,
+      isCanonical
     )
 
     verificationMetrics = metrics

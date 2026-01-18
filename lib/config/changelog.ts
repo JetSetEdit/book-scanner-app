@@ -9,6 +9,101 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.41",
+    date: "2026-01-18",
+    title: "New features",
+    changes: [
+      "Show admin/vip badges in navbar based on user mode",
+      "Add temporary ip check endpoint",
+      "Implement 50-scan limit for VIP users (replaces unlimited)",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.40",
+    date: "2026-01-18",
+    title: "New features",
+    changes: [
+      "Show admin/vip badges in navbar based on user mode",
+      "Add temporary ip check endpoint",
+      "Implement 50-scan limit for VIP users (replaces unlimited)",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.39",
+    date: "2026-01-18",
+    title: "New features",
+    changes: [
+      "Add temporary ip check endpoint",
+      "Implement 50-scan limit for VIP users (replaces unlimited)",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.38",
+    date: "2026-01-18",
+    title: "New features",
+    changes: [
+      "Add temporary ip check endpoint",
+      "Implement 50-scan limit for VIP users (replaces unlimited)",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.37",
+    date: "2026-01-18",
+    title: "New feature",
+    changes: [
+      "Implement 50-scan limit for VIP users (replaces unlimited)",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.36",
+    date: "2026-01-18",
+    title: "Improvements",
+    changes: [
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.35",
+    date: "2026-01-18",
+    title: "New feature",
+    changes: [
+      "Add one-time use VIP invite system",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33",
+      "Correct changelog entry for 1.03.32"
+    ],
+  },
+  {
+    version: "1.03.34",
+    date: "2026-01-16",
+    title: "New features",
+    changes: [
+      "Add one-time use VIP invite system",
+      "Exempt Australia from scan rate limits",
+      "Auto-select detected country in welcome page form",
+      "Improve content warning accuracy based on benchmark",
+      "Handle searchParams safely in welcome page",
+      "Improve error logging and handle redirect errors properly"
+    ],
+  },
+  {
     version: "1.03.33",
     date: "2026-01-16",
     title: "Content Warning Accuracy Improvements",

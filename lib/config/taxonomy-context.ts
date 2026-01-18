@@ -59,7 +59,7 @@ export const CONTEXT_MODIFIERS: Array<{
 /**
  * Evidence source types
  */
-export type EvidenceSource = 'text' | 'community' | 'author_note';
+export type EvidenceSource = 'text' | 'community' | 'author_note' | 'canon';
 
 /**
  * Evidence span with location and confidence
@@ -100,6 +100,7 @@ export interface EnhancedContentWarning {
   other_note?: string; // Required if subcategory_id starts with 'other_'
   description?: string; // Description of the warning (preserved from AI response)
   reasoning?: string; // AI reasoning for the warning assignment (preserved from AI response)
+  evidence_source?: 'text' | 'canon'; // Source of the warning: 'text' (from description) or 'canon' (from literary consensus)
   taxonomy_version: string; // Track which taxonomy version was used
   is_spoiler?: boolean; // True if this warning reveals major plot twists or significant plot points
   model_source?: 'openai' | 'gemini'; // Track which model generated this warning (for dev mode)
