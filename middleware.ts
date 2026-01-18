@@ -15,9 +15,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Check for access cookie (granted via welcome page)
+  // 2. Check for access cookie (granted via welcome page) OR VIP cookie
   const hasAccessCookie = request.cookies.has('subtext_access_granted');
-  if (hasAccessCookie) {
+  const hasVipCookie = request.cookies.has('subtext_vip');
+  
+  if (hasAccessCookie || hasVipCookie) {
     return NextResponse.next();
   }
 
