@@ -185,25 +185,24 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
               )}
 
               {/* Always-visible version badge (helps confirm deploy + caching state) */}
-              <div className="flex items-center gap-2">
-                {userMode === 'vip' && (
-                  <Badge 
-                    variant="outline" 
-                    className="font-mono text-[10px] bg-amber-50 text-amber-700 border-amber-200"
-                  >
-                    VIP
-                  </Badge>
-                )}
-                {userMode === 'admin' && (
-                  <Badge 
-                    variant="outline" 
-                    className="font-mono text-[10px] bg-purple-50 text-purple-700 border-purple-200 hidden sm:inline-flex"
-                  >
-                    ADMIN
-                  </Badge>
-                )}
-                <Popover>
-                  <PopoverTrigger asChild>
+              {userMode === 'vip' && (
+                <Badge 
+                  variant="outline" 
+                  className="font-mono text-[10px] bg-amber-50 text-amber-700 border-amber-200"
+                >
+                  VIP
+                </Badge>
+              )}
+              {userMode === 'admin' && (
+                <Badge 
+                  variant="outline" 
+                  className="font-mono text-[10px] bg-purple-50 text-purple-700 border-purple-200 hidden sm:inline-flex"
+                >
+                  ADMIN
+                </Badge>
+              )}
+              <Popover>
+                <PopoverTrigger asChild>
                   <button type="button" className="ml-1">
                     <Badge
                       variant="outline"
