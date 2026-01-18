@@ -26,21 +26,38 @@ export async function POST(req: NextRequest) {
             ? (Number.isFinite(DEEP_SCAN_COST) && DEEP_SCAN_COST > 0 ? DEEP_SCAN_COST : 2)
             : (Number.isFinite(QUICK_SCAN_COST) && QUICK_SCAN_COST > 0 ? QUICK_SCAN_COST : 1)
         
-        // Check rate limit before processing
+        // Rate limit logic
         const hasVipPass = req.cookies.has('subtext_vip')
         const clientIP = getClientIP(req);
-        const allowlisted = isIpAllowlisted(clientIP) || hasVipPass
-        const baseStatus = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
-        const rateLimit = allowlisted
+        
+        // Dev/Admin IPs are truly unlimited
+        const isDev = isIpAllowlisted(clientIP);
+        
+        // VIPs get a higher limit (e.g. 50), Regular users get standard limit (e.g. 5)
+        const VIP_LIMIT = 50;
+        const effectiveLimit = hasVipPass ? VIP_LIMIT : SCAN_CREDITS_PER_DAY;
+        
+        // Check status based on effective limit
+        // Note: We use the effective limit for the check
+        const rateLimitCheck = checkRateLimitWithCost(clientIP, effectiveLimit, timezone, scanCost);
+        
+        const rateLimit = isDev
           ? {
-              ...baseStatus,
               allowed: true,
-              remaining: SCAN_CREDITS_PER_DAY,
+              remaining: 999,
+              resetAt: Date.now() + 86400000,
               cost: scanCost,
               required: scanCost,
               unlimited: true,
             }
-          : checkRateLimitWithCost(clientIP, SCAN_CREDITS_PER_DAY, timezone, scanCost);
+          : {
+              ...rateLimitCheck,
+              // If VIP, we show 'unlimited' as false, but with high remaining
+              // OR we can show unlimited=true if we want to hide the counter?
+              // Let's treat VIPs as "Limited but High Cap"
+              unlimited: false, 
+              limit: effectiveLimit
+            };
         
         // Determine model assignment (only for Quick scans)
         const modelAssignment = normalizedScanMode === 'quick' 
@@ -143,7 +160,9 @@ export async function POST(req: NextRequest) {
 
                 // Increment rate limit only after successful scan
                 if (result.success) {
-                  if (!allowlisted) {
+                  // Only increment if NOT a Dev (Truly Unlimited)
+                  // VIPs (Limited but High Cap) DO increment their counter
+                  if (!isDev) {
                     incrementRateLimitBy(clientIP, timezone, scanCost)
                   }
                 }
@@ -157,15 +176,15 @@ export async function POST(req: NextRequest) {
                 })
                 
                 // Include rate limit info in response
-                const updatedRateLimit = checkRateLimit(clientIP, SCAN_CREDITS_PER_DAY, timezone)
+                const updatedRateLimit = checkRateLimit(clientIP, effectiveLimit, timezone)
                 const responseResult = {
                   ...result,
                   rateLimit: {
-                    limit: SCAN_CREDITS_PER_DAY,
-                    remaining: allowlisted ? SCAN_CREDITS_PER_DAY : updatedRateLimit.remaining,
+                    limit: effectiveLimit,
+                    remaining: isDev ? 999 : updatedRateLimit.remaining,
                     resetAt: updatedRateLimit.resetAt,
                     cost: scanCost,
-                    unlimited: allowlisted,
+                    unlimited: isDev,
                   }
                 }
                 
