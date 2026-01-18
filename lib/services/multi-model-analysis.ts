@@ -417,6 +417,18 @@ Instructions:
      * **Domestic Abuse**: Look for "controlling husband", "perfect marriage", "walking on eggshells". Flag as "emotional_abuse_or_toxic_relationships" or "violence.domestic_violence".
    - **SEVERITY RULE**: If a thriller involves a dead body, a missing person, or a "brutal" crime, the Violence severity is likely MODERATE or SEVERE, never Mild.
 
+2f. CANON KNOWLEDGE INFERENCE (Literary Fiction / Classics):
+   - **EXCEPTION TO "NO ASSUMPTIONS" RULE**: If the book is a widely studied literary text, curriculum-listed work, or award-winning novel (e.g., "Jasper Jones", "To Kill a Mockingbird", "The Great Gatsby"), you MAY use established literary consensus to identify central themes that are implied but euphemized in publisher descriptions.
+   - Allowed inferred themes (High confidence based on broad literary consensus ONLY):
+     * **Suicide / Self-Harm**
+     * **Racism / Discrimination**
+     * **Police Misconduct / Institutional Abuse**
+   - **STRICT PROHIBITION**: Do NOT infer **Sexual Abuse** or **Sexual Violence** based on canon knowledge. These must be explicitly supported by the provided text or enrichment context.
+   - **CONSTRAINT**: If you infer a warning based on canon knowledge rather than the provided text:
+     * You MUST have high confidence based on broad literary consensus.
+     * You MUST explicitly state in the reasoning: "Inferred based on established literary consensus (canon knowledge)."
+     * Do NOT use this for recent releases, genre fiction, or lesser-known books; stick to the text for those.
+
 3. For sexual content, carefully distinguish using this decision rubric:
 
    **DECISION RUBRIC: explicit_sexual_content vs intense_romance**
@@ -676,7 +688,18 @@ Instructions:
      * Burnout, feeling overwhelmed, or emotional collapse
    - If these are present, flag them as "mental_health.mental_health_struggles" (or appropriate category) with "mild" or "moderate" severity depending on intensity.
 
-5. Spoiler detection: Mark is_spoiler=true if the warning reveals:
+5. CANON KNOWLEDGE INFERENCE (Literary Fiction / Classics):
+   - **EXCEPTION TO "NO ASSUMPTIONS" RULE**: If the book is a widely studied literary text, curriculum-listed work, or award-winning novel, you MAY use established literary consensus to identify central themes that are implied but euphemized in publisher descriptions.
+   - Allowed inferred themes (High confidence based on broad literary consensus ONLY):
+     * **Suicide / Self-Harm**
+     * **Racism / Discrimination**
+     * **Police Misconduct / Institutional Abuse**
+   - **STRICT PROHIBITION**: Do NOT infer **Sexual Abuse** or **Sexual Violence** based on canon knowledge. These must be explicitly supported by the provided text.
+   - **CONSTRAINT**: If you infer a warning based on canon knowledge:
+     * You MUST explicitly state in the reasoning: "Inferred based on established literary consensus (canon knowledge)."
+     * Do NOT use this for recent releases or genre fiction; stick to the text for those.
+
+6. Spoiler detection: Mark is_spoiler=true if the warning reveals:
    - Character deaths or major character outcomes
    - Relationship status changes (who ends up together, breakups, etc.)
    - Major plot twists or reveals
