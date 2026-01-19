@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, CheckCircle, XCircle, AlertTriangle } from "lucide-react"
-import { Navbar } from "@/components/navbar"
 
 interface ScanResult {
   isbn: string
@@ -98,7 +97,6 @@ export default function BatchScanPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar userMode="admin" />
       
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="mb-8">
