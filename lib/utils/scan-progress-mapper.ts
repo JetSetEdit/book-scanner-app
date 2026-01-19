@@ -107,7 +107,7 @@ export function mapProgressToStage(message: string): ScanStage | null {
   // Default fallback: If message doesn't match any stage, assume it's still in analysis
   return {
     stage: 2,
-    displayText: 'AI is reading the synopsis...',
+    displayText: 'Analyzing the synopsis...',
     icon: Sparkles,
   }
 }

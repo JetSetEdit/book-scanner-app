@@ -83,7 +83,7 @@ export function BetaOnboardingModal() {
           <DialogDescription asChild>
             <div className="text-base text-muted-foreground leading-relaxed max-w-none space-y-6 text-left">
               <p className="font-serif italic text-lg text-center">
-                Discover content warnings and themes in books using AI-powered analysis.
+                Discover content warnings and themes in books using automated analysis.
               </p>
               
               <div className="disclaimer-content">
@@ -91,7 +91,7 @@ export function BetaOnboardingModal() {
                 
                 <ol className="space-y-4 list-decimal list-inside pl-4 text-foreground">
                   <li>
-                    <strong className="font-semibold text-[#8B4513]">We're in Public Beta:</strong> Our AI analysis is continuously improving. 
+                    <strong className="font-semibold text-[#8B4513]">We're in Public Beta:</strong> Our automated analysis is continuously improving. 
                     Results may vary, and we recommend verifying important warnings independently.
                   </li>
                   
@@ -119,7 +119,7 @@ export function BetaOnboardingModal() {
                   
                   <li>
                     <strong className="font-semibold text-[#8B4513]">Limitation of Liability:</strong> We disclaim all liability for errors, 
-                    omissions, or consequences arising from your reliance on AI-generated content. 
+                    omissions, or consequences arising from your reliance on automated content. 
                     You use this tool at your own discretion and risk.
                   </li>
                 </ol>

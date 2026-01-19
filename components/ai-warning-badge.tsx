@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge"
 import { Bot, Sparkles } from "lucide-react"
+import { getVariantConfig } from "@/lib/config/variants"
 
 interface AIWarningBadgeProps {
   count: number
@@ -10,6 +11,7 @@ interface AIWarningBadgeProps {
 
 export function AIWarningBadge({ count, confidence = 'medium' }: AIWarningBadgeProps) {
   if (count === 0) return null
+  const label = getVariantConfig().wording.warningLabel
 
   const getConfidenceColor = (conf: string) => {
     switch (conf) {
@@ -28,7 +30,7 @@ export function AIWarningBadge({ count, confidence = 'medium' }: AIWarningBadgeP
       >
         <Bot className="h-3 w-3" />
         <span className="text-xs font-medium">
-          {count} AI-generated warning{count !== 1 ? 's' : ''}
+          {count} {label} warning{count !== 1 ? 's' : ''}
         </span>
       </Badge>
       

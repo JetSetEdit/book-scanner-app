@@ -297,7 +297,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                           mainExplanation = `Content Rating: ${rating}. Based on content analysis.`
                       }
                       
-                      const processExplanation = 'How it works: Our AI analyzes the book\'s content and assigns severity scores (0.0-1.0) to each warning. The classification is determined by the highest severity found—severe warnings indicate MA15+/R18+, moderate indicates M, mild indicates PG, and no warnings indicates G.'
+                      const processExplanation = 'How it works: Our system analyzes the book\'s content and assigns severity scores (0.0-1.0) to each warning. The classification is determined by the highest severity found—severe warnings indicate MA15+/R18+, moderate indicates M, mild indicates PG, and no warnings indicates G.'
                       
                       const disclaimer = 'This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.'
                       

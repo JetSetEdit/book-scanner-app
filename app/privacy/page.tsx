@@ -132,8 +132,8 @@ export default function PrivacyPage() {
               <li><strong className="text-foreground">Open Library:</strong> Used as an alternative source for book information.</li>
               <li><strong className="text-foreground">Google Custom Search API:</strong> Used to enrich book descriptions when 
                 publicly available descriptions are limited. Subject to <a href="https://developers.google.com/custom-search/terms" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google's Terms of Service</a>.</li>
-              <li><strong className="text-foreground">OpenAI API:</strong> Used for AI-powered content analysis and warning generation.</li>
-              <li><strong className="text-foreground">Google Gemini API:</strong> Used for multi-model content analysis to improve accuracy.</li>
+              <li><strong className="text-foreground">OpenAI API:</strong> Used for LLM processing to generate content warnings.</li>
+              <li><strong className="text-foreground">Google Gemini API:</strong> Used for secondary verification of content analysis.</li>
               <li><strong className="text-foreground">Analytics Services:</strong> We may use analytics services (e.g., Vercel Analytics) to understand 
                 how the Service is used. These services may collect and process your information according to their own privacy policies.</li>
             </ul>

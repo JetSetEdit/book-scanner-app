@@ -3,8 +3,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { RecentScans } from "@/components/recent-scans"
+import { getVariantConfig } from "@/lib/config/variants"
 
 export default function HomePage() {
+  const v = getVariantConfig()
   return (
     <main className="min-h-screen bg-background flex flex-col">
       {/* Hero Section */}
@@ -14,29 +16,29 @@ export default function HomePage() {
             <div className="mb-6">
               <BookSpineLogo className="h-48 w-48 md:h-64 md:w-64 text-foreground" />
             </div>
-            <span className="text-5xl md:text-7xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>Subtext</span>
+            <span className="text-5xl md:text-7xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>{v.name}</span>
           </div>
 
           <h1 className="font-serif text-4xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
-            The hidden context <br className="hidden md:block" />
-            <span className="text-muted-foreground italic">of every story.</span>
+            {v.homepage.headline} <br className="hidden md:block" />
+            <span className="text-muted-foreground italic">{v.homepage.headlineItalic}</span>
           </h1>
 
           <p className="mx-auto max-w-2xl text-xl text-muted-foreground leading-relaxed font-light">
-            Subtext analyzes books to reveal content warnings, age ratings, and thematic depth—so you can read with confidence. Scan a barcode or enter an ISBN to get started.
+            {v.homepage.subhead}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <Link href="/scan">
               <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105">
                 <ScanBarcode className="mr-2 h-5 w-5" />
-                Start Scanning
+                {v.homepage.ctaPrimary}
               </Button>
             </Link>
             <Link href="/collection">
               <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-border text-foreground hover:bg-accent hover:text-accent-foreground">
                 <Search className="mr-2 h-5 w-5" />
-                Browse Bookshelf
+                {v.homepage.ctaSecondary}
               </Button>
             </Link>
           </div>
@@ -50,29 +52,26 @@ export default function HomePage() {
       <div className="border-t border-border/50 bg-card/60">
         <div className="container mx-auto px-4 py-24">
           <div className="grid md:grid-cols-3 gap-12">
-            {/* What We Have: Content Warnings */}
             <div className="space-y-4">
               <div className="h-12 w-12 rounded-full bg-amber-100/50 dark:bg-amber-900/30 flex items-center justify-center text-amber-700 dark:text-amber-400">
                 <Shield className="h-6 w-6" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground">Content Warnings</h3>
+              <h3 className="font-serif text-2xl font-bold text-foreground">{v.features.contentWarnings.title}</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Detailed, AI-generated alerts for sensitive topics with severity ratings and detailed reasoning. Know what to expect before you read.
+                {v.features.contentWarnings.description}
               </p>
             </div>
 
-            {/* What We Have: Age Ratings & Analysis */}
             <div className="space-y-4">
               <div className="h-12 w-12 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
                 <Brain className="h-6 w-6" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground">Age Ratings & Analysis</h3>
+              <h3 className="font-serif text-2xl font-bold text-foreground">{v.features.ageRatings.title}</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Australian Classification Board-based age ratings plus deep thematic analysis. Understand the themes, tone, and emotional weight of every book.
+                {v.features.ageRatings.description}
               </p>
             </div>
 
-            {/* Coming Soon: Community Features */}
             <div className="space-y-4 relative">
               <div className="absolute -top-2 -right-2">
                 <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border">
@@ -82,9 +81,9 @@ export default function HomePage() {
               <div className="h-12 w-12 rounded-full bg-emerald-100/50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 opacity-60">
                 <Users className="h-6 w-6" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground text-muted-foreground">Community Verified</h3>
+              <h3 className="font-serif text-2xl font-bold text-foreground text-muted-foreground">{v.features.community.title}</h3>
               <p className="text-muted-foreground leading-relaxed">
-                Help us improve accuracy by rating warnings and sharing your reading experiences. Author notes and community feedback coming soon.
+                {v.features.community.description}
               </p>
             </div>
           </div>

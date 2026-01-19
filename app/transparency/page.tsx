@@ -1,8 +1,10 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, BookOpen, Search, Sparkles, CheckCircle, Shield, ExternalLink, CheckCircle2, Clock, Users } from "lucide-react"
+import { getVariantConfig } from "@/lib/config/variants"
 
 export default function TransparencyPage() {
+  const v = getVariantConfig()
   return (
     <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16 max-w-4xl">
@@ -13,6 +15,20 @@ export default function TransparencyPage() {
           </h1>
           <p className="text-lg text-muted-foreground font-serif italic max-w-2xl mx-auto">
             Transparency is fundamental to how we analyze books. Here's what's available now and what's coming next.
+          </p>
+        </div>
+
+        {/* How Subtext Works — plain-language, non-AI-framed */}
+        <div className="mb-20 bg-card border border-border rounded-lg p-6">
+          <h2 className="font-serif text-xl text-foreground mb-4">How Subtext Works</h2>
+          <p className="text-muted-foreground leading-relaxed mb-3">
+            Subtext analyses publicly available book text and metadata to identify common sensitive themes (such as violence, abuse, or discrimination).
+          </p>
+          <p className="text-muted-foreground leading-relaxed mb-3">
+            It uses automated language analysis to surface patterns and provides severity and age guidance to help readers make informed choices.
+          </p>
+          <p className="text-muted-foreground leading-relaxed">
+            Subtext does not store personal reading histories or profiles.
           </p>
         </div>
 
@@ -30,9 +46,9 @@ export default function TransparencyPage() {
                   <Shield className="h-5 w-5 text-emerald-700 dark:text-emerald-400" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-bold text-foreground mb-2">AI-Generated Content Warnings</h3>
+                  <h3 className="font-bold text-foreground mb-2">{v.wording.analysisSourceTitleCase} Content Warnings</h3>
                   <p className="text-muted-foreground leading-relaxed text-sm">
-                    Detailed, AI-generated alerts for sensitive topics with severity ratings (mild, moderate, severe) and comprehensive reasoning. Every warning includes detailed explanations of how it was determined.
+                    Detailed, {v.wording.analysisSource} alerts for sensitive topics with severity ratings (mild, moderate, severe) and comprehensive reasoning. Every warning includes detailed explanations of how it was determined.
                   </p>
                 </div>
               </div>
@@ -157,7 +173,7 @@ export default function TransparencyPage() {
             <div className="space-y-3">
               <h3 className="font-bold text-foreground uppercase tracking-wider text-sm">Transparency First</h3>
               <p className="text-muted-foreground leading-relaxed text-sm">
-                AI-generated warnings include detailed reasoning so you can understand how each warning was determined. Source URLs coming in Phase 2.
+                {v.wording.analysisSourceTitleCase} warnings include detailed reasoning so you can understand how each warning was determined. Source URLs coming in Phase 2.
               </p>
             </div>
             
@@ -181,6 +197,13 @@ export default function TransparencyPage() {
                 Severity ratings are subjective—they vary by individual sensitivity and the nature of the content. We provide guidance, not absolutes.
               </p>
             </div>
+
+            <div className="space-y-3">
+              <h3 className="font-bold text-foreground uppercase tracking-wider text-sm">User Privacy</h3>
+              <p className="text-muted-foreground leading-relaxed text-sm">
+                We don't sell your reading data. Your scans are anonymous, and we don't train models on individual user preferences.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -194,7 +217,7 @@ export default function TransparencyPage() {
             <ul className="space-y-3 text-muted-foreground">
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span>The AI's detailed reasoning for each severity rating</span>
+                <span>{v.wording.reasoningSubject} detailed reasoning for each severity rating</span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />

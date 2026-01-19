@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE, APP_BUILD_ID } from "@/lib/config/version"
+import { getVariantConfig } from "@/lib/config/variants"
 import { usePathname } from "next/navigation"
 import { useState, useEffect } from "react"
 import { FeedbackDialog } from "@/components/feedback-dialog"
@@ -10,6 +11,7 @@ export function Footer() {
   const pathname = usePathname()
   const [isComfortRead, setIsComfortRead] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
+  const v = getVariantConfig()
 
   // Check if we're on a book page and if it's a Comfort Read
   useEffect(() => {
@@ -46,7 +48,7 @@ export function Footer() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
-            Subtext provides transparent content analysis: every AI-generated warning includes detailed reasoning so you can understand how it was determined. Source citations and author notes coming soon. While no system is perfect, we've built multiple verification layers and clear reasoning trails to ensure accuracy. Severity ratings are subjective—they vary by individual sensitivity and the nature of the content. Subtext is a tool for information, not a substitute for your own judgment.
+            {v.footer.trustStatement}
           </p>
           
           {/* Beta Disclaimer - Contextualized for Comfort Read */}
@@ -55,11 +57,11 @@ export function Footer() {
               <div className="flex items-center justify-center gap-2 flex-wrap">
                 {isComfortRead ? (
                   <p className="italic">
-                    Verified by AI Beta • {APP_VERSION_LABEL}
+                    {v.footer.comfortReadPrefix} • {APP_VERSION_LABEL}
                   </p>
                 ) : (
                   <p>
-                    {APP_VERSION_LABEL} • AI analysis is actively being improved. Results may vary.
+                    {APP_VERSION_LABEL} • {v.footer.betaDisclaimer}
                   </p>
                 )}
                 <button

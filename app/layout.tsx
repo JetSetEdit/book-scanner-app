@@ -10,6 +10,9 @@ import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { PWARegister } from '@/components/pwa-register'
 import { ThemeProvider } from '@/components/theme-provider'
 import { BetaOnboardingModal } from '@/components/beta-onboarding-modal'
+import { getVariantConfig } from '@/lib/config/variants'
+import { headers, cookies } from 'next/headers'
+import { isIpAllowlisted } from '@/lib/utils/rate-limiter'
 import './globals.css'
 
 const libreBaskerville = Libre_Baskerville({
@@ -18,14 +21,15 @@ const libreBaskerville = Libre_Baskerville({
   variable: '--font-serif',
 })
 
+const _vMeta = getVariantConfig().meta
 export const metadata: Metadata = {
-  title: 'Subtext',
-  description: 'Reveal the hidden content in every book.',
+  title: _vMeta.title,
+  description: _vMeta.description,
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Subtext',
+    title: _vMeta.title,
   },
   icons: {
     icon: [
@@ -48,11 +52,6 @@ export const viewport = {
   viewportFit: 'cover',
   themeColor: '#FDFBF7',
 }
-
-import { headers, cookies } from 'next/headers'
-import { isIpAllowlisted } from '@/lib/utils/rate-limiter'
-
-// ... imports
 
 export default async function RootLayout({
   children,

@@ -52,15 +52,15 @@ function formatStatusMessage(message: string): string {
     [/fetched and saved fresh description/i, 'Description ready'],
     [/checking if description is sufficient for analysis/i, 'Reviewing book summary...'],
     [/description for analysis: (\d+) characters/i, 'Analyzing $1 characters...'],
-    [/starting ai content analysis with openai/i, 'Starting AI analysis...'],
+    [/starting ai content analysis with openai/i, 'Starting analysis...'],
     [/analyzing: "([^"]+)"/i, 'Checking for: $1'],
     [/using description:/i, 'Reviewing book description'],
-    [/calling analyzebookwithmultimodel/i, 'AI is reading the book...'],
+    [/calling analyzebookwithmultimodel/i, 'Analyzing the book...'],
     [/ai analysis complete: (\d+) warnings generated/i, 'Found $1 content warnings'],
     [/analysis took (\d+)ms/i, 'Analysis complete!'],
     [/saving (\d+) content warnings to database/i, 'Saving results...'],
     [/deleting existing ai-generated warnings/i, 'Updating warnings...'],
-    // Avoid showing this redundant internal step
+    // Avoid showing this redundant internal step (backend still sends "ai-generated" internally)
     [/deleted existing ai-generated warnings/i, ''],
     [/saved (\d+) content warnings/i, 'Saved $1 warnings'],
     [/no content warnings identified by ai analysis/i, 'No warnings detected'],
@@ -678,7 +678,7 @@ function ScanTestPageContent() {
                   </Label>
                 </div>
                 <p className="text-xs text-muted-foreground ml-6">
-                  Recommended when testing changes. This deletes existing AI-generated warnings for the book and regenerates them.
+                  Recommended when testing changes. This deletes existing automated warnings for the book and regenerates them.
                 </p>
               </div>
             )}

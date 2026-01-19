@@ -36,8 +36,8 @@ async function verifyClaims() {
     console.log(`   ⚠️  WARNING: No books have content warnings!`)
   }
 
-  // Claim 2: "Detailed, AI-generated alerts... verify against author notes and community feedback"
-  console.log('\n📋 Claim 2: "AI-generated alerts verified against author notes and community feedback"')
+  // Claim 2: "Detailed, automated alerts... verify against author notes and community feedback"
+  console.log('\n📋 Claim 2: "Automated alerts verified against author notes and community feedback"')
   const { data: warningsWithSource } = await supabaseAdmin
     .from('content_warnings')
     .select('source, is_author_verified, source_url')
@@ -46,7 +46,7 @@ async function verifyClaims() {
   const withSourceUrl = warningsWithSource?.filter(w => w.source_url).length || 0
   const aiGenerated = warningsWithSource?.filter(w => w.source === 'ai_generated').length || 0
   
-  console.log(`   ✅ AI-generated: ${aiGenerated} warnings`)
+  console.log(`   ✅ Automated (source=ai_generated): ${aiGenerated} warnings`)
   console.log(`   ✅ Author verified: ${authorVerified} warnings`)
   console.log(`   ✅ With source URLs: ${withSourceUrl} warnings`)
   

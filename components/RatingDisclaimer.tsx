@@ -13,7 +13,7 @@ export function RatingDisclaimer() {
       {/* Process Explanation */}
       <div className="space-y-2 pl-6">
         <p>
-          Our AI analyzes the book's content and assigns severity scores (0.0-1.0) to each warning. 
+          Our system analyzes the book's content and assigns severity scores (0.0-1.0) to each warning. 
           The classification is determined by the highest severity found—severe warnings indicate MA15+/R18+, 
           moderate indicates M, mild indicates PG, and no warnings indicates G.
         </p>

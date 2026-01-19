@@ -148,10 +148,10 @@ export function ScanDebugSidebar({ statusUpdates, detailedStatusUpdates = [], lo
                                 )}
                               </div>
                               
-                              {/* AI Response */}
+                              {/* Model / analysis response (dev only) */}
                               {update.aiResponse && (
                                 <div className="mt-2 pt-2 border-t border-border/50">
-                                  <span className="text-muted-foreground text-[10px] uppercase">AI Response:</span>
+                                  <span className="text-muted-foreground text-[10px] uppercase">Analysis response:</span>
                                   <div className="mt-1 p-2 bg-blue-500/10 dark:bg-blue-500/20 rounded border border-blue-500/20">
                                     {typeof update.aiResponse === 'string' ? (
                                       <p className="text-foreground">{update.aiResponse}</p>
