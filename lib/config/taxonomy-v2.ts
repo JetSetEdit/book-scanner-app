@@ -418,7 +418,7 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       },
       {
         id: 'manipulation',
-        userLabel: 'Manipulation',
+        userLabel: 'Manipulation / Coercion',
         shortDescription: 'Manipulative behavior, emotional manipulation, coercive control.',
         defaultSeverityHint: 'moderate',
         defaultSeverityScore: 7,
@@ -426,8 +426,8 @@ export const WARNING_CATEGORIES: WarningCategory[] = [
       },
       {
         id: 'controlling_behavior',
-        userLabel: 'Controlling Behavior',
-        shortDescription: 'Controlling relationships, possessiveness, isolation.',
+        userLabel: 'Coercive Control / Controlling Behavior',
+        shortDescription: 'Controlling relationships, possessiveness, isolation, or removing autonomy.',
         defaultSeverityHint: 'moderate',
         defaultSeverityScore: 7,
         severityScoreOrigin: 'hand_tuned_v1'

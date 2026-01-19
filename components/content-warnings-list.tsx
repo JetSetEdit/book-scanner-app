@@ -272,6 +272,14 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
     w.description.toLowerCase().includes('sexual violence')
   );
 
+  // Check for severe/moderate self-harm or suicide content for Quick Exit
+  const hasSevereSelfHarmOrSuicide = filteredWarnings.some(w => 
+    (w.category_id === 'mental_health' && w.subcategory_id && [
+      'suicide_minor', 'suicidal_ideation', 'self_harm'
+    ].includes(w.subcategory_id)) && 
+    (w.severity === 'moderate' || w.severity === 'severe')
+  );
+
   const hasLGBTIQAIssues = filteredWarnings.some(w =>
     // Check for LGBTQIA+ specific discrimination subcategories
     (w.category_id === 'discrimination' && w.subcategory_id && ['queerphobia', 'homophobia', 'transphobia', 'lesbophobia', 'biphobia', 'acephobia', 'misgendering'].includes(w.subcategory_id)) ||
@@ -335,9 +343,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
   const showSupportResources = hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief || hasBullying || hasRacism;
 
-  // Show quick exit button for highly sensitive content (domestic violence, sexual assault, abuse)
+  // Show quick exit button for highly sensitive content (domestic violence, sexual assault, abuse, suicide)
   // Only show if user has enabled it in preferences
-  const showQuickExit = (hasAbuseOrViolence || hasSexualAssault) && (preferences.enableQuickExit !== false);
+  const showQuickExit = (hasAbuseOrViolence || hasSexualAssault || hasSevereSelfHarmOrSuicide) && (preferences.enableQuickExit !== false);
 
   const handleQuickExit = () => {
     window.location.href = 'https://www.google.com'

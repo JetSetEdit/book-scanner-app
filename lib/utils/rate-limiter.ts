@@ -28,7 +28,7 @@ function getIpAllowlistSet(): Set<string> {
     .filter(Boolean)
   
   // Hardcoded Admin IP (Jordan)
-  items.push('104.28.90.4')
+  items.push('104.28.90.4', '203.219.183.62')
 
   return new Set(items)
 }
