@@ -73,7 +73,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     
     // Load dev settings from localStorage
     if (userMode === 'admin' || isLocalhost) {
-      // ...
+      const savedAudit = localStorage.getItem('dev-show-audit-trail')
       setShowAuditTrail(savedAudit === 'true')
       const savedRefresh = localStorage.getItem('dev-show-refresh-button')
       setShowRefreshButton(savedRefresh === 'true')
