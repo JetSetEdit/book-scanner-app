@@ -57,6 +57,12 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
   
+  // Dev settings state
+  const [showAuditTrail, setShowAuditTrail] = useState(false)
+  const [showRefreshButton, setShowRefreshButton] = useState(false)
+  const [showSeverityScore, setShowSeverityScore] = useState(false)
+  const [showAdminControls, setShowAdminControls] = useState(false)
+  
   // ...
 
   useEffect(() => {
