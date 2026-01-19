@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState, useEffect, useMemo } from "react"
 import { useTheme } from "next-themes"
-import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, ScanBarcode, Moon, Sun, Image as ImageIcon, Info } from "lucide-react"
+import { BookOpen, Library, Menu, X, Settings, Code, FileText, RefreshCw, Calculator, Trash2, ScanBarcode, Moon, Sun, Image as ImageIcon, Info, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SearchComponent } from "@/components/search"
 import { BookSpineLogo } from "@/components/book-spine-logo"
@@ -353,6 +353,18 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                         <div className="h-full w-full bg-primary rounded-sm" />
                       )}
                     </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/batch-scan" className="flex items-center gap-2 cursor-pointer">
+                      <Layers className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Batch Scanner</div>
+                        <div className="text-xs text-muted-foreground">
+                          Bulk process multiple ISBNs
+                        </div>
+                      </div>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
