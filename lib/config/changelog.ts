@@ -9,6 +9,19 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.42",
+    date: "2026-01-19",
+    title: "New features",
+    changes: [
+      "Enable limited canon knowledge inference for literary classics",
+      "Show admin/vip badges in navbar based on user mode",
+      "Add temporary ip check endpoint",
+      "Implement 50-scan limit for VIP users (replaces unlimited)",
+      "Improve content warning accuracy based on benchmark",
+      "Correct changelog entry for 1.03.33"
+    ],
+  },
+  {
     version: "1.03.41",
     date: "2026-01-18",
     title: "New features",
