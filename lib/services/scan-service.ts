@@ -703,12 +703,29 @@ export async function processIsbnScan(
         const hasWarnings = existingWarnings && existingWarnings.length > 0
         
         timings.total = performance.now() - overallStartTime
+
+        // Record scan for "Recently Scanned" (non-fatal; same pattern as main scan insert)
+        let scanRecord: { id: string; isbn: string } = { id: 'existing', isbn: cleanIsbn }
+        try {
+          const { data: scanData, error: scanError } = await supabaseAdmin
+            .from('scans')
+            .insert({ isbn: cleanIsbn, book_id: bookId })
+            .select()
+            .single()
+          if (scanError) {
+            console.warn('Failed to record scan on existing-book lookup (scans table might be missing):', scanError.message)
+          } else {
+            scanRecord = scanData as { id: string; isbn: string }
+          }
+        } catch (e) {
+          console.warn('Exception recording scan on existing-book lookup:', e)
+        }
         
         return {
           success: true,
           status: 'complete',
           book: fullBook || currentBook,
-          scan: { id: 'existing', isbn: cleanIsbn },
+          scan: scanRecord,
           isNewBook: false,
           contentWarningsGenerated: hasWarnings,
           authorContextInvestigated: false,

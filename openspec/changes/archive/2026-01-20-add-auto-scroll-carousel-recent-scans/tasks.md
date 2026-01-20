@@ -1,0 +1,10 @@
+## 1. Implementation
+
+- [x] 1.1 Add a configurable speed constant (e.g. pixels per second or seconds per item) for the auto-scroll. Implement a slow horizontal auto-scroll (e.g. ~4–6s per item or equivalent) on the Recently Scanned strip. Use an interval or `requestAnimationFrame` to nudge `scrollLeft` on the scroll container, or use a CSS `@keyframes` + `transform` animation on an inner wrapper; when near the end, reset to 0 (or loop) so the motion appears continuous.
+- [x] 1.2 Pause auto-scroll on `mouseEnter` and `focus` (or `focusWithin`) on the carousel area; resume on `mouseLeave` and `blur`. Ensure the carousel container (or a wrapper) has the necessary `onMouseEnter`, `onMouseLeave`, `onFocus`, and `onBlur` handlers.
+- [x] 1.3 On mount, detect `prefers-reduced-motion: reduce` via `window.matchMedia('(prefers-reduced-motion: reduce)')` and subscribe to changes. When it matches, do not start or run the auto-scroll; the row SHALL behave as today (static, `overflow-x-auto`, user-scrollable only). When it does not match, enable the auto-scroll as in 1.1.
+- [x] 1.4 Keep the scroll container `overflow-x-auto` (or equivalent) so manual horizontal scroll continues to work. If using JS to nudge `scrollLeft`, avoid fighting the user: when the user scrolls, optionally pause the auto-scroll for a short period or until they stop. If using CSS animation, ensure user scroll is still possible (e.g. outer remains scrollable) or that the design explicitly replaces manual scroll with pause-and-resume only; the spec requires "manual horizontal scroll SHALL remain possible," so prefer a JS `scrollLeft` approach or a structure that keeps the container scrollable.
+
+## 2. Verification
+
+- [x] 2.1 Manually: with `prefers-reduced-motion` off, the carousel auto-scrolls at a slow speed and loops or resets; on hover/focus it pauses, on leave/blur it resumes. With `prefers-reduced-motion: reduce` (browser or OS setting), the row is static and user-scrollable. Manual horizontal scroll works when auto-scroll is enabled.

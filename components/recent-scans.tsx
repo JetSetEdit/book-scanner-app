@@ -1,10 +1,14 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { Clock, BookOpen } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { cn } from "@/lib/utils"
+
+/** Pixels per second for the carousel auto-scroll (~5s per item at ~144px). */
+const CAROUSEL_PX_PER_SEC = 28
+const CAROUSEL_TICK_MS = 80
 
 interface RecentScan {
   id: string
@@ -21,6 +25,11 @@ interface RecentScan {
 export function RecentScans() {
   const [scans, setScans] = useState<RecentScan[]>([])
   const [loading, setLoading] = useState(true)
+  const [isPaused, setIsPaused] = useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(true) // assume reduced until we've checked
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const programmaticScrollRef = useRef(false)
+  const userScrollPauseUntilRef = useRef(0)
 
   useEffect(() => {
     async function fetchRecentScans() {
@@ -42,6 +51,78 @@ export function RecentScans() {
     const interval = setInterval(fetchRecentScans, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  // Respect prefers-reduced-motion: disable auto-scroll when set
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)")
+    setPrefersReducedMotion(mq.matches)
+    const handler = () => setPrefersReducedMotion(mq.matches)
+    mq.addEventListener("change", handler)
+    return () => mq.removeEventListener("change", handler)
+  }, [])
+
+  // Auto-scroll: slow horizontal nudge, loop at end. Off when prefersReducedMotion or (paused by hover/focus) or (recent user scroll).
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el || prefersReducedMotion) return
+
+    const pxPerTick = (CAROUSEL_PX_PER_SEC * CAROUSEL_TICK_MS) / 1000
+
+    const id = setInterval(() => {
+      if (isPaused) return
+      const target = scrollRef.current
+      if (!target) return
+      if (target.scrollWidth <= target.clientWidth) return
+      if (Date.now() < userScrollPauseUntilRef.current) return
+
+      programmaticScrollRef.current = true
+      target.scrollLeft += pxPerTick
+      if (target.scrollLeft >= target.scrollWidth - target.clientWidth - 2) {
+        target.scrollLeft = 0
+      }
+      requestAnimationFrame(() => {
+        programmaticScrollRef.current = false
+      })
+    }, CAROUSEL_TICK_MS)
+
+    return () => clearInterval(id)
+  }, [prefersReducedMotion, isPaused])
+
+  // Pause on focus within carousel, resume on focus out
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onFocusIn = () => setIsPaused(true)
+    const onFocusOut = (e: FocusEvent) => {
+      if (!el.contains(e.relatedTarget as Node)) setIsPaused(false)
+    }
+    el.addEventListener("focusin", onFocusIn)
+    el.addEventListener("focusout", onFocusOut)
+    return () => {
+      el.removeEventListener("focusin", onFocusIn)
+      el.removeEventListener("focusout", onFocusOut)
+    }
+  }, [scans.length])
+
+  // On user scroll (non-programmatic), pause auto-scroll briefly
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    let throttle: ReturnType<typeof setTimeout> | null = null
+    const onScroll = () => {
+      if (programmaticScrollRef.current) return
+      if (throttle) return
+      throttle = setTimeout(() => {
+        userScrollPauseUntilRef.current = Date.now() + 2500
+        throttle = null
+      }, 100)
+    }
+    el.addEventListener("scroll", onScroll, { passive: true })
+    return () => {
+      el.removeEventListener("scroll", onScroll)
+      if (throttle) clearTimeout(throttle)
+    }
+  }, [scans.length])
 
   if (loading) {
     return (
@@ -79,7 +160,12 @@ export function RecentScans() {
             </h2>
           </div>
           
-          <div className="flex gap-4 overflow-x-auto overflow-y-visible pt-3 pb-6 -mx-4 px-4 scrollbar-hide">
+          <div
+            ref={scrollRef}
+            onMouseEnter={() => setIsPaused(true)}
+            onMouseLeave={() => setIsPaused(false)}
+            className="flex gap-4 overflow-x-auto overflow-y-visible pt-3 pb-6 -mx-4 px-4 scrollbar-hide"
+          >
             {scansWithBooks.slice(0, 8).map((scan) => {
               const timeAgo = formatDistanceToNow(new Date(scan.createdAt), {
                 addSuffix: true,

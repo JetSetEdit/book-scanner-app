@@ -20,6 +20,7 @@ import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { APP_VERSION } from "@/lib/config/version"
 import { generateSummary } from "@/lib/services/warning-renderer"
 import { FeedbackDialog } from "@/components/feedback-dialog"
+import { CONTENT_WARNING_GENERATION_EXPLANATION, HOW_WE_GENERATE_LABEL } from "@/lib/content-warning-explanation"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -63,6 +64,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
   const descriptionRef = useRef<HTMLDivElement>(null)
   const [fullHeight, setFullHeight] = useState<number | null>(null)
   const [focusWarningId, setFocusWarningId] = useState<string | null>(null)
+  const [isHowWeGenerateOpen, setIsHowWeGenerateOpen] = useState(false)
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -570,6 +572,32 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               <p className="text-sm text-muted-foreground italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
               </p>
+
+              {/* How we generate these — expandable explanation (collapsed by default) */}
+              <Collapsible
+                open={isHowWeGenerateOpen}
+                onOpenChange={setIsHowWeGenerateOpen}
+                className="mb-6 flex flex-col items-center"
+              >
+                <CollapsibleTrigger
+                  id="how-we-generate-trigger"
+                  aria-expanded={isHowWeGenerateOpen}
+                  aria-controls="how-we-generate-cw-explanation"
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded px-1 -mx-1"
+                >
+                  {HOW_WE_GENERATE_LABEL}
+                  {isHowWeGenerateOpen ? (
+                    <ChevronUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  ) : (
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent id="how-we-generate-cw-explanation" className="w-full max-w-2xl">
+                  <p className="text-sm text-muted-foreground mt-2 text-center">
+                    {CONTENT_WARNING_GENERATION_EXPLANATION}
+                  </p>
+                </CollapsibleContent>
+              </Collapsible>
 
               {/* Dynamic Reader Summary */}
               {warnings && warnings.length > 0 && (
