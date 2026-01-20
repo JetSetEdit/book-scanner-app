@@ -9,6 +9,7 @@ import { Footer } from '@/components/footer'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { PWARegister } from '@/components/pwa-register'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AestheticThemeApplicator } from '@/components/aesthetic-theme-applicator'
 import { BetaOnboardingModal } from '@/components/beta-onboarding-modal'
 import { getVariantConfig } from '@/lib/config/variants'
 import { headers, cookies } from 'next/headers'
@@ -80,6 +81,7 @@ export default async function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
+          <AestheticThemeApplicator />
           <Navbar userMode={userMode} />
           <main className="flex-1 pb-16 md:pb-0">
             {children}

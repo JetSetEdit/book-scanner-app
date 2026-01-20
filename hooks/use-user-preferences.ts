@@ -2,11 +2,14 @@
 
 import { useLocalStorage } from './use-browser-storage'
 
+import type { AestheticThemeId } from '@/lib/config/aesthetic-themes'
+
 export interface UserPreferences {
   strictnessMode?: 'standard' | 'strict' | 'parent'
   showRawApiResponse?: boolean
   autoSelectSingleCandidate?: boolean
   theme?: 'light' | 'dark' | 'system'
+  aestheticTheme?: AestheticThemeId
   showCameraScanner?: boolean
   useMultiModel?: boolean
   tropeMode?: 'tropes' | 'triggers' | 'both' // For dark romance readers: show tropes they seek, triggers they avoid, or both
@@ -20,6 +23,7 @@ const defaultPreferences: UserPreferences = {
   showRawApiResponse: false,
   autoSelectSingleCandidate: true,
   theme: 'system',
+  aestheticTheme: 'reader',
   showCameraScanner: false, // Default to manual entry, camera is opt-in
   useMultiModel: true, // Default to multi-model for better coverage
   tropeMode: 'both', // Default to showing both tropes and triggers
@@ -43,10 +47,16 @@ export function useUserPreferences() {
       ...prev,
       [key]: value,
     }))
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('subtext-preferences-changed'))
+    }
   }
 
   const resetPreferences = () => {
     setPreferences(defaultPreferences)
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('subtext-preferences-changed'))
+    }
   }
 
   return {

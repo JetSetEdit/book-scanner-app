@@ -24,21 +24,10 @@ import {
 import { Button } from "@/components/ui/button"
 
 const navigation = [
-  {
-    name: "Home",
-    href: "/",
-    icon: BookOpen,
-  },
-  {
-    name: "Scan",
-    href: "/scan",
-    icon: ScanBarcode,
-  },
-  {
-    name: "Bookshelf",
-    href: "/collection",
-    icon: Library,
-  },
+  { name: "Home", href: "/", icon: BookOpen },
+  { name: "Scan", href: "/scan", icon: ScanBarcode },
+  { name: "Bookshelf", href: "/collection", icon: Library },
+  { name: "Settings", href: "/settings", icon: Settings },
 ]
 
 // Check if we're in dev mode (only localhost/127.0.0.1, not production)
