@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
+import { getVariantConfig, getVariantId } from "@/lib/config/variants"
 
 const STORAGE_KEY = "subtext-beta-onboarding-accepted"
 const DISCLAIMER_VERSION = "2026-01-08-v1"
@@ -65,6 +66,10 @@ export function BetaOnboardingModal() {
     return null
   }
 
+  const v = getVariantConfig()
+  const isLite = getVariantId() === 'lite'
+  const modalSummary = v.footer.betaModalSummary || 'Content warnings are generated from book information. Beta—results may vary. Use your judgment.'
+
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
@@ -78,10 +83,21 @@ export function BetaOnboardingModal() {
             <BookSpineLogo className="h-16 w-16 text-foreground" />
           </div>
           <DialogTitle className="font-serif text-3xl md:text-4xl font-medium tracking-tight text-foreground">
-            Welcome to Subtext
+            Welcome to {v.name}
           </DialogTitle>
           <DialogDescription asChild>
             <div className="text-base text-muted-foreground leading-relaxed max-w-none space-y-6 text-left">
+              {isLite ? (
+                <>
+                  <p className="font-serif italic text-lg text-center">
+                    {modalSummary}
+                  </p>
+                  <p className="consent-statement font-serif italic pt-4 text-muted-foreground text-center">
+                    By clicking below, you acknowledge you have read this and agree to use {v.name} at your own discretion.
+                  </p>
+                </>
+              ) : (
+              <>
               <p className="font-serif italic text-lg text-center">
                 Discover content warnings and themes in books using automated analysis.
               </p>
@@ -129,6 +145,8 @@ export function BetaOnboardingModal() {
                   and agree to use Subtext at your own discretion.
                 </p>
               </div>
+              </>
+              )}
             </div>
           </DialogDescription>
         </DialogHeader>

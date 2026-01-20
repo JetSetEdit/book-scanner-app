@@ -75,15 +75,21 @@ export function Footer() {
             </div>
           )}
           
+          {v.flags?.showAffiliate !== false && (
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
             Subtext is a participant in the Amazon Services LLC Associates Program. As an Amazon Associate, we earn from qualifying purchases.
           </p>
+          )}
           <div className="text-center space-y-2">
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+              {v.flags?.showTransparencyLink !== false && (
+                <>
               <Link href="/transparency" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
                 Learn how we work
               </Link>
               <span className="text-muted-foreground/40">•</span>
+                </>
+              )}
               <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
                 Terms of Service
               </Link>

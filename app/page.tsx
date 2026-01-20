@@ -48,7 +48,8 @@ export default function HomePage() {
       {/* Recent Scans Section */}
       <RecentScans />
 
-      {/* Features Grid */}
+      {/* Features Grid (hidden in lite) */}
+      {v.flags?.showFeaturesGrid !== false && (
       <div className="border-t border-border/50 bg-card/60">
         <div className="container mx-auto px-4 py-24">
           <div className="grid md:grid-cols-3 gap-12">
@@ -89,6 +90,7 @@ export default function HomePage() {
           </div>
         </div>
       </div>
+      )}
     </main>
   )
 }

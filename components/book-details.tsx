@@ -21,6 +21,7 @@ import { APP_VERSION } from "@/lib/config/version"
 import { generateSummary } from "@/lib/services/warning-renderer"
 import { FeedbackDialog } from "@/components/feedback-dialog"
 import { CONTENT_WARNING_GENERATION_EXPLANATION, HOW_WE_GENERATE_LABEL } from "@/lib/content-warning-explanation"
+import { getVariantConfig } from "@/lib/config/variants"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
 
@@ -497,8 +498,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               </div>
               )}
               
-              {/* Quick Glance Summary */}
-              {warnings && warnings.length > 0 && (
+              {/* Quick Glance Summary (hidden in lite) */}
+              {getVariantConfig().flags?.showBookTokSummary !== false && warnings && warnings.length > 0 && (
                 <BooktokWarningsSummary warnings={warnings} onWarningClick={handleWarningClick} />
               )}
               
@@ -573,7 +574,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
               </p>
 
-              {/* How we generate these — expandable explanation (collapsed by default) */}
+              {/* How we generate these — expandable (hidden in lite) */}
+              {getVariantConfig().flags?.showHowWeGenerate !== false && (
               <Collapsible
                 open={isHowWeGenerateOpen}
                 onOpenChange={setIsHowWeGenerateOpen}
@@ -598,9 +600,10 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   </p>
                 </CollapsibleContent>
               </Collapsible>
+              )}
 
-              {/* Dynamic Reader Summary */}
-              {warnings && warnings.length > 0 && (
+              {/* Dynamic Reader Summary (hidden in lite) */}
+              {getVariantConfig().flags?.showBookTokSummary !== false && warnings && warnings.length > 0 && (
                 <div className="mb-8 p-6 bg-muted/30 border border-border rounded-lg">
                   <p className="text-base leading-relaxed font-serif text-foreground italic">
                     {generateSummary(warnings)}

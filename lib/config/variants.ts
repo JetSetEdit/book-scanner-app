@@ -1,10 +1,10 @@
 /**
- * Build-time variant config: "swappable body panels" for Public, Libraries, Schools.
- * Set NEXT_PUBLIC_VARIANT=public|libraries|schools per Vercel project/domain.
+ * Build-time variant config: "swappable body panels" for Public, Libraries, Schools, Lite.
+ * Set NEXT_PUBLIC_VARIANT=public|libraries|schools|lite per Vercel project/domain.
  * UI consumes config only; no if (variant === 'x') in components.
  */
 
-export type VariantId = 'public' | 'libraries' | 'schools'
+export type VariantId = 'public' | 'libraries' | 'schools' | 'lite'
 
 export interface VariantConfig {
   id: VariantId
@@ -30,6 +30,8 @@ export interface VariantConfig {
     trustStatement: string
     betaDisclaimer: string
     comfortReadPrefix: string
+    /** Optional; when set, beta onboarding modal uses this instead of default copy (for lite). */
+    betaModalSummary?: string
   }
   /** Wording for analysis source—avoids "AI" in institutional variants. */
   wording: {
@@ -39,11 +41,17 @@ export interface VariantConfig {
     /** e.g. "The AI's" or "The system's" for "X detailed reasoning" */
     reasoningSubject: string
   }
-  /** Feature flags for future (teacher mode, export, bulk, etc.). */
+  /** Feature flags. Lite uses show*: false to hide blocks. */
   flags?: {
     teacherMode?: boolean
     exportPdf?: boolean
     bulkScan?: boolean
+    showHowWeGenerate?: boolean
+    showTransparencyLink?: boolean
+    showFeaturesGrid?: boolean
+    showBookTokSummary?: boolean
+    showReasoningInWarnings?: boolean
+    showAffiliate?: boolean
   }
 }
 
@@ -186,10 +194,52 @@ const VARIANTS: Record<VariantId, VariantConfig> = {
       reasoningSubject: "The system's",
     },
   },
+  lite: {
+    id: 'lite',
+    name: 'Book Scanner',
+    tagline: 'Content warnings for books.',
+    meta: {
+      title: 'Book Scanner',
+      description: 'Scan books to see content warnings. No account required.',
+    },
+    homepage: {
+      headline: 'Content warnings for any book.',
+      headlineItalic: 'Scan and see.',
+      subhead: 'Scan a barcode or enter an ISBN to see content warnings and age guidance.',
+      ctaPrimary: 'Start Scanning',
+      ctaSecondary: 'Browse Bookshelf',
+    },
+    features: {
+      contentWarnings: { title: 'Content Warnings', description: 'See themes and sensitive content.' },
+      ageRatings: { title: 'Age Guidance', description: 'Age recommendations for readers.' },
+      community: { title: 'Community', description: 'Coming soon.' },
+    },
+    footer: {
+      trustStatement: 'Content warnings are advisory. Use your judgment.',
+      betaDisclaimer: 'Beta—results may vary.',
+      comfortReadPrefix: 'No content warnings detected (Beta)',
+      betaModalSummary: 'Content warnings are generated from book information. Beta—results may vary. Use your judgment.',
+    },
+    wording: {
+      analysisSource: 'generated',
+      analysisSourceTitleCase: 'Generated',
+      warningLabel: 'content',
+      reasoningSubject: "Our",
+    },
+    flags: {
+      showHowWeGenerate: false,
+      showTransparencyLink: false,
+      showFeaturesGrid: false,
+      showBookTokSummary: false,
+      showReasoningInWarnings: false,
+      showAffiliate: false,
+    },
+  },
 }
 
 export function getVariantId(): VariantId {
   const v = process.env.NEXT_PUBLIC_VARIANT
+  if (v === 'lite') return 'lite'
   if (v === 'libraries' || v === 'schools') return v
   return 'public'
 }

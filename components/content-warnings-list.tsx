@@ -37,6 +37,7 @@ import { getCategoryById, getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { TagWithTooltip } from "@/components/tag-with-tooltip"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/utils/dark-romance-context"
+import { getVariantConfig } from "@/lib/config/variants"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { getWarningPhrase } from "@/lib/services/warning-phraser"
@@ -168,6 +169,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   const [userState, setUserState] = useState<string | null>(null)
   const [stateServices, setStateServices] = useState<any>(null)
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
+  const showReasoning = getVariantConfig().flags?.showReasoningInWarnings !== false
 
   // Handle focus request
   useEffect(() => {
@@ -780,7 +782,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
           <div className="space-y-0">
             {officialVerifiedWarnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} isVerified={true} />
+              <WarningItem key={warning.id} warning={warning} isVerified={true} showReasoningInWarnings={showReasoning} />
             ))}
           </div>
         </section>
@@ -822,7 +824,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 <CollapsibleContent>
                   <div className="space-y-0 border-t border-border mt-2">
                     {group.warnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} isAi={true} />
+              <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} />
                     ))}
                   </div>
                 </CollapsibleContent>
@@ -868,7 +870,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 <CollapsibleContent>
                   <div className="space-y-0 border-t border-border mt-2">
                     {group.warnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} />
+              <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
                     ))}
                   </div>
                 </CollapsibleContent>
@@ -878,18 +880,20 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
         </section>
       )}
 
-      {/* Disclaimer */}
+      {/* Disclaimer (hidden in lite) */}
+      {showReasoning && (
       <div className="mt-12 pt-8 border-t border-border">
         <p className="text-[10px] text-muted-foreground leading-relaxed text-center italic max-w-xl mx-auto">
           All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment.
         </p>
       </div>
+      )}
       </div>
     </TooltipProvider>
   )
 }
 
-function WarningItem({ warning, isAi = false, isVerified = false }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean }) {
+function WarningItem({ warning, isAi = false, isVerified = false, showReasoningInWarnings = true }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean, showReasoningInWarnings?: boolean }) {
   const [isRevealed, setIsRevealed] = useState(false)
   const isSpoiler = warning.is_spoiler === true
 
@@ -1058,7 +1062,7 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               </Badge>
             )}
 
-            {(() => {
+            {showReasoningInWarnings && (() => {
               const c = getCombinedConfidence(warning)
               return (
                 <Popover>
@@ -1102,7 +1106,8 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
               userValidation={warning.user_validation}
             />
 
-            {/* Reasoning / Sources */}
+            {/* Reasoning / Sources (hidden in lite) */}
+            {showReasoningInWarnings && (
               <Popover>
                 <PopoverTrigger asChild>
                 <Button
@@ -1145,9 +1150,10 @@ function WarningItem({ warning, isAi = false, isVerified = false }: { warning: C
                   )}
                 </PopoverContent>
               </Popover>
+            )}
 
-            {/* Fallback: Show source link if no reasoning popover */}
-            {!warning.reasoning && warning.source_url && (
+            {/* Fallback: Show source link if no reasoning popover (hidden in lite) */}
+            {showReasoningInWarnings && !warning.reasoning && warning.source_url && (
               <a
                 href={warning.source_url}
                 target="_blank"

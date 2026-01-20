@@ -10,7 +10,7 @@ import { SearchComponent } from "@/components/search"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { APP_VERSION, APP_VERSION_LABEL, APP_BUILD_DATE } from "@/lib/config/version"
 import { CHANGELOG } from "@/lib/config/changelog"
-import { getVariantId } from "@/lib/config/variants"
+import { getVariantId, getVariantConfig } from "@/lib/config/variants"
 import { Badge } from "@/components/ui/badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
@@ -128,7 +128,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
               <BookSpineLogo className="h-10 w-10 text-foreground" />
-              <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-foreground hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>Subtext Preview</span>
+              <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-foreground hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>{getVariantConfig().name}</span>
             </Link>
 
             {/* Search - Desktop */}
