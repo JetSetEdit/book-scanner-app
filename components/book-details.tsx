@@ -219,7 +219,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   {analysisStatus === 'complete' && warnings.length === 0 && (
                     <Badge
                       data-comfort-read="true"
-                      className="px-3 py-1 text-[10px] font-medium tracking-wide rounded-full bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800"
+                      className="px-3 py-1 text-[10px] font-medium tracking-wide rounded-full bg-forest/10 dark:bg-forest/20 text-forest border border-forest/30 dark:border-forest/40"
                     >
                       ✨ Comfort Read
                     </Badge>
@@ -232,7 +232,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <div className="mb-4">
                   <Badge
                     data-comfort-read="true"
-                    className="px-3 py-1 text-[10px] font-medium tracking-wide rounded-full bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800"
+                    className="px-3 py-1 text-[10px] font-medium tracking-wide rounded-full bg-forest/10 dark:bg-forest/20 text-forest border border-forest/30 dark:border-forest/40"
                   >
                     ✨ Comfort Read
                   </Badge>

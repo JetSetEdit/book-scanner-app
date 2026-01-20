@@ -3,6 +3,20 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* --- BookTok Web-Core design tokens (emotion over efficiency, warm literary) ---
+ * Primary:   Parchment #F6F1EB, Espresso #3A2F2A, Ink #1E1B1A
+ * Accents:   Oxblood #7A2E2E, Forest #2F4F3E, Muted gold #B9A16B (sparingly)
+ * Rule:      Warm neutrals do the heavy lifting; accents like highlighted sentences.
+ */
+:root {
+  --booktok-parchment: oklch(0.95 0.018 78);   /* warmer cream/ivory */
+  --booktok-espresso:  oklch(0.28 0.02 55);    /* #3A2F2A */
+  --booktok-ink:       oklch(0.19 0.01 50);    /* #1E1B1A */
+  --booktok-oxblood:   oklch(0.42 0.17 22);    /* stronger dried-rose */
+  --booktok-forest:    oklch(0.38 0.06 162);   /* #2F4F3E */
+  --booktok-gold:      oklch(0.72 0.09 85);    /* #B9A16B - use sparingly */
+}
+
 /* Hide scrollbar but keep functionality */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */
@@ -13,40 +27,34 @@
 }
 
 :root {
-  /* Warm Paper Theme */
-  --background: oklch(0.98 0.01 85);
-  /* Warm Cream (#F9F7F1) */
-  --foreground: oklch(0.25 0.05 30);
-  /* Soft Charcoal */
+  /* BookTok Web-Core: warm neutrals + oxblood as primary */
+  --background: var(--booktok-parchment);
+  --foreground: var(--booktok-ink);
 
-  --card: oklch(0.99 0.01 85);
-  /* Lighter Cream */
-  --card-foreground: oklch(0.25 0.05 30);
+  --card: oklch(0.99 0.008 85);
+  --card-foreground: var(--booktok-ink);
 
-  --popover: oklch(0.99 0.01 85);
-  --popover-foreground: oklch(0.25 0.05 30);
+  --popover: oklch(0.99 0.008 85);
+  --popover-foreground: var(--booktok-ink);
 
-  --primary: oklch(0.45 0.15 35);
-  /* Deep Leather/Rust */
+  --primary: var(--booktok-oxblood);
   --primary-foreground: oklch(0.98 0.02 85);
 
   --secondary: oklch(0.92 0.04 85);
-  /* Beige/Parchment */
-  --secondary-foreground: oklch(0.35 0.1 35);
+  --secondary-foreground: var(--booktok-espresso);
 
-  --muted: oklch(0.94 0.03 85);
-  --muted-foreground: oklch(0.55 0.05 35);
+  --muted: oklch(0.94 0.025 85);
+  --muted-foreground: oklch(0.50 0.04 55);
 
-  --accent: oklch(0.92 0.04 85);
-  --accent-foreground: oklch(0.45 0.15 35);
+  --accent: oklch(0.93 0.03 85);
+  --accent-foreground: var(--booktok-oxblood);
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.98 0.02 85);
 
   --border: oklch(0.88 0.02 85);
-  /* Warm Grey/Beige Border */
   --input: oklch(0.88 0.02 85);
-  --ring: oklch(0.45 0.15 35);
+  --ring: var(--booktok-oxblood);
 
   --chart-1: oklch(0.45 0.15 35);
   --chart-2: oklch(0.6 0.15 60);
@@ -123,6 +131,10 @@
 }
 
 @theme inline {
+  /* BookTok accents — use like highlighted sentences, not confetti */
+  --color-oxblood: var(--booktok-oxblood);
+  --color-forest: var(--booktok-forest);
+  --color-gold: var(--booktok-gold);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -194,21 +206,35 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.65;
     overflow-x: hidden;
-    /* Improve touch responsiveness on iOS */
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
   }
 
-  /* Smooth theme transitions - prevents flashbang effect */
+  /* Links: underlines encouraged, accent on hover (BookTok brief) */
+  a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    transition: color 0.2s ease;
+  }
+  a:hover {
+    color: var(--primary);
+  }
+
+  /* Smooth theme transitions — "turning a page, not opening an app" */
   *,
   *::before,
   *::after {
-    transition: background-color 0.3s ease, 
-                color 0.3s ease, 
-                border-color 0.3s ease,
-                fill 0.3s ease,
-                stroke 0.3s ease;
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, fill 0.3s ease, stroke 0.3s ease;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition: none;
+    }
   }
 
   /* Mobile touch improvements */

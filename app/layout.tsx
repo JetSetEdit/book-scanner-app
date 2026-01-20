@@ -50,7 +50,7 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#FDFBF7',
+  themeColor: '#F6F1EB', /* BookTok parchment */
 }
 
 export default async function RootLayout({

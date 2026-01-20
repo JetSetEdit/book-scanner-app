@@ -18,8 +18,8 @@ export default function TransparencyPage() {
           </p>
         </div>
 
-        {/* How Subtext Works — plain-language, non-AI-framed */}
-        <div className="mb-20 bg-card border border-border rounded-lg p-6">
+        {/* How Subtext Works — plain-language, non-AI-framed; gold = bookmark accent */}
+        <div className="mb-20 bg-card border border-border border-l-4 border-l-gold rounded-lg p-6">
           <h2 className="font-serif text-xl text-foreground mb-4">How Subtext Works</h2>
           <p className="text-muted-foreground leading-relaxed mb-3">
             Subtext analyses publicly available book text and metadata to identify common sensitive themes (such as violence, abuse, or discrimination).
