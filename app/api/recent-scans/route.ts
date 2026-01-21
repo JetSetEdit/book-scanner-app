@@ -63,6 +63,28 @@ export async function GET() {
     // Limit to 10 most recent unique scans
     const recentScans = uniqueScans.slice(0, 10)
 
+    // Fetch distinct category ids from content_warnings for these books
+    const bookIds = recentScans.flatMap((s) => (s.book ? [s.book.id] : []))
+    const categoryMap = new Map<string, string[]>()
+    if (bookIds.length > 0) {
+      const { data: cw } = await supabaseAdmin
+        .from("content_warnings")
+        .select("book_id, category_id, category")
+        .in("book_id", bookIds)
+      for (const r of cw || []) {
+        const key = r.category_id ?? r.category
+        if (key == null) continue
+        const arr = categoryMap.get(r.book_id) ?? []
+        if (!arr.includes(key)) arr.push(key)
+        categoryMap.set(r.book_id, arr)
+      }
+    }
+    for (const scan of recentScans) {
+      if (scan.book) {
+        scan.book.warningCategoryIds = categoryMap.get(scan.book.id) ?? []
+      }
+    }
+
     return NextResponse.json({ scans: recentScans })
   } catch (error) {
     console.error('Error in recent-scans API:', error)

@@ -204,14 +204,11 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' })
           
-          // Add a graceful highlight effect
-          // rounded-xl softens the edges, bg-primary/10 gives a gentle spotlight
-          // We use negative margin and padding to create a bubble effect without shifting content
-          element.classList.add('bg-primary/10', 'rounded-2xl', '-mx-4', 'px-4', 'transition-all', 'duration-1000')
+          // Layout-safe highlight: ring + rounded corners (no negative margins to avoid overextension)
+          element.classList.add('ring-2', 'ring-primary/30', 'ring-offset-2', 'rounded-2xl', 'transition-all', 'duration-1000')
           
           setTimeout(() => {
-            // Fade out
-            element.classList.remove('bg-primary/10', 'rounded-2xl', '-mx-4', 'px-4')
+            element.classList.remove('ring-2', 'ring-primary/30', 'ring-offset-2', 'rounded-2xl', 'transition-all', 'duration-1000')
           }, 2000)
         }
       }, 350)
@@ -771,7 +768,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {/* Official Author/Publisher Warnings (Gold Standard) */}
       {officialVerifiedWarnings.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="h-px bg-border flex-1"></div>
             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
               <CheckCircle className="h-4 w-4" />
@@ -791,7 +788,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {/* Automated / system-generated warnings */}
       {standardAiWarnings.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="h-px bg-border flex-1"></div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Sparkles className="h-4 w-4" />
@@ -821,8 +818,8 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
                 </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="space-y-0 border-t border-border mt-2">
+                <CollapsibleContent className="min-w-0">
+                  <div className="space-y-0 border-t border-border mt-2 pt-3">
                     {group.warnings.map((warning) => (
               <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} />
                     ))}
@@ -837,7 +834,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {/* Community Submitted Warnings */}
       {communityWarnings.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="h-px bg-border flex-1"></div>
             <div className="flex items-center gap-2 text-muted-foreground">
               <Shield className="h-4 w-4" />
@@ -867,8 +864,8 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                   </div>
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
                 </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="space-y-0 border-t border-border mt-2">
+                <CollapsibleContent className="min-w-0">
+                  <div className="space-y-0 border-t border-border mt-2 pt-3">
                     {group.warnings.map((warning) => (
               <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
                     ))}
@@ -926,7 +923,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
     <div 
       id={anchorId}
       className={cn(
-        "group py-6 border-b border-border last:border-0 transition-colors scroll-mt-20",
+        "group py-7 border-b border-border last:border-0 transition-colors scroll-mt-20",
         isVerified ? "hover:border-amber-200 dark:hover:border-amber-800" : "hover:border-border"
       )}
     >
@@ -983,7 +980,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
         </div>
 
         {/* Right: Description & Actions */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {/* Context Badge for Dark Romance */}
           {(() => {
             const context = getWarningContext(warning.category_id, warning.subcategory_id, warning.description)
@@ -1004,7 +1001,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
             return null
           })()}
           
-          <div className="mb-3">
+          <div className="mb-4">
             {isSpoiler && !isRevealed ? (
               <div className="relative">
                 <div className="bg-muted/50 border border-border rounded-lg p-4 text-center">
@@ -1037,7 +1034,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
           </div>
 
           {/* On mobile there is no hover, so keep actions fully visible. */}
-          <div className="flex items-center gap-4 transition-opacity md:opacity-40 md:group-hover:opacity-100">
+          <div className="flex flex-wrap items-center gap-4 transition-opacity md:opacity-40 md:group-hover:opacity-100">
             {/* Dev Mode: Show which model generated this warning (localhost only) */}
             {typeof window !== 'undefined' && window.location.hostname === 'localhost' && warning.evidence && warning.evidence[0]?.model_source && (
               <Badge 
