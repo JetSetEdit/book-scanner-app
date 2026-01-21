@@ -14,6 +14,7 @@ export interface UserPreferences {
   useMultiModel?: boolean
   tropeMode?: 'tropes' | 'triggers' | 'both' // For dark romance readers: show tropes they seek, triggers they avoid, or both
   enableQuickExit?: boolean // Enable/disable Quick Exit button for sensitive content
+  bookPageLayoutPreview?: 'baseline' | 'compact' | 'spacious' // For Settings → Book page layouts; which variant the Preview link opens
 }
 
 const PREFERENCES_KEY = 'book-scanner-preferences'
@@ -28,6 +29,7 @@ const defaultPreferences: UserPreferences = {
   useMultiModel: true, // Default to multi-model for better coverage
   tropeMode: 'both', // Default to showing both tropes and triggers
   enableQuickExit: true, // Default to enabled for safety
+  bookPageLayoutPreview: 'baseline', // For Settings → Book page layouts Preview (dev only)
 }
 
 /**

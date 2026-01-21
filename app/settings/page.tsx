@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useTheme } from "next-themes"
 import Link from "next/link"
 import { toast } from "sonner"
-import { ArrowLeft, Sun, Moon, Monitor, Palette, Check } from "lucide-react"
+import { ArrowLeft, Sun, Moon, Monitor, Palette, Check, LayoutTemplate } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
@@ -129,6 +129,36 @@ export default function SettingsPage() {
                 </Button>
               )}
             </div>
+
+            {/* Book page layouts (design) — dev only */}
+            {process.env.NODE_ENV === "development" && (
+              <div className="space-y-3 border-t border-border pt-6">
+                <span className="text-sm font-medium text-foreground">Book page layouts</span>
+                <p className="text-xs text-muted-foreground">
+                  Compare Baseline, Compact, and Spacious layouts with fixture data.
+                </p>
+                <div className="flex gap-2">
+                  {(["baseline", "compact", "spacious"] as const).map((v) => (
+                    <Button
+                      key={v}
+                      variant={(preferences.bookPageLayoutPreview ?? "baseline") === v ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => updatePreference("bookPageLayoutPreview", v)}
+                      className="flex-1"
+                    >
+                      {v === "baseline" ? "Baseline" : v === "compact" ? "Compact" : "Spacious"}
+                    </Button>
+                  ))}
+                </div>
+                <Link
+                  href={`/design/book-page?v=${preferences.bookPageLayoutPreview ?? "baseline"}`}
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                >
+                  <LayoutTemplate className="h-4 w-4" />
+                  Preview
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

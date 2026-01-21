@@ -768,13 +768,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {/* Official Author/Publisher Warnings (Gold Standard) */}
       {officialVerifiedWarnings.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-px bg-border flex-1"></div>
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-500">
-              <CheckCircle className="h-4 w-4" />
-              <h3 className="font-bold uppercase tracking-widest text-xs">Official Author Notes</h3>
-            </div>
-            <div className="h-px bg-border flex-1"></div>
+          <div className="flex items-center gap-2 mb-4 text-amber-600 dark:text-amber-500">
+            <CheckCircle className="h-4 w-4" />
+            <h3 className="font-semibold text-sm uppercase tracking-wide">Official Author Notes</h3>
           </div>
 
           <div className="space-y-0">
@@ -788,13 +784,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {/* Automated / system-generated warnings */}
       {standardAiWarnings.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-px bg-border flex-1"></div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Sparkles className="h-4 w-4" />
-              <h3 className="font-bold uppercase tracking-widest text-xs">Content analysis</h3>
-            </div>
-            <div className="h-px bg-border flex-1"></div>
+          <div className="flex items-center gap-2 mb-4 text-muted-foreground">
+            <Sparkles className="h-4 w-4" />
+            <h3 className="font-semibold text-sm uppercase tracking-wide">Content analysis</h3>
           </div>
 
           <div className="space-y-2">
@@ -804,7 +796,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 open={openCategories[group.category] || false}
                 onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
               >
-                <CollapsibleTrigger className="w-full flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left">
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-muted/5 hover:bg-muted/40 transition-colors text-left">
                   <div className="flex items-center gap-3">
                     <CategoryIcon
                       id={group.category}
@@ -819,7 +811,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="min-w-0">
-                  <div className="space-y-0 border-t border-border mt-2 pt-3">
+                  <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
                     {group.warnings.map((warning) => (
               <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} />
                     ))}
@@ -834,13 +826,9 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {/* Community Submitted Warnings */}
       {communityWarnings.length > 0 && (
         <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="h-px bg-border flex-1"></div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Shield className="h-4 w-4" />
-              <h3 className="font-bold uppercase tracking-widest text-xs">Community Reports</h3>
-            </div>
-            <div className="h-px bg-border flex-1"></div>
+          <div className="flex items-center gap-2 mb-4 text-muted-foreground">
+            <Shield className="h-4 w-4" />
+            <h3 className="font-semibold text-sm uppercase tracking-wide">Community Reports</h3>
           </div>
 
           <div className="space-y-2">
@@ -850,7 +838,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                 open={openCategories[group.category] || false}
                 onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
               >
-                <CollapsibleTrigger className="w-full flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-colors text-left">
+                <CollapsibleTrigger className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-muted/5 hover:bg-muted/40 transition-colors text-left">
                   <div className="flex items-center gap-3">
                     <CategoryIcon
                       id={group.category}
@@ -865,7 +853,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                   <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
                 </CollapsibleTrigger>
                 <CollapsibleContent className="min-w-0">
-                  <div className="space-y-0 border-t border-border mt-2 pt-3">
+                  <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
                     {group.warnings.map((warning) => (
               <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
                     ))}
@@ -923,7 +911,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
     <div 
       id={anchorId}
       className={cn(
-        "group py-7 border-b border-border last:border-0 transition-colors scroll-mt-20",
+        "group py-7 border-b border-border/70 last:border-0 transition-colors scroll-mt-20",
         isVerified ? "hover:border-amber-200 dark:hover:border-amber-800" : "hover:border-border"
       )}
     >
@@ -933,7 +921,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
         <div className="md:w-1/3 shrink-0">
           <div className="flex items-center gap-3 mb-2">
             <div className={cn(
-              "p-1.5 rounded-full",
+              "p-1 rounded-full",
               warning.severity === "severe" && "bg-red-50 text-red-600",
               warning.severity === "moderate" && "bg-orange-50 text-orange-600",
               warning.severity === "mild" && "bg-yellow-50 text-yellow-600"
@@ -941,13 +929,13 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
               <CategoryIcon
                 id={warning.category_id}
                 legacyCategory={warning.category}
-                className="h-4 w-4"
+                className="h-3.5 w-3.5"
               />
             </div>
             <div className="flex flex-col gap-1">
               <TagWithTooltip 
                 label={categoryLabel} 
-                className="font-bold text-foreground text-sm uppercase tracking-wide" 
+                className="font-semibold text-foreground text-sm uppercase tracking-wide" 
               />
               {subcategoryLabel && (
                 <TagWithTooltip 
@@ -955,27 +943,24 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
                   className="text-xs text-muted-foreground font-medium" 
                 />
               )}
+              <span className={cn(
+                "text-xs",
+                warning.severity === "severe" && "text-red-600 dark:text-red-500",
+                warning.severity === "moderate" && "text-orange-600 dark:text-orange-500",
+                warning.severity === "mild" && "text-yellow-600 dark:text-yellow-500"
+              )}>
+                {warning.severity === "severe" ? "Severe" : warning.severity === "moderate" ? "Moderate" : "Mild"}
+              </span>
+              {isSpoiler && isRevealed && (
+                <button
+                  onClick={() => setIsRevealed(false)}
+                  className="text-[10px] text-muted-foreground/60 hover:text-foreground font-medium flex items-center gap-1 transition-colors cursor-pointer w-fit"
+                >
+                  <EyeOff className="h-3 w-3" />
+                  <span>Hide spoiler</span>
+                </button>
+              )}
             </div>
-          </div>
-
-          <div className="flex flex-col gap-1 pl-9">
-            <span className={cn(
-              "text-[10px] font-bold uppercase tracking-widest",
-              warning.severity === "severe" && "text-red-600 dark:text-red-500",
-              warning.severity === "moderate" && "text-orange-600 dark:text-orange-500",
-              warning.severity === "mild" && "text-yellow-600 dark:text-yellow-500"
-            )}>
-              {warning.severity} Intensity
-            </span>
-            {isSpoiler && isRevealed && (
-              <button
-                onClick={() => setIsRevealed(false)}
-                className="text-[10px] text-muted-foreground/60 hover:text-foreground font-medium flex items-center gap-1 transition-colors cursor-pointer w-fit"
-              >
-                <EyeOff className="h-3 w-3" />
-                <span>Hide spoiler</span>
-              </button>
-            )}
           </div>
         </div>
 
