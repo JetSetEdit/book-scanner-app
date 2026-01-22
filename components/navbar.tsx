@@ -40,6 +40,8 @@ function isDevMode(): boolean {
   if (hostname.includes('.vercel.app') || 
       hostname.includes('.netlify.app') ||
       hostname.includes('subtext.app') ||
+      hostname.includes('subtextscanner.com.au') ||
+      hostname.includes('subtextscanner.com') ||
       (hostname !== 'localhost' && 
        hostname !== '127.0.0.1' && 
        !hostname.startsWith('192.168.') && 
@@ -75,9 +77,12 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
 
   useEffect(() => {
     setMounted(true)
-    // Dev mode is active if Admin IP OR Localhost
+    // Dev mode is ONLY active on localhost/dev environments
+    // Never show dev badges in production, even for admins
     const isLocalhost = isDevMode()
-    setIsDev(userMode === 'admin' || isLocalhost)
+    // Only show dev badges if we're actually on localhost/dev
+    // Ignore userMode - production should never show dev badges
+    setIsDev(isLocalhost)
     
     // Load dev settings from localStorage
     if (userMode === 'admin' || isLocalhost) {
