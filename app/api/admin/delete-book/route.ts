@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/utils/admin-auth'
 
 // Dev-only endpoint to delete a book and all related data
+// Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
 export async function DELETE(request: NextRequest) {
+  const auth = requireAdmin(request);
+  if (auth) return auth;
+
   // Check if we're in dev mode
   const isDev = process.env.NODE_ENV === 'development' || 
                 request.headers.get('host')?.includes('localhost')

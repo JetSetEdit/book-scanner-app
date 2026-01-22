@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/utils/admin-auth'
 
+/**
+ * GET /api/db-stats
+ * Get database statistics
+ * Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
+ */
 export async function GET(request: NextRequest) {
+  const auth = requireAdmin(request);
+  if (auth) return auth;
   try {
     // First check if the new columns exist
     const { data: testData, error: testError } = await supabaseAdmin

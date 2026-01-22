@@ -3,27 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { normalizeISBN, validateISBN } from '@/lib/isbn-validation'
 import { processIsbnScan } from '@/lib/services/scan-service'
 import { MODEL_VERSION } from '@/lib/config/taxonomy-v2'
+import { requireAdmin } from '@/lib/utils/admin-auth'
 
 export const runtime = 'nodejs'
-
-function requireAdmin(req: NextRequest): NextResponse | null {
-  const secret = req.headers.get('x-admin-secret')
-  const adminSecret = process.env.ADMIN_SECRET
-  const debugSecret = process.env.DEBUG_IP_SECRET
-  if (!adminSecret && !debugSecret) {
-    return NextResponse.json(
-      { ok: false, error: { code: 'ADMIN_NOT_CONFIGURED', message: 'Admin auth not configured (set ADMIN_SECRET or DEBUG_IP_SECRET and pass x-admin-secret).' } },
-      { status: 503 }
-    )
-  }
-  if (!secret || (secret !== adminSecret && secret !== debugSecret)) {
-    return NextResponse.json(
-      { ok: false, error: { code: 'UNAUTHORIZED', message: 'Missing or invalid x-admin-secret.' } },
-      { status: 401 }
-    )
-  }
-  return null
-}
 
 async function validateCoverUrl(url: string): Promise<boolean> {
   try {

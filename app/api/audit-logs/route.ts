@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/utils/admin-auth'
 
+/**
+ * GET /api/audit-logs
+ * Get audit logs for a book
+ * Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
+ */
 export async function GET(request: NextRequest) {
+  const auth = requireAdmin(request);
+  if (auth) return auth;
   try {
     const searchParams = request.nextUrl.searchParams
     const bookId = searchParams.get('book_id')

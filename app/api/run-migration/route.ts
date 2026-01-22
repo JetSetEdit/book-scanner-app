@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/utils/admin-auth'
 import fs from 'fs'
 import path from 'path'
 
+/**
+ * POST /api/run-migration
+ * Execute database migration
+ * Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
+ */
 export async function POST(request: NextRequest) {
+  const auth = requireAdmin(request);
+  if (auth) return auth;
   try {
     // Read the migration SQL from file
     const migrationPath = path.join(process.cwd(), 'scripts', '017_create_ai_audit_logs_table.sql')

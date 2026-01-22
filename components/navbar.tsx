@@ -34,9 +34,27 @@ const navigation = [
 function isDevMode(): boolean {
   if (typeof window === 'undefined') return false
   // Only show dev features on localhost - never in production
+  const hostname = window.location.hostname.toLowerCase()
+  
+  // Explicitly hide in production domains
+  if (hostname.includes('.vercel.app') || 
+      hostname.includes('.netlify.app') ||
+      hostname.includes('subtext.app') ||
+      (hostname !== 'localhost' && 
+       hostname !== '127.0.0.1' && 
+       !hostname.startsWith('192.168.') && 
+       !hostname.startsWith('10.') &&
+       !hostname.includes('localhost'))) {
+    return false
+  }
+  
+  // Only show on localhost or local network
   return (
-    window.location.hostname === 'localhost' ||
-    window.location.hostname === '127.0.0.1'
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname.startsWith('192.168.') ||
+    hostname.startsWith('10.') ||
+    hostname.includes('localhost')
   )
 }
 

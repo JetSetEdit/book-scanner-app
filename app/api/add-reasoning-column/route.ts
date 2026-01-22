@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { requireAdmin } from '@/lib/utils/admin-auth'
 import fs from 'fs'
 import path from 'path'
 
+/**
+ * POST /api/add-reasoning-column
+ * Add reasoning column to content_warnings table
+ * Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
+ */
 export async function POST(request: NextRequest) {
+  const auth = requireAdmin(request);
+  if (auth) return auth;
   try {
     console.log('🔄 Adding reasoning column to content_warnings table...')
 

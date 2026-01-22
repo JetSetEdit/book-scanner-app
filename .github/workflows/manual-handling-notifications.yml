@@ -79,15 +79,35 @@ jobs:
               switch (scan.reason) {
                 case 'not_found':
                   title = `📚 Manual Handling: Book Not Found - ISBN ${scan.isbn}`;
-                  body = `## Book Not Found\n\n` +
-                    `**ISBN:** ${scan.isbn}\n\n` +
+                  
+                  // Check if this is a user-reported missing book
+                  const metadata = scan.metadata || {};
+                  const isUserReport = metadata.source === 'user_report' || 
+                                      metadata.user_reported === true || 
+                                      !!metadata.user_provided_title;
+                  
+                  body = `## Book Not Found\n\n`;
+                  
+                  if (isUserReport) {
+                    body += `**User-Reported:** Yes\n\n`;
+                    body += `**User-Provided Title:** ${metadata.user_provided_title || '—'}\n`;
+                    body += `**User-Provided Author:** ${metadata.user_provided_author || '—'}\n`;
+                    body += `**Additional Info:** ${metadata.user_additional_info || '—'}\n\n`;
+                  }
+                  
+                  body += `**ISBN:** ${scan.isbn}\n\n` +
                     `**Reason:** Book not found in any external library (Open Library, Google Books)\n\n` +
                     `**Error:** ${scan.error_message || 'N/A'}\n\n` +
                     `**Created:** ${new Date(scan.created_at).toLocaleString()}\n\n` +
                     `**Action Required:**\n` +
                     `- [ ] Verify the ISBN is correct\n` +
-                    `- [ ] Check if book exists in other sources\n` +
-                    `- [ ] Manually add book metadata if needed\n\n` +
+                    `- [ ] Check if book exists in other sources\n`;
+                  
+                  if (isUserReport && metadata.user_provided_title) {
+                    body += `- [ ] Resolve via POST /api/admin/manual-handling-scans/resolve-by-adding-book with body {"id": "${scan.id}"} (if title/author provided)\n`;
+                  }
+                  
+                  body += `- [ ] Manually add book metadata if needed\n\n` +
                     `---\n` +
                     `_This issue was automatically created by GitHub Actions_`;
                   break;
