@@ -5,9 +5,9 @@
  * Update this when deploying new versions.
  */
 
-export const APP_VERSION = "1.03.55"
+export const APP_VERSION = "1.03.56"
 export const APP_VERSION_LABEL = "Public Beta"
-export const APP_BUILD_DATE = "2026-01-22" // YYYY-MM-DD - Update on each deployment
+export const APP_BUILD_DATE = "2026-01-24" // YYYY-MM-DD - Update on each deployment
 
 // Build ID from git commit hash (set at build time)
 // Falls back to "dev" if not in git repo or during development

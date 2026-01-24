@@ -169,13 +169,22 @@ function getMidnightInTimezone(timezone: string): number {
  * @param ip Client IP address
  * @param limit Maximum scans per day (default: 5)
  * @param timezone Optional IANA timezone string (e.g., 'Australia/Sydney'). If not provided, uses UTC.
- * @returns Object with { allowed: boolean, remaining: number, resetAt: number }
+ * @param userId Optional user identifier for bonus scan lookup
+ * @param bonusScans Optional bonus scans amount (if already fetched, to avoid duplicate queries)
+ * @returns Object with { allowed: boolean, remaining: number, resetAt: number, effectiveLimit: number }
  */
-export function checkRateLimit(ip: string, limit: number = 5, timezone?: string): {
+export async function checkRateLimit(
+  ip: string, 
+  limit: number = 5, 
+  timezone?: string,
+  userId?: string,
+  bonusScans?: number
+): Promise<{
   allowed: boolean
   remaining: number
   resetAt: number
-} {
+  effectiveLimit: number
+}> {
   const now = Date.now()
   
   // Calculate reset time based on timezone
@@ -189,6 +198,17 @@ export function checkRateLimit(ip: string, limit: number = 5, timezone?: string)
   
   const entry = rateLimitStore.get(ip)
   
+  // Get bonus scans if userId provided
+  let activeBonusScans = bonusScans
+  if (userId && activeBonusScans === undefined) {
+    const { getActiveBonusScans } = await import('@/lib/services/referral-bonus-service')
+    activeBonusScans = await getActiveBonusScans(userId)
+  }
+  activeBonusScans = activeBonusScans || 0
+  
+  // Calculate effective limit (base + bonus)
+  const effectiveLimit = limit + activeBonusScans
+  
   // No entry or expired - create new
   if (!entry || entry.resetAt < now) {
     rateLimitStore.set(ip, {
@@ -197,19 +217,21 @@ export function checkRateLimit(ip: string, limit: number = 5, timezone?: string)
     })
     return {
       allowed: true,
-      remaining: limit,
-      resetAt
+      remaining: effectiveLimit,
+      resetAt,
+      effectiveLimit
     }
   }
   
   // Check if limit exceeded (count is "credits used")
-  const remaining = Math.max(0, limit - entry.count)
-  const allowed = entry.count < limit
+  const remaining = Math.max(0, effectiveLimit - entry.count)
+  const allowed = entry.count < effectiveLimit
   
   return {
     allowed,
     remaining,
-    resetAt: entry.resetAt
+    resetAt: entry.resetAt,
+    effectiveLimit
   }
 }
 
@@ -217,20 +239,23 @@ export function checkRateLimit(ip: string, limit: number = 5, timezone?: string)
  * Check whether a request costing N credits is allowed.
  * This is useful when certain actions (e.g., Deep scan) should cost more.
  */
-export function checkRateLimitWithCost(
+export async function checkRateLimitWithCost(
   ip: string,
   limit: number = 5,
   timezone?: string,
-  cost: number = 1
-): {
+  cost: number = 1,
+  userId?: string,
+  bonusScans?: number
+): Promise<{
   allowed: boolean
   remaining: number
   resetAt: number
   cost: number
   required: number
-} {
+  effectiveLimit: number
+}> {
   const normalizedCost = Number.isFinite(cost) && cost > 0 ? Math.floor(cost) : 1
-  const status = checkRateLimit(ip, limit, timezone)
+  const status = await checkRateLimit(ip, limit, timezone, userId, bonusScans)
   return {
     ...status,
     allowed: status.remaining >= normalizedCost,
@@ -302,13 +327,28 @@ export function incrementRateLimitBy(ip: string, timezone?: string, cost: number
  * @param ip Client IP address
  * @param limit Maximum scans per day (default: 5)
  * @param timezone Optional IANA timezone string for calculating reset time
+ * @param userId Optional user identifier for bonus scan lookup
  */
-export function getRateLimitStatus(ip: string, limit: number = 5, timezone?: string): {
+export async function getRateLimitStatus(
+  ip: string, 
+  limit: number = 5, 
+  timezone?: string,
+  userId?: string
+): Promise<{
   count: number
   remaining: number
   limit: number
   resetAt: number
-} {
+  effectiveLimit: number
+}> {
+  // Get bonus scans if userId provided
+  let activeBonusScans = 0
+  if (userId) {
+    const { getActiveBonusScans } = await import('@/lib/services/referral-bonus-service')
+    activeBonusScans = await getActiveBonusScans(userId)
+  }
+  
+  const effectiveLimit = limit + activeBonusScans
   const now = Date.now()
   const entry = rateLimitStore.get(ip)
   
@@ -324,17 +364,19 @@ export function getRateLimitStatus(ip: string, limit: number = 5, timezone?: str
   if (!entry || entry.resetAt < now) {
     return {
       count: 0,
-      remaining: limit,
-      limit,
-      resetAt: defaultResetAt
+      remaining: effectiveLimit,
+      limit: effectiveLimit,
+      resetAt: defaultResetAt,
+      effectiveLimit
     }
   }
   
   return {
     count: entry.count,
-    remaining: Math.max(0, limit - entry.count),
-    limit,
-    resetAt: entry.resetAt
+    remaining: Math.max(0, effectiveLimit - entry.count),
+    limit: effectiveLimit,
+    resetAt: entry.resetAt,
+    effectiveLimit
   }
 }
 

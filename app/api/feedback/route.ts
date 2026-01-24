@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         const bookPageMatch = pageUrl.match(/\/book\/([0-9X-]+)/)
         if (bookPageMatch) {
           bookIsbn = bookPageMatch[1].replace(/-/g, '')
-          // Try to find book
+          // Try to find book (but keep ISBN even if book doesn't exist)
           const { data: bookData } = await supabaseAdmin
             .from('books')
             .select('id, title, author')
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
             bookTitle = bookData.title
             bookAuthor = bookData.author
           }
+          // Note: bookIsbn is kept even if book doesn't exist yet
         }
       } catch (error) {
         // Ignore URL parsing errors
@@ -194,7 +195,13 @@ export async function POST(req: NextRequest) {
           warnings_count: context?.warningsCount || null,
           analysis_status: context?.analysisStatus || null,
           metadata_issues: context?.metadataIssues || null,
-          pathname: pageUrl ? new URL(pageUrl).pathname : null
+          pathname: pageUrl ? (() => {
+            try {
+              return new URL(pageUrl).pathname
+            } catch {
+              return pageUrl.split('?')[0] // Fallback: just get path before query
+            }
+          })() : null
         }
       })
       .select()

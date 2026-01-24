@@ -9,6 +9,45 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.55",
+    date: "2026-01-22",
+    title: "New features",
+    changes: [
+      "Design book page, Settings layout selector+Preview, variant-check, reduce clutter, resolve-by-adding-book",
+      "Content explanation, scan recording on rescan, auto-scroll carousel"
+    ],
+  },
+  {
+    version: "1.03.54",
+    date: "2026-01-22",
+    title: "New features",
+    changes: [
+      "Design book page, Settings layout selector+Preview, variant-check, reduce clutter, resolve-by-adding-book",
+      "Content explanation, scan recording on rescan, auto-scroll carousel",
+      "Remove duplicate Navbar from Batch Scanner page"
+    ],
+  },
+  {
+    version: "1.03.53",
+    date: "2026-01-22",
+    title: "New features",
+    changes: [
+      "Design book page, Settings layout selector+Preview, variant-check, reduce clutter, resolve-by-adding-book",
+      "Content explanation, scan recording on rescan, auto-scroll carousel",
+      "Remove duplicate Navbar from Batch Scanner page"
+    ],
+  },
+  {
+    version: "1.03.52",
+    date: "2026-01-21",
+    title: "New features",
+    changes: [
+      "Design book page, Settings layout selector+Preview, variant-check, reduce clutter, resolve-by-adding-book",
+      "Content explanation, scan recording on rescan, auto-scroll carousel",
+      "Remove duplicate Navbar from Batch Scanner page"
+    ],
+  },
+  {
     version: "1.03.51",
     date: "2026-01-21",
     title: "New feature",

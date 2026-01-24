@@ -12,6 +12,7 @@ import { APP_VERSION, APP_VERSION_LABEL, APP_BUILD_DATE } from "@/lib/config/ver
 import { CHANGELOG } from "@/lib/config/changelog"
 import { getVariantId, getVariantConfig } from "@/lib/config/variants"
 import { Badge } from "@/components/ui/badge"
+import { BonusScanBadge } from "@/components/bonus-scan-badge"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   DropdownMenu,
@@ -212,7 +213,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                   VIP
                 </Badge>
               )}
-              {userMode === 'admin' && (
+              {/* Only show ADMIN badge in dev mode, never in production */}
+              {userMode === 'admin' && isDev && (
                 <Badge 
                   variant="outline" 
                   className="font-mono text-[10px] bg-purple-50 text-purple-700 border-purple-200 hidden sm:inline-flex"
@@ -225,6 +227,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                   {getVariantId()}
                 </Badge>
               )}
+              <BonusScanBadge variant="nav" />
               <Popover>
                 <PopoverTrigger asChild>
                   <button type="button" className="ml-1">

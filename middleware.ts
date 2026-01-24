@@ -9,6 +9,7 @@ export function middleware(request: NextRequest) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/static') ||
     pathname === '/welcome' ||
+    pathname.startsWith('/share/') || // Allow referral links through
     pathname === '/favicon.ico' ||
     pathname.match(/\.(svg|png|jpg|jpeg|gif|webp)$/)
   ) {

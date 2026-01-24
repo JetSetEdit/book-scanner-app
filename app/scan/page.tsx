@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils"
 import { getCurrentStage } from "@/lib/utils/scan-progress-mapper"
 import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
 import { RateLimitFeedbackDialog } from "@/components/rate-limit-feedback-dialog"
+import { BonusScanBadge } from "@/components/bonus-scan-badge"
+import { BonusClaimNotification } from "@/components/bonus-claim-notification"
 
 import { ScanningAnimation } from "@/components/scanning-animation"
 
@@ -153,6 +155,7 @@ function ScanTestPageContent() {
   
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [bonusClaimInfo, setBonusClaimInfo] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [statusUpdates, setStatusUpdates] = useState<string[]>([])
   const [detailedStatusUpdates, setDetailedStatusUpdates] = useState<any[]>([])
@@ -442,6 +445,13 @@ function ScanTestPageContent() {
         // Update rate limit from result if available
         if (result.rateLimit) {
           setRateLimit(result.rateLimit)
+        }
+        
+        // Handle bonus claim notification if bonus was claimed
+        if (result.bonusClaimInfo) {
+          setBonusClaimInfo(result.bonusClaimInfo)
+          // Clear after notification is shown (component will handle toast)
+          setTimeout(() => setBonusClaimInfo(null), 6000)
         }
 
         // Transform result to match expected format
@@ -787,6 +797,11 @@ function ScanTestPageContent() {
             </div>
           )}
 
+          {/* Bonus Scan Badge - Prominently displayed above rate limit */}
+          <div className="mb-4">
+            <BonusScanBadge variant="scan-page" />
+          </div>
+
           {/* Rate Limit Status */}
           {rateLimit && (
             <div className={cn(
@@ -804,7 +819,14 @@ function ScanTestPageContent() {
                     ) : rateLimit.remaining === 0 ? (
                       <>Daily scan credit limit reached</>
                     ) : (
-                      <>{rateLimit.remaining} of {rateLimit.limit} scan credits remaining today</>
+                      <>
+                        {rateLimit.remaining} of {rateLimit.limit} scan credits remaining today
+                        {rateLimit.limit > DEFAULT_SCAN_CREDITS_PER_DAY && (
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            ({DEFAULT_SCAN_CREDITS_PER_DAY} base + {rateLimit.limit - DEFAULT_SCAN_CREDITS_PER_DAY} bonus)
+                          </span>
+                        )}
+                      </>
                     )}
                   </span>
                 </div>
@@ -1185,6 +1207,12 @@ function ScanTestPageContent() {
                 )}
             </div>
           )}
+
+                 {/* Bonus Claim Notification */}
+                 <BonusClaimNotification 
+                   claimInfo={bonusClaimInfo}
+                   onDismiss={() => setBonusClaimInfo(null)}
+                 />
 
                  {result && result.success && (
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">

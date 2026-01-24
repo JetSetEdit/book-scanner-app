@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { AESTHETIC_THEMES, type AestheticThemeId } from "@/lib/config/aesthetic-themes"
 import { cn } from "@/lib/utils"
+import { ShareSubtextButton } from "@/components/share-subtext-button"
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
@@ -161,6 +162,9 @@ export default function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Share Subtext */}
+        <ShareSubtextButton />
       </div>
     </main>
   )

@@ -4,6 +4,7 @@ import { normalizeISBN, validateISBN } from '@/lib/isbn-validation'
 import { processIsbnScan } from '@/lib/services/scan-service'
 import { MODEL_VERSION } from '@/lib/config/taxonomy-v2'
 import { requireAdmin } from '@/lib/utils/admin-auth'
+import { fetchBookByISBNWithRetry, fetchByTitleAuthor } from '@/lib/book-api'
 
 export const runtime = 'nodejs'
 
@@ -90,12 +91,73 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const title = (meta.user_provided_title || 'Unknown').trim() || 'Unknown'
-    const author = (meta.user_provided_author || '').trim() || null
+    // Enhanced search: Try ISBN with retry, then title/author search
+    let foundBookData: {
+      title: string
+      author: string | null
+      description: string | null
+      cover_url: string | null
+      publisher: string | null
+      published_date: string | null
+      page_count: number | null
+      categories: string[] | null
+    } | null = null
+    let searchMethod = 'user_provided'
 
-    const olCover = `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`
-    const coverOk = await validateCoverUrl(olCover)
-    const coverUrl = coverOk ? olCover : null
+    // Step 1: Try ISBN search with format retry
+    console.log(`[resolve-by-adding-book] Attempting ISBN search with retry for ${cleanIsbn}`)
+    const isbnResult = await fetchBookByISBNWithRetry(cleanIsbn)
+    if (isbnResult) {
+      foundBookData = {
+        title: isbnResult.title,
+        author: isbnResult.author || null,
+        description: isbnResult.description || null,
+        cover_url: isbnResult.cover_url || null,
+        publisher: isbnResult.publisher || null,
+        published_date: isbnResult.published_date || null,
+        page_count: isbnResult.page_count || null,
+        categories: isbnResult.categories || null,
+      }
+      searchMethod = 'isbn_with_retry'
+      console.log(`[resolve-by-adding-book] ✅ Found book via ISBN search with retry: ${isbnResult.title}`)
+    } else {
+      // Step 2: Try title/author search if user provided that data
+      const userTitle = (meta.user_provided_title || '').trim()
+      const userAuthor = (meta.user_provided_author || '').trim() || undefined
+      
+      if (userTitle && userTitle.length > 0) {
+        console.log(`[resolve-by-adding-book] ISBN search failed, trying title/author search: "${userTitle}" by ${userAuthor || 'unknown'}`)
+        const titleAuthorResult = await fetchByTitleAuthor(cleanIsbn, userTitle, userAuthor)
+        if (titleAuthorResult) {
+          foundBookData = {
+            title: titleAuthorResult.title,
+            author: titleAuthorResult.author || null,
+            description: titleAuthorResult.description || null,
+            cover_url: titleAuthorResult.cover_url || null,
+            publisher: titleAuthorResult.publisher || null,
+            published_date: titleAuthorResult.published_date || null,
+            page_count: titleAuthorResult.page_count || null,
+            categories: titleAuthorResult.categories || null,
+          }
+          searchMethod = 'title_author'
+          console.log(`[resolve-by-adding-book] ✅ Found book via title/author search: ${titleAuthorResult.title}`)
+        }
+      }
+    }
+
+    // Use found metadata if available, otherwise fall back to user-provided data
+    const title = foundBookData?.title || (meta.user_provided_title || 'Unknown').trim() || 'Unknown'
+    const author = foundBookData?.author || (meta.user_provided_author || '').trim() || null
+    const description = foundBookData?.description || null
+    const coverUrl = foundBookData?.cover_url || (await (async () => {
+      const olCover = `https://covers.openlibrary.org/b/isbn/${cleanIsbn}-L.jpg`
+      const coverOk = await validateCoverUrl(olCover)
+      return coverOk ? olCover : null
+    })())
+    const publisher = foundBookData?.publisher || null
+    const publishedDate = foundBookData?.published_date || null
+    const pageCount = foundBookData?.page_count || null
+    const categories = foundBookData?.categories || null
 
     const now = new Date().toISOString()
     const { data: book, error: insertErr } = await supabaseAdmin
@@ -104,12 +166,12 @@ export async function POST(req: NextRequest) {
         isbn: cleanIsbn,
         title,
         author,
-        description: null,
+        description,
         cover_url: coverUrl,
-        publisher: null,
-        published_date: null,
-        page_count: null,
-        categories: null,
+        publisher,
+        published_date: publishedDate,
+        page_count: pageCount,
+        categories,
         created_at: now,
         updated_at: now,
       })
@@ -145,8 +207,8 @@ export async function POST(req: NextRequest) {
     }
 
     const resolutionNotes = scanTriggered
-      ? `Added book from user report; book_id=${book.id}. Scan triggered.`
-      : `Added book from user report; book_id=${book.id}. Scan failed: ${scanError}`
+      ? `Added book from user report (found via ${searchMethod}); book_id=${book.id}. Scan triggered.`
+      : `Added book from user report (found via ${searchMethod}); book_id=${book.id}. Scan failed: ${scanError}`
 
     const { error: updateErr } = await supabaseAdmin
       .from('manual_handling_scans')

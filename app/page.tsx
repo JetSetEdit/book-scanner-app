@@ -1,14 +1,22 @@
 import { Shield, Users, ScanBarcode, Search, Brain } from "lucide-react"
 import Link from "next/link"
+import { Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { RecentScans } from "@/components/recent-scans"
 import { getVariantConfig } from "@/lib/config/variants"
+import { ReferralWelcomeModalWrapper } from "@/components/referral-welcome-modal-wrapper"
 
 export default function HomePage() {
   const v = getVariantConfig()
+
   return (
     <main className="min-h-screen bg-background flex flex-col">
+      {/* Referral Welcome Modal Wrapper (client component) */}
+      <Suspense fallback={null}>
+        <ReferralWelcomeModalWrapper />
+      </Suspense>
+
       {/* Hero Section */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-24 md:py-32 text-center">
         <div className="max-w-4xl mx-auto space-y-8">

@@ -14,7 +14,7 @@ interface OpenLibraryBook {
 }
 
 import { isPlaceholderTitle, filterPlaceholderCandidates } from './utils/placeholder-detection'
-import { normalizeISBN } from './isbn-validation'
+import { normalizeISBN, getBothISBNFormats } from './isbn-validation'
 
 interface BookData {
   isbn: string
@@ -94,7 +94,14 @@ function isbnMatches(scannedIsbn: string, returnedISBNs: string[]): boolean {
 async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandidate[]> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`, {
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY
+    const url = new URL('https://www.googleapis.com/books/v1/volumes')
+    url.searchParams.append('q', `isbn:${cleanScannedIsbn}`)
+    if (apiKey) {
+      url.searchParams.append('key', apiKey)
+    }
+    
+    const response = await fetch(url.toString(), {
       next: { revalidate: 86400 },
       headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
     })
@@ -156,6 +163,15 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
     fetchFromGoogleBooks(cleanIsbn)
   ])
 
+  // Check for rate limiting errors and re-throw them
+  if (googleResult.status === 'rejected') {
+    const error = googleResult.reason
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+      throw error // Re-throw rate limit errors so caller can handle them
+    }
+  }
+
   const openLibBook = openLibResult.status === 'fulfilled' ? openLibResult.value : null
   const googleBook = googleResult.status === 'fulfilled' ? googleResult.value : null
 
@@ -196,6 +212,67 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
 
   // Both APIs failed
   console.log(`[Book API] ❌ Book not found in any API for ISBN: ${cleanIsbn}`)
+  return null
+}
+
+/**
+ * Fetch book by ISBN with automatic retry using alternative ISBN formats
+ * Tries the original ISBN first, then tries converted format (ISBN-10 <-> ISBN-13) if first attempt fails
+ * @param isbn - The ISBN to search for
+ * @returns BookData if found, null otherwise
+ * @throws Error if rate limited (429) - caller should handle this
+ */
+export async function fetchBookByISBNWithRetry(isbn: string): Promise<BookData | null> {
+  const cleanIsbn = normalizeISBN(isbn)
+  let rateLimited = false
+  
+  // Try original ISBN first
+  try {
+    const result = await fetchBookByISBN(cleanIsbn)
+    if (result) {
+      return result
+    }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+      rateLimited = true
+      throw error // Re-throw rate limit errors so caller can handle them
+    }
+    // For other errors, continue to retry with alternative format
+  }
+
+  // If original search failed, try converted format
+  const bothFormats = getBothISBNFormats(cleanIsbn)
+  let alternativeIsbn: string | null = null
+
+  if (cleanIsbn.length === 13 && bothFormats.isbn10) {
+    alternativeIsbn = bothFormats.isbn10
+    console.log(`[Book API] Original ISBN-13 search failed, retrying with ISBN-10: ${alternativeIsbn}`)
+  } else if (cleanIsbn.length === 10 && bothFormats.isbn13) {
+    alternativeIsbn = bothFormats.isbn13
+    console.log(`[Book API] Original ISBN-10 search failed, retrying with ISBN-13: ${alternativeIsbn}`)
+  }
+
+  if (alternativeIsbn && !rateLimited) {
+    try {
+      const retryResult = await fetchBookByISBN(alternativeIsbn)
+      if (retryResult) {
+        // Use the original ISBN as the canonical ISBN, but return the found metadata
+        return {
+          ...retryResult,
+          isbn: cleanIsbn
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+        throw error // Re-throw rate limit errors
+      }
+    }
+  }
+
+  // Both attempts failed (but not due to rate limiting)
+  console.log(`[Book API] ❌ Book not found after retrying with alternative ISBN format`)
   return null
 }
 
@@ -262,7 +339,14 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
 async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`, {
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY
+    const url = new URL('https://www.googleapis.com/books/v1/volumes')
+    url.searchParams.append('q', `isbn:${cleanScannedIsbn}`)
+    if (apiKey) {
+      url.searchParams.append('key', apiKey)
+    }
+    
+    const response = await fetch(url.toString(), {
       next: { revalidate: 86400 },
       headers: {
         'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
@@ -270,6 +354,9 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
     })
 
     if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error(`Google Books API rate limit exceeded (429). Please try again later.`)
+      }
       throw new Error(`Google Books API request failed: ${response.status}`)
     }
 
@@ -353,6 +440,148 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
     }
   } catch (error) {
     console.error("[Book API] Google Books error:", error)
+    return null
+  }
+}
+
+/**
+ * Search for a book by title and author using Google Books API
+ * Returns book data if found with ISBN matching (or close to) the provided ISBN hint
+ * @param isbnHint - The ISBN we're looking for (used to validate results)
+ * @param title - Book title to search for
+ * @param author - Book author to search for (optional)
+ * @returns BookData if found with matching ISBN, null otherwise
+ */
+export async function fetchByTitleAuthor(
+  isbnHint: string,
+  title: string,
+  author?: string
+): Promise<BookData | null> {
+  if (!title || title.trim().length === 0) {
+    return null
+  }
+
+  try {
+    const cleanIsbnHint = normalizeISBN(isbnHint)
+    const bothFormats = getBothISBNFormats(cleanIsbnHint)
+    const validISBNs = [cleanIsbnHint]
+    if (bothFormats.isbn10) validISBNs.push(bothFormats.isbn10)
+    if (bothFormats.isbn13) validISBNs.push(bothFormats.isbn13)
+
+    // Build Google Books query with intitle: and inauthor: operators
+    let query = `intitle:"${title.trim()}"`
+    if (author && author.trim().length > 0) {
+      query += ` inauthor:"${author.trim()}"`
+    }
+
+    console.log(`[Book API] Searching by title/author: ${query} (ISBN hint: ${cleanIsbnHint})`)
+
+    const apiKey = process.env.GOOGLE_BOOKS_API_KEY
+    const url = new URL('https://www.googleapis.com/books/v1/volumes')
+    url.searchParams.append('q', query)
+    url.searchParams.append('maxResults', '5')
+    if (apiKey) {
+      url.searchParams.append('key', apiKey)
+    }
+
+    const response = await fetch(url.toString(), {
+      next: { revalidate: 86400 },
+      headers: {
+        'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
+      }
+    })
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        console.warn(`[Book API] Google Books title/author search rate limited (429)`)
+        throw new Error(`Google Books API rate limit exceeded (429). Please try again later.`)
+      }
+      console.warn(`[Book API] Google Books title/author search failed: ${response.status}`)
+      return null
+    }
+
+    const data = await response.json()
+
+    if (!data.items || data.items.length === 0) {
+      console.log(`[Book API] No results found for title/author search: ${query}`)
+      return null
+    }
+
+    // Find first book with matching ISBN
+    for (const item of data.items) {
+      const volumeInfo = item.volumeInfo
+      if (!volumeInfo.title || isPlaceholderTitle(volumeInfo.title)) {
+        continue
+      }
+
+      // Check if any returned ISBN matches our hint
+      const returnedISBNs = extractISBNsFromGoogleBooks(volumeInfo.industryIdentifiers)
+      const hasMatchingISBN = validISBNs.some(hintIsbn => 
+        isbnMatches(hintIsbn, returnedISBNs)
+      )
+
+      if (!hasMatchingISBN) {
+        console.warn(
+          `[Book API] Title/author search found "${volumeInfo.title}" but ISBNs ${returnedISBNs.join(', ')} don't match hint ${cleanIsbnHint}. Skipping.`
+        )
+        continue
+      }
+
+      // Found a match! Use the ISBN hint (normalized) as the canonical ISBN
+      const matchedISBN = cleanIsbnHint
+
+      // Get best cover image
+      const getBestCover = async (imageLinks: any) => {
+        if (!imageLinks) return undefined
+
+        const candidates = [
+          imageLinks.extraLarge,
+          imageLinks.large,
+          imageLinks.medium,
+          imageLinks.small,
+          imageLinks.thumbnail,
+          imageLinks.smallThumbnail
+        ].filter(Boolean)
+
+        if (candidates.length === 0) return undefined
+
+        const validationResults = await Promise.allSettled(
+          candidates.map(async (url) => {
+            const secureUrl = url.replace("http:", "https:").replace("&edge=curl", "")
+            const isValid = await validateImageUrl(secureUrl)
+            return { url: secureUrl, valid: isValid }
+          })
+        )
+
+        for (const result of validationResults) {
+          if (result.status === 'fulfilled' && result.value.valid) {
+            return result.value.url
+          }
+        }
+
+        return undefined
+      }
+
+      console.log(`[Book API] ✅ Found book via title/author search: ${volumeInfo.title} (ISBN: ${matchedISBN})`)
+
+      return {
+        isbn: matchedISBN,
+        title: volumeInfo.title,
+        author: volumeInfo.authors?.[0],
+        cover_url: await getBestCover(volumeInfo.imageLinks),
+        description: volumeInfo.description,
+        publisher: volumeInfo.publisher,
+        published_date: volumeInfo.publishedDate,
+        page_count: volumeInfo.pageCount,
+        categories: volumeInfo.categories?.slice(0, 5),
+        source: 'googlebooks',
+      }
+    }
+
+    console.log(`[Book API] Title/author search found results but none matched ISBN ${cleanIsbnHint}`)
+    return null
+  } catch (error) {
+    console.error("[Book API] Title/author search error:", error)
     return null
   }
 }
