@@ -74,7 +74,7 @@ export async function fetchCandidatesByISBN(isbn: string): Promise<BookCandidate
 /**
  * Extract and normalize ISBNs from Google Books industryIdentifiers
  */
-function extractISBNsFromGoogleBooks(industryIdentifiers: any[] | undefined): string[] {
+export function extractISBNsFromGoogleBooks(industryIdentifiers: any[] | undefined): string[] {
   if (!industryIdentifiers) return []
   
   return industryIdentifiers
