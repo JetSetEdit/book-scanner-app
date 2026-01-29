@@ -49,6 +49,28 @@ export interface AnalysisOptions {
   includeReasoning?: boolean
   /** Truncate description to N characters for this analysis */
   maxDescriptionChars?: number
+  /** 
+   * Use Gemini as the primary model, falling back to OpenAI on rate limit errors.
+   * When true, ignores enableOpenAI/enableGemini and uses sequential execution.
+   * (default: false - uses parallel execution based on enableOpenAI/enableGemini)
+   */
+  geminiFirst?: boolean
+}
+
+/**
+ * Detect if an error is a rate limit or quota error that should trigger fallback
+ */
+function isRateLimitError(error: unknown): boolean {
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase()
+    return msg.includes('429') ||
+      msg.includes('quota') ||
+      msg.includes('rate limit') ||
+      msg.includes('rate_limit') ||
+      msg.includes('resource exhausted') ||
+      msg.includes('too many requests')
+  }
+  return false
 }
 
 type WebEnrichmentInfo = {
@@ -147,7 +169,7 @@ Context Modifiers (add nuance):
  */
 function selectRelevantCategories(metadata: BookMetadata): string[] {
   const text = `${metadata.title} ${metadata.author} ${metadata.description}`.toLowerCase()
-  
+
   // Category keyword mappings (keywords that suggest a category is relevant)
   const categoryKeywords: Record<string, string[]> = {
     'mental_health': ['anxiety', 'depression', 'ptsd', 'trauma', 'suicide', 'self-harm', 'eating disorder', 'panic', 'mental health', 'psychological', 'burnout', 'stress'],
@@ -161,10 +183,10 @@ function selectRelevantCategories(metadata: BookMetadata): string[] {
     'bullying_or_social_cruelty': ['bullying', 'hazing', 'humiliation', 'social pressure', 'peer pressure', 'ostracized', 'excluded'],
     'tropes': ['enemies to lovers', 'bully romance', 'dark romance', 'mafia', 'stalker', 'kidnapping', 'captive', 'omegaverse', 'age gap', 'reverse harem', 'why choose', 'harem', 'grumpy sunshine', 'forbidden love'],
   }
-  
+
   // Score each category based on keyword matches
   const categoryScores = new Map<string, number>()
-  
+
   for (const [categoryId, keywords] of Object.entries(categoryKeywords)) {
     const score = keywords.reduce((acc, keyword) => {
       // Count occurrences (case-insensitive)
@@ -174,13 +196,13 @@ function selectRelevantCategories(metadata: BookMetadata): string[] {
     }, 0)
     categoryScores.set(categoryId, score)
   }
-  
+
   // Get top 5 categories by score
   const sortedCategories = Array.from(categoryScores.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
     .map(([categoryId]) => categoryId)
-  
+
   // If we have good matches (score > 0), use those
   if (sortedCategories.length > 0 && categoryScores.get(sortedCategories[0])! > 0) {
     return sortedCategories.map(catId => {
@@ -188,7 +210,7 @@ function selectRelevantCategories(metadata: BookMetadata): string[] {
       return category?.userLabel || catId
     })
   }
-  
+
   // Fallback: Use a rotating selection based on book title hash for variety
   // This ensures different books show different categories even if description is minimal
   let hash = 0
@@ -197,7 +219,7 @@ function selectRelevantCategories(metadata: BookMetadata): string[] {
     hash = hash & hash // Convert to 32-bit integer
   }
   const startIndex = Math.abs(hash) % Math.max(1, WARNING_CATEGORIES.length - 4)
-  
+
   return WARNING_CATEGORIES
     .slice(startIndex, startIndex + 5)
     .map(cat => cat.userLabel)
@@ -510,7 +532,7 @@ Instructions:
     const modelName = model || MODEL_VERSION
     // GPT-5 models only support temperature=1 (default), so omit it for GPT-5
     const isGpt5 = modelName.includes('gpt-5') || modelName.includes('o1') || modelName.includes('o3')
-    
+
     const response = await openai.chat.completions.create({
       model: modelName,
       messages: [
@@ -584,27 +606,27 @@ DESCRIPTION FORMAT (Australian Classification Board style):
     return { warnings, noWarningsReasoning }
   } catch (error) {
     console.error('OpenAI analysis error:', error)
-    
+
     // Check if it's a rate limit error - these should be thrown, not caught
     const errorMessage = error instanceof Error ? error.message : String(error)
     const errorCode = (error as any)?.status || (error as any)?.code
-    
-    const isRateLimit = errorCode === 429 || 
-                       errorMessage.includes('429') || 
-                       errorMessage.includes('rate limit') || 
-                       errorMessage.includes('quota') ||
-                       errorMessage.includes('Rate limit') ||
-                       errorMessage.includes('rate_limit')
-    
+
+    const isRateLimit = errorCode === 429 ||
+      errorMessage.includes('429') ||
+      errorMessage.includes('rate limit') ||
+      errorMessage.includes('quota') ||
+      errorMessage.includes('Rate limit') ||
+      errorMessage.includes('rate_limit')
+
     if (isRateLimit) {
       console.error('OpenAI rate limit exceeded - throwing error to prevent false "no warnings" result')
       onProgress?.('⚠️ OpenAI rate limit exceeded - analysis cannot complete')
       // Throw a specific error that can be caught and handled appropriately
       const rateLimitError = new Error('OpenAI rate limit exceeded')
-      ;(rateLimitError as any).isRateLimit = true
+        ; (rateLimitError as any).isRateLimit = true
       throw rateLimitError
     }
-    
+
     // For other errors, also throw to prevent false "no warnings"
     throw error
   }
@@ -621,14 +643,29 @@ async function analyzeWithGemini(
   const taxonomyContext = buildTaxonomyContext()
   const modifiersList = buildContextModifiersList()
 
-    const maxWarningsInstruction = options?.maxWarnings
-      ? `\nIMPORTANT: Return AT MOST ${options.maxWarnings} warnings. Prioritize the highest-impact and most safety-relevant warnings.`
-      : ''
-    const reasoningInstruction = options?.includeReasoning === false
-      ? `\nIMPORTANT: Omit the per-warning \"reasoning\" field (or keep it to one short sentence max).`
-      : ''
+  const maxWarningsInstruction = options?.maxWarnings
+    ? `\nIMPORTANT: Return AT MOST ${options.maxWarnings} warnings. Prioritize the highest-impact and most safety-relevant warnings.`
+    : ''
+  const reasoningInstruction = options?.includeReasoning === false
+    ? `\nIMPORTANT: Omit the per-warning \"reasoning\" field (or keep it to one short sentence max).`
+    : ''
 
-    const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.${maxWarningsInstruction}${reasoningInstruction}
+  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.${maxWarningsInstruction}${reasoningInstruction}
+
+Official References:
+- Guidelines for the Classification of Publications 2005 (F2008C00129)
+- National Classification Code (F2013C00006)
+- https://www.classification.gov.au/classification-ratings/how-rating-decided
+
+The Board assesses content based on six classifiable elements: themes, violence, language, drug use, nudity, and sex. Ratings are determined by the IMPACT of these elements (very mild, mild, moderate, strong, high).
+
+Per the Publications Guidelines (p.124-129), impact is assessed through:
+- Emphasis: How prominently the element is featured
+- Tone: The manner in which content is presented
+- Frequency: How often the element appears
+- Context: The setting and justification for the content
+- Detail: The amount of visual or written detail
+- Cumulative effect: How elements combine to create overall impact
 
 Book Information:
 - Title: ${metadata.title}
@@ -642,6 +679,7 @@ ${metadata.description}
 Available Categories and Subcategories:
 ${taxonomyContext}
 ${modifiersList}
+
 
 Instructions:
 0. **PRIORITY EXCEPTION: CANON KNOWLEDGE (Literary Classics)**
@@ -818,9 +856,9 @@ function updateDescriptionForSeverity(
     mild: 'Mild'
   }
   const targetIntensity = intensityMap[computedSeverity]
-  
+
   let updatedDescription = originalDescription.trim()
-  
+
   // CRITICAL FIX: Handle the common AI error "Moderate of..." → "Moderate themes of..."
   // This must be checked FIRST before any other processing
   const missingThemesPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i
@@ -832,21 +870,21 @@ function updateDescriptionForSeverity(
       return updatedDescription
     }
   }
-  
+
   // Pattern to match intensity word at the start
   const intensityStartPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i
-  
+
   if (intensityStartPattern.test(updatedDescription)) {
     // Extract the current intensity word and everything after it
     const match = updatedDescription.match(intensityStartPattern)
     if (match) {
       const currentIntensity = match[1]
       const restOfDescription = updatedDescription.substring(match[0].length).trim()
-      
+
       // Check if "themes" is missing (common AI error: "Moderate of..." instead of "Moderate themes of...")
       const hasThemes = /^themes?\s+of/i.test(restOfDescription)
       const hasDirectOf = /^of\s+/i.test(restOfDescription)
-      
+
       // If we have "Moderate of..." (missing themes), add "themes"
       if (hasDirectOf && !hasThemes) {
         updatedDescription = `${targetIntensity} themes ${restOfDescription}`
@@ -897,7 +935,7 @@ function updateReasoningForSeverity(
 ): string {
   // Safety check: if signals is undefined, null, or has undefined properties, provide default values
   // This prevents TypeError when accessing signals.frequency.toFixed() etc.
-  const safeSignals: SeveritySignals = (signals && 
+  const safeSignals: SeveritySignals = (signals &&
     typeof signals === 'object' &&
     typeof signals.frequency === 'number' && !isNaN(signals.frequency) &&
     typeof signals.explicitness === 'number' && !isNaN(signals.explicitness) &&
@@ -911,7 +949,7 @@ function updateReasoningForSeverity(
     centrality: 0.5,
     intensity_markers: []
   }
-  
+
   if (!originalReasoning) {
     // Generate basic reasoning if none provided
     const severityText = computedSeverity.charAt(0).toUpperCase() + computedSeverity.slice(1)
@@ -919,7 +957,7 @@ function updateReasoningForSeverity(
   }
 
   const severityText = computedSeverity.charAt(0).toUpperCase() + computedSeverity.slice(1)
-  
+
   // Pattern to match severity classification claims (not detail level)
   const severityClassificationPatterns = [
     /\b(mild|moderate|severe)\s+severity\s+classification\b/gi,
@@ -931,7 +969,7 @@ function updateReasoningForSeverity(
   ]
 
   let updatedReasoning = originalReasoning
-  
+
   // Replace severity classification claims
   for (const pattern of severityClassificationPatterns) {
     updatedReasoning = updatedReasoning.replace(pattern, (match, claimedSeverity) => {
@@ -944,14 +982,14 @@ function updateReasoningForSeverity(
 
   // Check if reasoning explicitly states the severity classification
   const hasExplicitSeverityClaim = severityClassificationPatterns.some(pattern => pattern.test(originalReasoning))
-  
+
   // If no explicit severity claim found, append it
   if (!hasExplicitSeverityClaim) {
     // Check if reasoning ends with a period or other punctuation
     const trimmed = updatedReasoning.trim()
     const endsWithPunctuation = /[.!?]$/.test(trimmed)
     const separator = endsWithPunctuation ? ' ' : '. '
-    
+
     updatedReasoning = `${trimmed}${separator}This content is classified as ${severityText.toLowerCase()} severity based on computed signals (frequency: ${safeSignals.frequency.toFixed(1)}, centrality: ${safeSignals.centrality.toFixed(1)}, proximity: ${safeSignals.proximity.toFixed(1)}, explicitness: ${safeSignals.explicitness.toFixed(1)}).`
   }
 
@@ -966,37 +1004,37 @@ function enforceSeverityFloors(
   warning: EnhancedContentWarning
 ): EnhancedContentWarning {
   const severeKeywords = [
-    'rape', 
-    'sexual assault', 
-    'suicide', 
-    'torture', 
-    'domestic violence', 
-    'infanticide', 
-    'child abuse', 
+    'rape',
+    'sexual assault',
+    'suicide',
+    'torture',
+    'domestic violence',
+    'infanticide',
+    'child abuse',
     'self-harm',
     'self harm'
   ]
-  
+
   const text = (warning.description + ' ' + (warning.reasoning || '')).toLowerCase()
-  
+
   // Check for severe keywords
   const hasSevereKeyword = severeKeywords.some(kw => text.includes(kw))
-  
+
   if (hasSevereKeyword && warning.severity !== 'severe') {
     // Upgrade severity
     const upgraded: EnhancedContentWarning = { ...warning, severity: 'severe' }
-    
+
     // Update description text to match new severity (e.g. "Moderate themes of..." -> "Strong themes of...")
     upgraded.description = updateDescriptionForSeverity(upgraded.description, 'severe')
-    
+
     // Append note to reasoning
     if (upgraded.reasoning) {
       upgraded.reasoning += ' (Severity automatically upgraded due to critical trigger keywords).'
     }
-    
+
     return upgraded
   }
-  
+
   return warning
 }
 
@@ -1041,23 +1079,23 @@ function processWarnings(
 
     // Validate sexual violence if applicable
     let subcategoryId = w.subcategory_id
-    
+
     // Signal-based backstop: Upgrade intense_romance to explicit_sexual_content if signals indicate on-page explicit content
     // This prevents "on-page, explicit" content from being mislabeled as mere spice
     // Uses same thresholds as explicit flag in age-rating.ts for consistency
-    if (subcategoryId === 'sexual_content.intense_romance' || 
-        subcategoryId?.includes('intense_romance')) {
+    if (subcategoryId === 'sexual_content.intense_romance' ||
+      subcategoryId?.includes('intense_romance')) {
       const explicitness = signals.explicitness ?? 0.5
       const proximity = signals.proximity ?? 0.5
       const frequency = signals.frequency ?? 0.5
-      
+
       // If explicitness >= 0.6 AND proximity >= 0.9 (on-page) AND frequency >= 0.35, upgrade to explicit_sexual_content
       // This matches the explicit flag logic in age-rating.ts
       if (explicitness >= 0.6 && proximity >= 0.9 && frequency >= 0.35) {
         subcategoryId = 'sexual_content.explicit_sexual_content'
         // Update description to reflect the upgrade if it's too vague
-        if (w.description && !w.description.toLowerCase().includes('explicit') && 
-            !w.description.toLowerCase().includes('graphic')) {
+        if (w.description && !w.description.toLowerCase().includes('explicit') &&
+          !w.description.toLowerCase().includes('graphic')) {
           w.description = w.description.replace(/intense romance|spice|steamy/gi, 'explicit sexual content')
         }
       }
@@ -1078,9 +1116,9 @@ function processWarnings(
 
       // Conversely, if the model under-calls non-consensual acts as "consent ambiguity" or "explicit sexual content",
       // upgrade to sexual violence when strong signals are present (e.g., "groping", "unwanted", "assault").
-      if (violenceCheck.isViolence && 
-          (subcategoryId === 'sexual_content.consent_ambiguity' || subcategoryId === 'sexual_content.explicit_sexual_content') && 
-          violenceCheck.confidence >= 0.7) {
+      if (violenceCheck.isViolence &&
+        (subcategoryId === 'sexual_content.consent_ambiguity' || subcategoryId === 'sexual_content.explicit_sexual_content') &&
+        violenceCheck.confidence >= 0.7) {
         subcategoryId = 'sexual_content.sexual_violence'
       }
     }
@@ -1090,7 +1128,7 @@ function processWarnings(
       w.description,
       severity
     )
-    
+
     // Debug logging to verify function is working
     if (w.description && w.description !== updatedDescription) {
       console.log(`[updateDescriptionForSeverity] Updated: "${w.description}" → "${updatedDescription}" (severity: ${severity})`)
@@ -1113,7 +1151,7 @@ function processWarnings(
       })
       signals = rebuiltSignals
     }
-    
+
     const updatedReasoning = updateReasoningForSeverity(
       w.reasoning,
       severity,
@@ -1270,7 +1308,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       if (verifierModel === 'openai') {
         // GPT-5 models only support temperature=1 (default), so omit it for GPT-5
         const isGpt5 = MODEL_VERSION.includes('gpt-5') || MODEL_VERSION.includes('o1') || MODEL_VERSION.includes('o3')
-        
+
         const response = await openai.chat.completions.create({
           model: MODEL_VERSION,
           messages: [
@@ -1307,7 +1345,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
               model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
             }
           }
-          
+
           const result = await model.generateContent(prompt)
           const response = result.response
           const text = response.text()
@@ -1437,12 +1475,12 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
             warning.description,
             adjustedSeverity
           )
-          
+
           // Ensure signals are valid before passing to updateReasoningForSeverity
           let validSignals = warning.severity_signals
-          if (!validSignals || 
-              typeof validSignals.frequency !== 'number' || 
-              typeof validSignals.explicitness !== 'number') {
+          if (!validSignals ||
+            typeof validSignals.frequency !== 'number' ||
+            typeof validSignals.explicitness !== 'number') {
             validSignals = buildSeveritySignals({
               presence: undefined,
               detail_level: undefined,
@@ -1452,7 +1490,7 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
               centrality_hint: undefined
             })
           }
-          
+
           adjusted.reasoning = updateReasoningForSeverity(
             warning.reasoning,
             adjustedSeverity,
@@ -1545,7 +1583,7 @@ function combineResults(
     if (!warning.model_source) {
       warning.model_source = 'openai'
     }
-    
+
     const geminiWarning = geminiMap.get(warning.subcategory_id)
 
     if (!geminiWarning) {
@@ -1556,7 +1594,7 @@ function combineResults(
       if (!geminiWarning.model_source) {
         geminiWarning.model_source = 'gemini'
       }
-      
+
       // Both found it - check severity
       if (warning.severity !== geminiWarning.severity) {
         severityDifferences.push({
@@ -1571,7 +1609,7 @@ function combineResults(
       const selectedWarning = warning.severity === 'severe' ||
         (warning.severity === 'moderate' && geminiWarning.severity === 'mild')
         ? warning : geminiWarning
-      
+
       // Mark as 'both' if both models found it (store in evidence for UI)
       if (selectedWarning.evidence && selectedWarning.evidence.length > 0) {
         selectedWarning.evidence[0] = {
@@ -1582,7 +1620,7 @@ function combineResults(
         // Fallback: mark in model_source field
         selectedWarning.model_source = 'both' as any // Both models found it
       }
-      
+
       combined.push(selectedWarning)
     }
   }
@@ -1593,7 +1631,7 @@ function combineResults(
     if (!warning.model_source) {
       warning.model_source = 'gemini'
     }
-    
+
     if (!openaiMap.has(warning.subcategory_id)) {
       uniqueToGemini.push(warning)
       combined.push(warning)
@@ -1666,37 +1704,85 @@ export async function analyzeBookWithMultiModel(
   const effectiveMetadata = applyDescriptionTruncation(metadata, effectiveOptions.maxDescriptionChars)
   const isCanonical = isCanonicalBook(metadata.title, metadata.author)
 
-  // Run both OpenAI and Gemini in parallel for cross-validation
-  // IMPORTANT: Don't catch errors here - let them propagate to scan-service
-  // If we catch and return empty array, it will be treated as "no warnings" which is wrong
-  // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
-  
-  // Run enabled models in parallel (when both enabled)
-  const openaiPromise = effectiveOptions.enableOpenAI
-    ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
-    : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
+  let openaiWarnings: EnhancedContentWarning[] = []
+  let geminiWarnings: EnhancedContentWarning[] = []
+  let openaiNoWarningsReasoning: string | undefined = undefined
+  let usedFallback = false
 
-  const geminiPromise = effectiveOptions.enableGemini
-    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical).catch(err => {
+  // GEMINI-FIRST MODE: Try Gemini first, fallback to OpenAI on rate limit
+  if (effectiveOptions.geminiFirst) {
+    onProgress?.('⏳ Analyzing content with Gemini...')
+
+    try {
+      geminiWarnings = await analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical)
+      onProgress?.(`✓ Gemini analysis complete (found ${geminiWarnings.length} warning${geminiWarnings.length === 1 ? '' : 's'})`)
+    } catch (geminiError) {
+      if (isRateLimitError(geminiError)) {
+        console.warn('[Multi-Model] Gemini rate limited, falling back to OpenAI:', geminiError)
+        onProgress?.('⚠️ Gemini rate limited - switching to OpenAI...')
+        usedFallback = true
+
+        // Fallback to OpenAI
+        try {
+          const openaiResult = await analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
+          openaiWarnings = openaiResult.warnings
+          openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
+          onProgress?.(`✓ OpenAI analysis complete (found ${openaiWarnings.length} warning${openaiWarnings.length === 1 ? '' : 's'})`)
+        } catch (openaiError) {
+          console.error('[Multi-Model] OpenAI fallback also failed:', openaiError)
+          throw openaiError // Let scan-service handle this
+        }
+      } else {
+        // Non-rate-limit errors: try OpenAI as fallback anyway
+        console.warn('[Multi-Model] Gemini failed (non-rate-limit), falling back to OpenAI:', geminiError)
+        onProgress?.('⚠️ Gemini unavailable - switching to OpenAI...')
+        usedFallback = true
+
+        try {
+          const openaiResult = await analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
+          openaiWarnings = openaiResult.warnings
+          openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
+          onProgress?.(`✓ OpenAI analysis complete (found ${openaiWarnings.length} warning${openaiWarnings.length === 1 ? '' : 's'})`)
+        } catch (openaiError) {
+          console.error('[Multi-Model] OpenAI fallback also failed:', openaiError)
+          throw openaiError
+        }
+      }
+    }
+  } else {
+    // PARALLEL MODE: Run both OpenAI and Gemini in parallel for cross-validation
+    // IMPORTANT: Don't catch errors here - let them propagate to scan-service
+    // If we catch and return empty array, it will be treated as "no warnings" which is wrong
+    // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
+
+    // Run enabled models in parallel (when both enabled)
+    const openaiPromise = effectiveOptions.enableOpenAI
+      ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
+      : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
+
+    const geminiPromise = effectiveOptions.enableGemini
+      ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical).catch(err => {
         // Gemini failures are non-fatal - log and continue with OpenAI only
         console.warn('[Multi-Model] Gemini analysis failed, continuing:', err)
         return []
       })
-    : Promise.resolve([])
+      : Promise.resolve([])
 
-  const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
-  
-  const openaiWarnings = openaiResult.status === 'fulfilled' 
-    ? openaiResult.value.warnings 
-    : []
-  const openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
-    ? openaiResult.value.noWarningsReasoning
-    : undefined
-  
-  const geminiWarnings = geminiResult.status === 'fulfilled'
-    ? geminiResult.value
-    : []
-  
+    const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
+
+    openaiWarnings = openaiResult.status === 'fulfilled'
+      ? openaiResult.value.warnings
+      : []
+    openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
+      ? openaiResult.value.noWarningsReasoning
+      : undefined
+
+    geminiWarnings = geminiResult.status === 'fulfilled'
+      ? geminiResult.value
+      : []
+  }
+
+
   // Log cross-validation status
   if (geminiWarnings.length > 0) {
     onProgress?.(`✓ Cross-validated with Gemini (found ${geminiWarnings.length} warning${geminiWarnings.length === 1 ? '' : 's'})`)
@@ -1722,7 +1808,7 @@ export async function analyzeBookWithMultiModel(
         effectiveMetadata,
         onProgress
       )
-      
+
       // Use refined warnings from adversarial validation if available
       if (adversarialResult.refined_warnings.length > 0) {
         refinedWarnings = adversarialResult.refined_warnings
@@ -1751,7 +1837,7 @@ export async function analyzeBookWithMultiModel(
     const verifierModel = analysis.unique_to_openai.length > 0 && geminiWarnings.length > 0
       ? 'gemini' // If OpenAI found unique warnings and Gemini is available, use Gemini to verify
       : 'openai' // Otherwise use OpenAI (more reliable fallback)
-    
+
     const { verified, metrics } = await verifyUniqueWarnings(
       allUniqueWarnings,
       effectiveMetadata,
@@ -1782,7 +1868,7 @@ export async function analyzeBookWithMultiModel(
     })
   }
 
-      // Final message will be shown by scan-service
+  // Final message will be shown by scan-service
 
   // Web Search Enrichment: If we got 0 warnings or very few (or very generic) warnings,
   // search for content warnings from community sources.
@@ -1830,8 +1916,8 @@ export async function analyzeBookWithMultiModel(
 
   if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster || looksLikeViolenceWithoutSex || hasOtherViolence)) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
-    const hasOnlyGenericWarnings = finalWarnings.length > 0 && 
-      finalWarnings.every(w => 
+    const hasOnlyGenericWarnings = finalWarnings.length > 0 &&
+      finalWarnings.every(w =>
         w.subcategory_id === 'emotional_abuse_or_toxic_relationships.other_toxic_relationships' ||
         w.subcategory_id === 'substance_use_or_alcohol.alcohol'
       )
@@ -1847,15 +1933,15 @@ export async function analyzeBookWithMultiModel(
       hasOtherViolence ||
       hasOnlyGenericWarnings ||
       (finalWarnings.length <= 2 &&
-       !finalWarnings.some(w => 
-         w.subcategory_id?.includes('mental_health') ||
-         w.subcategory_id?.includes('grief') ||
-         w.subcategory_id?.includes('death')
-       ))
+        !finalWarnings.some(w =>
+          w.subcategory_id?.includes('mental_health') ||
+          w.subcategory_id?.includes('grief') ||
+          w.subcategory_id?.includes('death')
+        ))
 
     if (shouldEnrich) {
       onProgress?.('⏳ Initial scan found few warnings - searching community sources for additional information...')
-      
+
       try {
         const originalWarningCount = finalWarnings.length
         webEnrichment = {
@@ -1879,7 +1965,7 @@ export async function analyzeBookWithMultiModel(
         if (enrichmentResult.enrichedContext) {
           enrichedContextText = enrichmentResult.enrichedContext
           onProgress?.('⏳ Gathering additional information from community sources...')
-          
+
           // Create enriched metadata with community-sourced context
           const enrichedMetadata: BookMetadata = {
             ...effectiveMetadata,
@@ -1907,7 +1993,7 @@ export async function analyzeBookWithMultiModel(
               webEnrichment.used = true
               webEnrichment.added_warnings = Math.max(0, finalWarnings.length - originalWarningCount)
             }
-            
+
             // Update noWarningsReasoning if we now have warnings
             if (finalWarnings.length > 0 && openaiNoWarningsReasoning) {
               // Clear noWarningsReasoning since we now have warnings
@@ -1921,7 +2007,7 @@ export async function analyzeBookWithMultiModel(
         if (enrichedContextText) {
           onProgress?.('⏳ Validating warnings with enriched context...')
           const enrichedContextLower = enrichedContextText.toLowerCase()
-          
+
           // Check 1: Sexual violence upgrade (explicit_sexual_content -> sexual_violence)
           finalWarnings = finalWarnings.map(w => {
             // Only check sexual content warnings
@@ -1936,10 +2022,10 @@ export async function analyzeBookWithMultiModel(
               )
 
               // Upgrade if strong signals found in enriched context
-              if (violenceCheck.isViolence && 
-                  (w.subcategory_id === 'sexual_content.consent_ambiguity' || 
-                   w.subcategory_id === 'sexual_content.explicit_sexual_content') && 
-                  violenceCheck.confidence >= 0.7) {
+              if (violenceCheck.isViolence &&
+                (w.subcategory_id === 'sexual_content.consent_ambiguity' ||
+                  w.subcategory_id === 'sexual_content.explicit_sexual_content') &&
+                violenceCheck.confidence >= 0.7) {
                 onProgress?.(`✓ Upgraded ${w.subcategory_id} to sexual_violence based on enriched context`)
                 return {
                   ...w,
@@ -1956,19 +2042,19 @@ export async function analyzeBookWithMultiModel(
             'infanticide', 'child murder', 'baby death', 'intentional child harm',
             'murder of a child', 'harm to children', 'child abuse', 'child death'
           ]
-          const hasInfanticideSignal = infanticideSignals.some(signal => 
+          const hasInfanticideSignal = infanticideSignals.some(signal =>
             enrichedContextLower.includes(signal)
           )
 
           if (hasOtherViolence && hasInfanticideSignal) {
             // Check if infanticide warning already exists
-            const hasInfanticideWarning = finalWarnings.some(w => 
+            const hasInfanticideWarning = finalWarnings.some(w =>
               w.subcategory_id === 'violence.infanticide_or_intentional_child_harm'
             )
 
             if (!hasInfanticideWarning) {
               // Replace other_violence with infanticide_or_intentional_child_harm
-              const otherViolenceIndex = finalWarnings.findIndex(w => 
+              const otherViolenceIndex = finalWarnings.findIndex(w =>
                 w.subcategory_id === 'violence.other_violence'
               )
               if (otherViolenceIndex !== -1) {
