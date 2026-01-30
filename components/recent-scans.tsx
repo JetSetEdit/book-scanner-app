@@ -102,7 +102,7 @@ function BackFace({
       <p className="text-xs text-muted-foreground flex-shrink-0 mt-0.5">{timeAgo}</p>
       {(scan.book?.warningCategoryIds?.length ?? 0) > 0 && (
         <div className="flex flex-wrap gap-1 flex-shrink-0">
-          {(scan.book.warningCategoryIds ?? []).slice(0, 6).map((id) => (
+          {(scan.book?.warningCategoryIds ?? []).slice(0, 6).map((id) => (
             <span
               key={id}
               title={getCategoryLabel(id)}
@@ -141,7 +141,7 @@ export function RecentScans() {
   const [scans, setScans] = useState<RecentScan[]>([])
   const [loading, setLoading] = useState(true)
   const [isPaused, setIsPaused] = useState(false)
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(true) // assume reduced until we've checked
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false) // default to motion enabled
   const [flippedIsbn, setFlippedIsbn] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const programmaticScrollRef = useRef(false)
@@ -202,7 +202,7 @@ export function RecentScans() {
     }, CAROUSEL_TICK_MS)
 
     return () => clearInterval(id)
-  }, [prefersReducedMotion, isPaused])
+  }, [prefersReducedMotion, isPaused, scans.length, loading])
 
   // Pause on focus within carousel, resume on focus out
   useEffect(() => {
@@ -275,7 +275,7 @@ export function RecentScans() {
               Recently Scanned
             </h2>
           </div>
-          
+
           <div
             ref={scrollRef}
             onMouseEnter={() => setIsPaused(true)}
