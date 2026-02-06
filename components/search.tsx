@@ -1,5 +1,8 @@
 "use client"
 
+
+
+
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, BookOpen, Loader2 } from "lucide-react"
@@ -47,9 +50,10 @@ interface SearchResponse {
 
 interface SearchProps {
   className?: string
+  placeholder?: string
 }
 
-export function SearchComponent({ className }: SearchProps) {
+export function SearchComponent({ className, placeholder }: SearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -94,7 +98,7 @@ export function SearchComponent({ className }: SearchProps) {
           .filter(([_, enabled]) => enabled)
           .map(([severity]) => severity)
           .join(",")
-        
+
         const url = `/api/search?q=${encodeURIComponent(query)}${severityParams ? `&severity=${severityParams}` : ""}`
         const response = await fetch(url)
         const data: SearchResponse = await response.json()
@@ -154,11 +158,11 @@ export function SearchComponent({ className }: SearchProps) {
     <div ref={searchRef} className={cn("relative w-full max-w-md", className)}>
       {/* Search Input */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/50 pointer-events-none" strokeWidth={1.5} />
         <Input
           ref={inputRef}
           type="text"
-          placeholder="Search by title, author, ISBN, genre..."
+          placeholder={placeholder || "Search by title, author, or ISBN (e.g. ‘Fourth Wing’ or 9781649374042)"}
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
@@ -173,7 +177,7 @@ export function SearchComponent({ className }: SearchProps) {
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Clear search"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" strokeWidth={1.5} />
           </button>
         )}
         {isLoading && (
@@ -241,7 +245,7 @@ export function SearchComponent({ className }: SearchProps) {
               </div>
             </div>
           )}
-          
+
           {isLoading && results.length === 0 && externalResults.length === 0 && query.length >= 3 ? (
             <div className="p-4 text-center space-y-2">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
@@ -299,7 +303,7 @@ export function SearchComponent({ className }: SearchProps) {
                       <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
                         {book.cover_url ? (
                           <Image
-                            src={book.cover_url.startsWith('http') 
+                            src={book.cover_url.startsWith('http')
                               ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
                               : book.cover_url}
                             alt={`Cover of ${book.title}`}

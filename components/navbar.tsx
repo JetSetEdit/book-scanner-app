@@ -36,21 +36,21 @@ function isDevMode(): boolean {
   if (typeof window === 'undefined') return false
   // Only show dev features on localhost - never in production
   const hostname = window.location.hostname.toLowerCase()
-  
+
   // Explicitly hide in production domains
-  if (hostname.includes('.vercel.app') || 
-      hostname.includes('.netlify.app') ||
-      hostname.includes('subtext.app') ||
-      hostname.includes('subtextscanner.com.au') ||
-      hostname.includes('subtextscanner.com') ||
-      (hostname !== 'localhost' && 
-       hostname !== '127.0.0.1' && 
-       !hostname.startsWith('192.168.') && 
-       !hostname.startsWith('10.') &&
-       !hostname.includes('localhost'))) {
+  if (hostname.includes('.vercel.app') ||
+    hostname.includes('.netlify.app') ||
+    hostname.includes('subtext.app') ||
+    hostname.includes('subtextscanner.com.au') ||
+    hostname.includes('subtextscanner.com') ||
+    (hostname !== 'localhost' &&
+      hostname !== '127.0.0.1' &&
+      !hostname.startsWith('192.168.') &&
+      !hostname.startsWith('10.') &&
+      !hostname.includes('localhost'))) {
     return false
   }
-  
+
   // Only show on localhost or local network
   return (
     hostname === 'localhost' ||
@@ -67,13 +67,13 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
   const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
-  
+
   // Dev settings state
   const [showAuditTrail, setShowAuditTrail] = useState(false)
   const [showRefreshButton, setShowRefreshButton] = useState(false)
   const [showSeverityScore, setShowSeverityScore] = useState(false)
   const [showAdminControls, setShowAdminControls] = useState(false)
-  
+
   // ...
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     // Only show dev badges if we're actually on localhost/dev
     // Ignore userMode - production should never show dev badges
     setIsDev(isLocalhost)
-    
+
     // Load dev settings from localStorage
     if (userMode === 'admin' || isLocalhost) {
       const savedAudit = localStorage.getItem('dev-show-audit-trail')
@@ -108,8 +108,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     setShowAuditTrail(newValue)
     localStorage.setItem('dev-show-audit-trail', String(newValue))
     // Update all book detail pages by triggering a custom event
-    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail: newValue, showRefreshButton, showSeverityScore, showAdminControls } 
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', {
+      detail: { showAuditTrail: newValue, showRefreshButton, showSeverityScore, showAdminControls }
     }))
   }
 
@@ -118,8 +118,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     setShowRefreshButton(newValue)
     localStorage.setItem('dev-show-refresh-button', String(newValue))
     // Update all pages by triggering a custom event
-    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail, showRefreshButton: newValue, showSeverityScore, showAdminControls } 
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', {
+      detail: { showAuditTrail, showRefreshButton: newValue, showSeverityScore, showAdminControls }
     }))
   }
 
@@ -128,8 +128,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     setShowSeverityScore(newValue)
     localStorage.setItem('dev-show-severity-score', String(newValue))
     // Update all pages by triggering a custom event
-    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail, showRefreshButton, showSeverityScore: newValue, showAdminControls } 
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', {
+      detail: { showAuditTrail, showRefreshButton, showSeverityScore: newValue, showAdminControls }
     }))
   }
 
@@ -138,8 +138,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     setShowAdminControls(newValue)
     localStorage.setItem('dev-show-admin-controls', String(newValue))
     // Update all pages by triggering a custom event
-    window.dispatchEvent(new CustomEvent('dev-settings-changed', { 
-      detail: { showAuditTrail, showRefreshButton, showSeverityScore, showAdminControls: newValue } 
+    window.dispatchEvent(new CustomEvent('dev-settings-changed', {
+      detail: { showAuditTrail, showRefreshButton, showSeverityScore, showAdminControls: newValue }
     }))
   }
 
@@ -157,12 +157,12 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
 
             {/* Search - Desktop */}
             <div className="hidden md:flex flex-1 max-w-md mx-4">
-              <SearchComponent />
+              <SearchComponent placeholder="Search title, author, ISBN..." />
             </div>
 
             {/* Search - Mobile */}
             <div className="md:hidden flex-1 max-w-xs mx-2">
-              <SearchComponent />
+              <SearchComponent placeholder="Search..." />
             </div>
 
 
@@ -178,15 +178,15 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       "flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                       isActive
                         ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                        : "text-foreground/70 hover:text-foreground hover:bg-accent"
                     )}
                   >
-                    <item.icon className="h-4 w-4" />
+                    <item.icon className="h-4 w-4" strokeWidth={1.5} />
                     {item.name}
                   </Link>
                 )
               })}
-              
+
               {/* Theme Toggle */}
               {mounted && (
                 <Button
@@ -206,8 +206,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
 
               {/* Always-visible version badge (helps confirm deploy + caching state) */}
               {userMode === 'vip' && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="font-mono text-[10px] bg-amber-50 text-amber-700 border-amber-200"
                 >
                   VIP
@@ -215,8 +215,8 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
               )}
               {/* Only show ADMIN badge in dev mode, never in production */}
               {userMode === 'admin' && isDev && (
-                <Badge 
-                  variant="outline" 
+                <Badge
+                  variant="outline"
                   className="font-mono text-[10px] bg-purple-50 text-purple-700 border-purple-200 hidden sm:inline-flex"
                 >
                   ADMIN
@@ -266,151 +266,151 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                   </div>
                 </PopoverContent>
               </Popover>
-              
+
               {/* Dev Settings Dropdown */}
               {isDev && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
-                  >
-                    <Code className="h-4 w-4" />
-                    <span className="hidden lg:inline">Dev</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="flex items-center gap-2">
-                    <Settings className="h-4 w-4" />
-                    Developer Settings
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={toggleAuditTrail}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <FileText className="h-4 w-4" />
-                    <div className="flex-1">
-                      <div className="font-medium">Show Audit Trail</div>
-                      <div className="text-xs text-muted-foreground">
-                        Display system logs on book pages
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showAuditTrail 
-                        ? "bg-primary border-primary" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showAuditTrail && (
-                        <div className="h-full w-full bg-primary rounded-sm" />
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={toggleRefreshButton}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    <div className="flex-1">
-                      <div className="font-medium">Show Refresh Button</div>
-                      <div className="text-xs text-muted-foreground">
-                        Display refresh button on book cards
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showRefreshButton 
-                        ? "bg-primary border-primary" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showRefreshButton && (
-                        <div className="h-full w-full bg-primary rounded-sm" />
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={toggleSeverityScore}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <Calculator className="h-4 w-4" />
-                    <div className="flex-1">
-                      <div className="font-medium">Show Severity Score</div>
-                      <div className="text-xs text-muted-foreground">
-                        Display severity score badges on book cards
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showSeverityScore 
-                        ? "bg-primary border-primary" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showSeverityScore && (
-                        <div className="h-full w-full bg-primary rounded-sm" />
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={toggleAdminControls}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <div className="flex-1">
-                      <div className="font-medium">Show Admin Controls</div>
-                      <div className="text-xs text-muted-foreground">
-                        Enable delete/edit buttons on book pages
-                      </div>
-                    </div>
-                    <div className={cn(
-                      "h-4 w-4 rounded border-2 transition-colors",
-                      showAdminControls 
-                        ? "bg-primary border-primary" 
-                        : "border-muted-foreground"
-                    )}>
-                      {showAdminControls && (
-                        <div className="h-full w-full bg-primary rounded-sm" />
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/batch-scan" className="flex items-center gap-2 cursor-pointer">
-                      <Layers className="h-4 w-4" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+                    >
+                      <Code className="h-4 w-4" />
+                      <span className="hidden lg:inline">Dev</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                      <Settings className="h-4 w-4" />
+                      Developer Settings
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={toggleAuditTrail}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <FileText className="h-4 w-4" />
                       <div className="flex-1">
-                        <div className="font-medium">Batch Scanner</div>
+                        <div className="font-medium">Show Audit Trail</div>
                         <div className="text-xs text-muted-foreground">
-                          Bulk process multiple ISBNs
+                          Display system logs on book pages
                         </div>
                       </div>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/dev/check-covers" className="flex items-center gap-2 cursor-pointer">
-                      <ImageIcon className="h-4 w-4" />
+                      <div className={cn(
+                        "h-4 w-4 rounded border-2 transition-colors",
+                        showAuditTrail
+                          ? "bg-primary border-primary"
+                          : "border-muted-foreground"
+                      )}>
+                        {showAuditTrail && (
+                          <div className="h-full w-full bg-primary rounded-sm" />
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={toggleRefreshButton}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <RefreshCw className="h-4 w-4" />
                       <div className="flex-1">
-                        <div className="font-medium">Check Book Covers</div>
+                        <div className="font-medium">Show Refresh Button</div>
                         <div className="text-xs text-muted-foreground">
-                          Validate covers for existing books
+                          Display refresh button on book cards
                         </div>
                       </div>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="flex items-center gap-2 cursor-default">
-                    <Info className="h-4 w-4" />
-                    <div className="flex-1">
-                      <div className="font-medium">{APP_VERSION_LABEL}</div>
-                      <div className="text-xs text-muted-foreground">
-                        Version {APP_VERSION} • Built {APP_BUILD_DATE}
+                      <div className={cn(
+                        "h-4 w-4 rounded border-2 transition-colors",
+                        showRefreshButton
+                          ? "bg-primary border-primary"
+                          : "border-muted-foreground"
+                      )}>
+                        {showRefreshButton && (
+                          <div className="h-full w-full bg-primary rounded-sm" />
+                        )}
                       </div>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={toggleSeverityScore}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <Calculator className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Show Severity Score</div>
+                        <div className="text-xs text-muted-foreground">
+                          Display severity score badges on book cards
+                        </div>
+                      </div>
+                      <div className={cn(
+                        "h-4 w-4 rounded border-2 transition-colors",
+                        showSeverityScore
+                          ? "bg-primary border-primary"
+                          : "border-muted-foreground"
+                      )}>
+                        {showSeverityScore && (
+                          <div className="h-full w-full bg-primary rounded-sm" />
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={toggleAdminControls}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">Show Admin Controls</div>
+                        <div className="text-xs text-muted-foreground">
+                          Enable delete/edit buttons on book pages
+                        </div>
+                      </div>
+                      <div className={cn(
+                        "h-4 w-4 rounded border-2 transition-colors",
+                        showAdminControls
+                          ? "bg-primary border-primary"
+                          : "border-muted-foreground"
+                      )}>
+                        {showAdminControls && (
+                          <div className="h-full w-full bg-primary rounded-sm" />
+                        )}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/batch-scan" className="flex items-center gap-2 cursor-pointer">
+                        <Layers className="h-4 w-4" />
+                        <div className="flex-1">
+                          <div className="font-medium">Batch Scanner</div>
+                          <div className="text-xs text-muted-foreground">
+                            Bulk process multiple ISBNs
+                          </div>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link href="/dev/check-covers" className="flex items-center gap-2 cursor-pointer">
+                        <ImageIcon className="h-4 w-4" />
+                        <div className="flex-1">
+                          <div className="font-medium">Check Book Covers</div>
+                          <div className="text-xs text-muted-foreground">
+                            Validate covers for existing books
+                          </div>
+                        </div>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem className="flex items-center gap-2 cursor-default">
+                      <Info className="h-4 w-4" />
+                      <div className="flex-1">
+                        <div className="font-medium">{APP_VERSION_LABEL}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Version {APP_VERSION} • Built {APP_BUILD_DATE}
+                        </div>
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
           </div>
@@ -431,13 +431,13 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                   "relative flex flex-col items-center justify-center gap-1 px-2 py-2 rounded-md text-xs font-medium transition-colors flex-1 max-w-[80px] min-w-0",
                   isActive
                     ? "text-primary"
-                    : "text-muted-foreground"
+                    : "text-foreground/70"
                 )}
               >
                 <item.icon className={cn(
                   "h-5 w-5 flex-shrink-0",
                   isActive && "text-primary"
-                )} />
+                )} strokeWidth={1.5} />
                 <span className="text-[10px] leading-tight truncate w-full text-center">{item.name}</span>
                 {isActive && (
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-b-full" />

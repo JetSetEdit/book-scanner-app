@@ -21,11 +21,11 @@ export function Footer() {
         const comfortReadBadge = document.querySelector('[data-comfort-read="true"]')
         setIsComfortRead(!!comfortReadBadge)
       }
-      
+
       // Check after a short delay to allow page to render
       const timer = setTimeout(checkComfortRead, 100)
       checkComfortRead() // Also check immediately
-      
+
       return () => clearTimeout(timer)
     } else {
       setIsComfortRead(false)
@@ -48,9 +48,9 @@ export function Footer() {
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
-            {v.footer.trustStatement}
+            Subtext is in public beta—warnings are automated with human review in progress. Use your own judgment and let us know if something looks off.
           </p>
-          
+
           {/* Beta Disclaimer - Contextualized for Comfort Read */}
           {!isDismissed && (
             <div className="text-xs text-muted-foreground/70 text-center mb-4">
@@ -74,20 +74,20 @@ export function Footer() {
               </div>
             </div>
           )}
-          
+
           {v.flags?.showAffiliate !== false && (
-          <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
-            Subtext is a participant in the Amazon Services LLC Associates Program. As an Amazon Associate, we earn from qualifying purchases.
-          </p>
+            <p className="text-xs text-muted-foreground text-center leading-relaxed max-w-2xl mx-auto mb-4">
+              Subtext is a participant in the Amazon Services LLC Associates Program. As an Amazon Associate, we earn from qualifying purchases.
+            </p>
           )}
           <div className="text-center space-y-2">
             <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
               {v.flags?.showTransparencyLink !== false && (
                 <>
-              <Link href="/transparency" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
-                Learn how we work
-              </Link>
-              <span className="text-muted-foreground/40">•</span>
+                  <Link href="/transparency" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">
+                    Learn how we work
+                  </Link>
+                  <span className="text-muted-foreground/40">•</span>
                 </>
               )}
               <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2">

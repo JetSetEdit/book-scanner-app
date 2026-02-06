@@ -1,9 +1,8 @@
-import { Shield, Users, ScanBarcode, Search, Brain } from "lucide-react"
-import Link from "next/link"
+import { Shield, Users, Brain } from "lucide-react"
 import { Suspense } from "react"
-import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { RecentScans } from "@/components/recent-scans"
+import { SearchComponent } from "@/components/search"
 import { getVariantConfig } from "@/lib/config/variants"
 import { ReferralWelcomeModalWrapper } from "@/components/referral-welcome-modal-wrapper"
 
@@ -19,37 +18,35 @@ export default function HomePage() {
 
       {/* Hero Section */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-24 md:py-32 text-center">
-        <div className="max-w-4xl mx-auto space-y-8">
-          <div className="flex flex-col items-center justify-center mb-12">
-            <div className="mb-6">
-              <BookSpineLogo className="h-48 w-48 md:h-64 md:w-64 text-foreground" />
-            </div>
-            <span className="text-5xl md:text-7xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>{v.name}</span>
+        <div className="w-full max-w-3xl mx-auto space-y-8 flex flex-col items-center">
+
+          {/* 1. Big “S” mark */}
+          <div className="mb-6">
+            <BookSpineLogo className="h-48 w-48 md:h-64 md:w-64 text-foreground" />
           </div>
 
-          <h1 className="font-serif text-4xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
-            {v.homepage.headline} <br className="hidden md:block" />
-            <span className="text-muted-foreground italic">{v.homepage.headlineItalic}</span>
+          {/* 2. “Subtext” wordmark */}
+          <span className="text-4xl md:text-5xl font-serif font-normal tracking-tight text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100" style={{ fontFamily: 'var(--font-serif)' }}>
+            Subtext
+          </span>
+
+          {/* 3. Large centered search bar */}
+          <div className="relative z-10 w-full max-w-2xl pt-6 pb-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+            <Suspense>
+              <SearchComponent className="w-full max-w-full h-auto text-lg [&_input]:h-14 [&_input]:text-lg [&_input]:px-12 [&_svg]:h-6 [&_svg]:w-6 [&_svg]:left-4 [&_input]:!bg-white" />
+            </Suspense>
+          </div>
+
+          {/* 4. Tagline */}
+          <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-foreground animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+            The hidden context of every story.
           </h1>
 
-          <p className="mx-auto max-w-2xl text-xl text-muted-foreground leading-relaxed font-light">
-            {v.homepage.subhead}
+          {/* 5. Sub-line */}
+          <p className="mx-auto max-w-2xl text-lg text-muted-foreground leading-relaxed font-light animate-in fade-in slide-in-from-bottom-4 duration-700 delay-400">
+            Instant book content warnings and age guidance. Scan a barcode or search a title to see Mild / Moderate / Severe warnings with explanations.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-            <Link href="/scan">
-              <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-105">
-                <ScanBarcode className="mr-2 h-5 w-5" />
-                {v.homepage.ctaPrimary}
-              </Button>
-            </Link>
-            <Link href="/collection">
-              <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-border text-foreground hover:bg-accent hover:text-accent-foreground">
-                <Search className="mr-2 h-5 w-5" />
-                {v.homepage.ctaSecondary}
-              </Button>
-            </Link>
-          </div>
         </div>
       </div>
 
@@ -57,48 +54,36 @@ export default function HomePage() {
       <RecentScans />
 
       {/* Features Grid (hidden in lite) */}
-      {v.flags?.showFeaturesGrid !== false && (
-      <div className="border-t border-border/50 bg-card/60">
-        <div className="container mx-auto px-4 py-24">
-          <div className="grid md:grid-cols-3 gap-12">
-            <div className="space-y-4">
-              <div className="h-12 w-12 rounded-full bg-amber-100/50 dark:bg-amber-900/30 flex items-center justify-center text-amber-700 dark:text-amber-400">
-                <Shield className="h-6 w-6" />
-              </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground">{v.features.contentWarnings.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {v.features.contentWarnings.description}
+      {/* Feature Row - concise version */}
+      <div className="border-t border-border/50 bg-card/30">
+        <div className="container mx-auto px-4 py-16">
+          <div className="grid md:grid-cols-3 gap-8 text-center">
+
+            <div className="flex flex-col items-center gap-3">
+              <Shield className="h-8 w-8 text-foreground/90 stroke-[1.5]" />
+              <p className="font-medium text-foreground">
+                Content warnings with severity <br />
+                <span className="text-muted-foreground text-sm font-normal">(Mild / Moderate / Severe)</span>
               </p>
             </div>
 
-            <div className="space-y-4">
-              <div className="h-12 w-12 rounded-full bg-blue-100/50 dark:bg-blue-900/30 flex items-center justify-center text-blue-700 dark:text-blue-400">
-                <Brain className="h-6 w-6" />
-              </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground">{v.features.ageRatings.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {v.features.ageRatings.description}
+            <div className="flex flex-col items-center gap-3">
+              <Brain className="h-8 w-8 text-foreground/90 stroke-[1.5]" />
+              <p className="font-medium text-foreground">
+                Age ratings based on real‑world standards
               </p>
             </div>
 
-            <div className="space-y-4 relative">
-              <div className="absolute -top-2 -right-2">
-                <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border">
-                  Coming Soon
-                </span>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-emerald-100/50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 opacity-60">
-                <Users className="h-6 w-6" />
-              </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground text-muted-foreground">{v.features.community.title}</h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {v.features.community.description}
+            <div className="flex flex-col items-center gap-3">
+              <Users className="h-8 w-8 text-foreground/90 stroke-[1.5]" />
+              <p className="font-medium text-foreground">
+                Clear “Why?” explanations for every warning
               </p>
             </div>
+
           </div>
         </div>
       </div>
-      )}
     </main>
   )
 }

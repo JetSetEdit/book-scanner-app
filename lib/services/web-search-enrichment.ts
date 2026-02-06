@@ -15,9 +15,14 @@ import { BookMetadata } from '../lib/config/taxonomy-context'
 import { searchForContentWarnings, SearchResult } from '@/lib/google-search'
 
 export interface EnrichmentResult {
+  /** @deprecated Use combinedText for new code; kept for backward compatibility */
   enrichedContext: string | null
   source: 'web_search' | 'llm_fallback' | null
   foundContentWarnings: boolean
+  /** Combined enrichment text for analysis input; empty string when no enrichment. */
+  combinedText: string
+  /** True when enrichment produced any combined text (had results). */
+  hadResults: boolean
 }
 
 /**
@@ -39,7 +44,7 @@ export async function enrichWithWebSearch(
   // spending time on books that already have many warnings.
   if (initialWarningsCount > 7) {
     onProgress?.('ℹ️ Many warnings already present, skipping web enrichment')
-    return { enrichedContext: null, source: null, foundContentWarnings: false }
+    return { enrichedContext: null, source: null, foundContentWarnings: false, combinedText: '', hadResults: false }
   }
 
   onProgress?.('🔍 Searching for content warnings from community sources...')
@@ -85,22 +90,25 @@ Return a compact bullet list.`
           const text = resp.choices?.[0]?.message?.content?.trim() || ''
           if (!text) {
             onProgress?.('ℹ️ Fallback enrichment returned no usable content')
-            return { enrichedContext: null, source: null, foundContentWarnings: false }
+            return { enrichedContext: null, source: null, foundContentWarnings: false, combinedText: '', hadResults: false }
           }
 
+          const combined = `LLM fallback enrichment (no live web search configured):\n${text}`
           return {
-            enrichedContext: `LLM fallback enrichment (no live web search configured):\n${text}`,
+            enrichedContext: combined,
             source: 'llm_fallback',
             foundContentWarnings: true,
+            combinedText: combined,
+            hadResults: true,
           }
         } catch (e) {
           onProgress?.('⚠️ Fallback enrichment failed')
-          return { enrichedContext: null, source: null, foundContentWarnings: false }
+          return { enrichedContext: null, source: null, foundContentWarnings: false, combinedText: '', hadResults: false }
         }
       }
 
       onProgress?.('ℹ️ No search results found from community sources')
-      return { enrichedContext: null, source: null, foundContentWarnings: false }
+      return { enrichedContext: null, source: null, foundContentWarnings: false, combinedText: '', hadResults: false }
     }
 
     // Filter out retailer websites and low-quality user-generated content
@@ -125,7 +133,9 @@ Return a compact bullet list.`
       return {
         enrichedContext: null,
         source: null,
-        foundContentWarnings: false
+        foundContentWarnings: false,
+        combinedText: '',
+        hadResults: false,
       }
     }
 
@@ -183,7 +193,9 @@ Return a compact bullet list.`
     return {
       enrichedContext: enrichmentText,
       source: 'web_search',
-      foundContentWarnings: foundContentWarnings
+      foundContentWarnings: foundContentWarnings,
+      combinedText: enrichmentText,
+      hadResults: true,
     }
   } catch (error) {
     console.error('[Web Search Enrichment] Error:', error)
@@ -199,7 +211,9 @@ Return a compact bullet list.`
     return {
       enrichedContext: null,
       source: null,
-      foundContentWarnings: false
+      foundContentWarnings: false,
+      combinedText: '',
+      hadResults: false,
     }
   }
 }

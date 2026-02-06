@@ -30,6 +30,9 @@ export interface Database {
           audio_generated_at: string | null
           audio_voice_id: string | null
           last_synced_at: string | null
+          sss_level: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
+          sss_notes: string | null
+          content_warnings_needs_review: boolean
         }
         Insert: {
           id?: string
@@ -51,6 +54,9 @@ export interface Database {
           audio_generated_at?: string | null
           audio_voice_id?: string | null
           last_synced_at?: string | null
+          sss_level?: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
+          sss_notes?: string | null
+          content_warnings_needs_review?: boolean
         }
         Update: {
           id?: string
@@ -72,6 +78,9 @@ export interface Database {
           audio_generated_at?: string | null
           audio_voice_id?: string | null
           last_synced_at?: string | null
+          sss_level?: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
+          sss_notes?: string | null
+          content_warnings_needs_review?: boolean
         }
         Relationships: []
       }

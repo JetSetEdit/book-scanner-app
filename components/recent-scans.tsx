@@ -269,11 +269,14 @@ export function RecentScans() {
     <div className="border-t border-border/50 bg-card/60 py-12">
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-2 mb-6">
-            <Clock className="h-5 w-5 text-muted-foreground" />
-            <h2 className="font-serif text-2xl font-bold text-foreground">
-              Recently Scanned
-            </h2>
+          <div className="flex flex-col items-center justify-center text-center mb-8 space-y-2">
+            <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Here’s what Subtext looks like in action:</span>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              <h2 className="font-serif text-2xl font-bold text-foreground">
+                Recently Scanned
+              </h2>
+            </div>
           </div>
 
           <div

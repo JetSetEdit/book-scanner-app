@@ -1,7 +1,26 @@
+/**
+ * Book Page Route - Enhanced with SEO-friendly stub pages
+ * 
+ * This route implements programmatic SEO by creating indexable landing pages
+ * for books that haven't been scanned yet. When a book doesn't exist in Subtext,
+ * we fetch metadata from external sources (Open Library, Google Books) and display
+ * a helpful stub page that can be indexed by search engines.
+ * 
+ * SEO Quality Gates:
+ * - Invalid ISBNs (wrong length, checksum failure) → 404
+ * - Valid ISBNs without minimum metadata (title + author) → 200 OK with `noindex`
+ * - Valid ISBNs with minimum metadata → 200 OK, indexable
+ * 
+ * This follows the "future-complete page" pattern used by Goodreads, StoryGraph, etc.
+ */
+
 import { BookDetails } from "@/components/book-details"
-import { Button } from "@/components/ui/button"
 import { supabaseAdmin } from "@/lib/supabase/admin"
-import Link from "next/link"
+import { fetchBookByISBN } from "@/lib/book-api"
+import { validateISBNWithChecksum } from "@/lib/isbn-validation"
+import { BookStubPage } from "@/components/book-stub-page"
+import { notFound } from "next/navigation"
+import type { Metadata } from "next"
 
 interface BookPageProps {
   params: Promise<{
@@ -9,48 +28,132 @@ interface BookPageProps {
   }>
 }
 
+// Generate metadata for SEO
+export async function generateMetadata({ params }: BookPageProps): Promise<Metadata> {
+  const { isbn } = await params
+  const supabase = supabaseAdmin
+
+  // Check if book exists in Subtext
+  const { data: book } = await supabase.from("books").select("*").eq("isbn", isbn).single()
+
+  if (book) {
+    // Full page with content warnings
+    return {
+      title: `${book.title} – Content Warnings | Subtext Scanner`,
+      description: `View content warnings for ${book.title}${book.author ? ` by ${book.author}` : ''}. Discover what's inside before you read.`,
+      openGraph: {
+        title: `${book.title} – Content Warnings`,
+        description: `View content warnings for ${book.title}${book.author ? ` by ${book.author}` : ''}.`,
+        type: "website",
+        images: book.cover_url ? [book.cover_url] : [],
+      },
+    }
+  }
+
+  // Try to fetch metadata for stub page
+  const externalMetadata = await fetchBookByISBN(isbn)
+  const hasMinimumMetadata = externalMetadata && externalMetadata.title && externalMetadata.author
+
+  if (hasMinimumMetadata) {
+    // Stub page with metadata
+    return {
+      title: `${externalMetadata.title} – Scan for Content Warnings | Subtext Scanner`,
+      description: `Check content warnings for ${externalMetadata.title}${externalMetadata.author ? ` by ${externalMetadata.author}` : ''}. Scan this book with Subtext Scanner to unlock community-reviewed warnings before you read.`,
+      openGraph: {
+        title: `${externalMetadata.title} – Scan for Content Warnings`,
+        description: `Check content warnings for ${externalMetadata.title}${externalMetadata.author ? ` by ${externalMetadata.author}` : ''}.`,
+        type: "website",
+        images: externalMetadata.cover_url ? [externalMetadata.cover_url] : [],
+      },
+      robots: {
+        index: true,
+        follow: true,
+      },
+    }
+  }
+
+  // Fallback metadata
+  return {
+    title: `Book ${isbn} – Subtext Scanner`,
+    description: "Scan this book to unlock content warnings and help others read safely.",
+    robots: {
+      index: false,
+      follow: true,
+    },
+  }
+}
+
 export default async function BookPage({ params }: BookPageProps) {
   const { isbn } = await params
   const supabase = supabaseAdmin
 
-  // No authentication required
+  // Step 1: Validate ISBN format and checksum
+  // Quality gate: Invalid ISBNs return 404 to avoid polluting search index
+  if (!validateISBNWithChecksum(isbn)) {
+    // Invalid ISBN (wrong length, checksum failure, non-ISBN characters) → 404
+    notFound()
+  }
 
-  // Fetch book data
+  // Step 2: Check if book exists in Subtext database
   const { data: book, error: bookError } = await supabase.from("books").select("*").eq("isbn", isbn).single()
 
-  // If book doesn't exist yet, don't 404 — show a recovery path back into scanning.
-  // This is critical for the search → click flow (users often click books that haven't been scanned yet).
+  // Step 3: If book doesn't exist, fetch external metadata and show stub page
+  // This creates SEO-friendly landing pages for unscanned books
   if (bookError || !book) {
+    const externalMetadata = await fetchBookByISBN(isbn)
+    
+    // Quality gate: Only index pages with minimum metadata (title + author)
+    // Pages without minimum metadata return 200 OK but with `noindex` directive
+    // This prevents indexing low-quality pages while maintaining helpful UX
+    const hasMinimumMetadata = externalMetadata && externalMetadata.title && externalMetadata.author
+    const shouldIndex = hasMinimumMetadata === true
+
     return (
-      <main className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-12">
-          <div className="max-w-2xl mx-auto">
-            <div className="border border-border bg-card/60 p-8">
-              <h1 className="font-serif text-3xl font-bold text-foreground mb-3">This book isn&apos;t in Subtext yet</h1>
-              <p className="text-muted-foreground leading-relaxed mb-6">
-                We couldn&apos;t find ISBN <span className="font-mono text-foreground">{isbn}</span> in the database.
-                Scan it to create the book page and generate content warnings.
-              </p>
+      <>
+        {/* JSON-LD structured data for stub pages (schema.org Book schema)
+            Only included when minimum metadata is available to ensure quality.
+            Helps Google understand page content and improves rich snippet eligibility. */}
+        {hasMinimumMetadata && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "Book",
+                isbn: isbn,
+                name: externalMetadata.title,
+                ...(externalMetadata.author && {
+                  author: {
+                    "@type": "Person",
+                    name: externalMetadata.author,
+                  },
+                }),
+                ...(externalMetadata.cover_url && {
+                  image: externalMetadata.cover_url,
+                }),
+                ...(externalMetadata.publisher && {
+                  publisher: {
+                    "@type": "Organization",
+                    name: externalMetadata.publisher,
+                  },
+                }),
+                url: process.env.NEXT_PUBLIC_SITE_URL 
+                  ? `${process.env.NEXT_PUBLIC_SITE_URL}/book/${isbn}`
+                  : `https://subtextscanner.com.au/book/${isbn}`,
+                ...(externalMetadata.source === "openlibrary" && {
+                  sameAs: `https://openlibrary.org/isbn/${isbn}`,
+                }),
+              }),
+            }}
+          />
+        )}
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Link href={`/scan?isbn=${encodeURIComponent(isbn)}`}>
-                  <Button className="w-full sm:w-auto">Scan this book</Button>
-                </Link>
-                <Link href="/scan">
-                  <Button variant="outline" className="w-full sm:w-auto">Go to scanner</Button>
-                </Link>
-                <Link href="/">
-                  <Button variant="ghost" className="w-full sm:w-auto">Back to home</Button>
-                </Link>
-              </div>
-
-              <p className="text-xs text-muted-foreground mt-6">
-                Tip: scanning from this page will auto-fill the ISBN and start the scan.
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
+        <BookStubPage 
+          isbn={isbn} 
+          metadata={externalMetadata}
+          shouldIndex={shouldIndex}
+        />
+      </>
     )
   }
 

@@ -5,6 +5,7 @@ import { Database } from '@/types/supabase'
 import { isStale, refreshBookMetadata } from '@/lib/book-cache'
 import { MODEL_VERSION, TAXONOMY_VERSION, normalizeCategorySubcategory, getCategoryById } from '@/lib/config/taxonomy-v2'
 import { assessMetadataQuality, type MetadataQuality } from '@/lib/utils/metadata-quality'
+import { S0_NO_INPUT_SSS_RESULT } from '@/lib/services/sss-assignment'
 
 // Helper to validate cover URL is not a placeholder
 async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
@@ -1000,12 +1001,14 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
 
         // Build effective analysis options (Quick mode defaults, with optional overrides)
         // Use Gemini-first strategy for Quick scans: try Gemini first, fallback to OpenAI on rate limit
+        const quickForceOpenAI = scanMode === 'quick' && modelAssignment === 'openai'
         const effectiveAnalysisOptions: import('./multi-model-analysis').AnalysisOptions =
           scanMode === 'quick'
             ? {
-              // Gemini-first: uses Gemini as primary, falls back to OpenAI on rate limit/errors
-              // This replaces the previous IP-based model assignment for more consistent results
-              geminiFirst: true,
+              // Gemini-first by default, but honor model assignment (OpenAI-only when assigned).
+              geminiFirst: !quickForceOpenAI,
+              enableOpenAI: true,
+              enableGemini: !quickForceOpenAI,
               enableAdversarial: analysisOptions?.enableAdversarial ?? false,
               enableVerification: analysisOptions?.enableVerification ?? false,
               enableWebEnrichment:
@@ -1056,7 +1059,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
         }
 
         // Increment Gemini usage counter if Gemini was successfully used
-        if (modelAssignment === 'gemini' && geminiSucceeded) {
+        if (geminiEnabled && geminiSucceeded) {
           const { incrementGeminiUsage, getDailyGeminiUsage } = await import('@/lib/utils/rate-limiter')
           incrementGeminiUsage()
           console.log(`[Gemini Usage] Incremented counter (now at ${getDailyGeminiUsage()}/day)`)
@@ -1091,6 +1094,11 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
 
         // Store no_warnings_reasoning for use in audit log if no warnings found
         const noWarningsReasoning = analysisResult.noWarningsReasoning
+        const needsReview = (analysisResult as { needsReview?: boolean }).needsReview === true
+        const enrichmentCombinedText = (analysisResult as { web_enrichment?: { combinedText?: string } }).web_enrichment?.combinedText
+        const hasAnyInput =
+          (descriptionForAnalysis?.trim().length ?? 0) > 0 ||
+          (enrichmentCombinedText?.trim().length ?? 0) > 0
 
         timings.aiContentWarningGeneration = performance.now() - analysisStartTime
 
@@ -1342,6 +1350,36 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               // Don't fail the scan if age rating calculation fails
             }
 
+            // SSS (Subtext Suitability Scale): assign reader-focused emotional intensity and persist
+            try {
+              const sssDescription = descriptionForAnalysis || enrichmentCombinedText || `${bookForAnalysis.title || 'Unknown'} by ${bookForAnalysis.author || 'Unknown'}`
+              const { assignSSS } = await import('@/lib/services/sss-assignment')
+              const sssResult = await assignSSS({
+                warnings: analysisResult.warnings,
+                title: bookForAnalysis.title || 'Unknown',
+                author: bookForAnalysis.author,
+                description: sssDescription,
+              })
+              const { error: sssError } = await supabaseAdmin
+                .from('books')
+                .update({
+                  sss_level: sssResult.sss_level,
+                  sss_notes: sssResult.sss_notes,
+                  content_warnings_needs_review: false,
+                })
+                .eq('id', bookId)
+              if (sssError) {
+                console.error('Failed to update SSS:', sssError)
+              } else {
+                if (currentBook) {
+                  (currentBook as any).sss_level = sssResult.sss_level
+                  ;(currentBook as any).sss_notes = sssResult.sss_notes
+                }
+              }
+            } catch (sssErr) {
+              console.error('SSS assignment failed:', sssErr)
+            }
+
             // Log audit decision: warnings were generated
             await logAuditDecision({
               bookId: bookId,
@@ -1365,6 +1403,41 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
         } else {
           onProgress?.('ℹ️ No content warnings identified by AI analysis')
           console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
+
+          // SSS: when no input to assess, set S0_NO_INPUT; otherwise assign via AI
+          try {
+            const sssResult = !hasAnyInput
+              ? S0_NO_INPUT_SSS_RESULT
+              : await (async () => {
+                  const { assignSSS } = await import('@/lib/services/sss-assignment')
+                  const sssDescription =
+                    descriptionForAnalysis ||
+                    enrichmentCombinedText ||
+                    `${bookForAnalysis.title || 'Unknown'} by ${bookForAnalysis.author || 'Unknown'}`
+                  return assignSSS({
+                    warnings: [],
+                    title: bookForAnalysis.title || 'Unknown',
+                    author: bookForAnalysis.author,
+                    description: sssDescription,
+                  })
+                })()
+            if (bookId) {
+              const { error: sssError } = await supabaseAdmin
+                .from('books')
+                .update({
+                  sss_level: sssResult.sss_level,
+                  sss_notes: sssResult.sss_notes,
+                  content_warnings_needs_review: needsReview,
+                })
+                .eq('id', bookId)
+              if (!sssError && currentBook) {
+                (currentBook as any).sss_level = sssResult.sss_level
+                ;(currentBook as any).sss_notes = sssResult.sss_notes
+              }
+            }
+          } catch (sssErr) {
+            console.error('SSS assignment (no-warnings) failed:', sssErr)
+          }
 
           // Initialize variables for web search verification
           let webSearchFoundWarnings = false
@@ -1454,7 +1527,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
               return null
             })
 
-            timings.webSearch = performance.now() - webSearchStartTime
+            timings.webSearch += performance.now() - webSearchStartTime
 
             if (searchResponse) {
               const messageContent = searchResponse.choices[0]?.message?.content || ''
@@ -1476,7 +1549,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 console.warn('[Web Search] TOS Compliance: Rejected response containing retailer content')
                 onProgress?.('⚠️ Web search response contained retailer content - rejected for TOS compliance')
                 // Don't use retailer content - skip to avoid TOS violation
-                timings.webSearch = performance.now() - webSearchStartTime
+                timings.webSearch += performance.now() - webSearchStartTime
                 usedWebSearch = false
                 webSearchContext = '' // Clear any retailer content
                 // Skip to end of try block - don't process this response
@@ -1491,7 +1564,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 )
 
                 // Also check for negative indicators (safe, cozy, light, etc.)
-                const safeIndicators = ['safe', 'cozy', 'light', 'romance', 'comedy', 'no warnings', 'no content warnings', 'family-friendly']
+                const safeIndicators = ['safe', 'cozy', 'light', 'comedy', 'no warnings', 'no content warnings', 'family-friendly']
                 const hasSafeIndicators = safeIndicators.some(indicator =>
                   messageContent.toLowerCase().includes(indicator)
                 )
@@ -1595,7 +1668,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           } catch (webSearchError) {
             console.error('Web search verification error:', webSearchError)
             onProgress?.('⚠️ Web search verification failed, continuing without verification')
-            timings.webSearch = performance.now() - webSearchStartTime
+            timings.webSearch += performance.now() - webSearchStartTime
             // Don't set usedWebSearch = true if it failed
           }
 

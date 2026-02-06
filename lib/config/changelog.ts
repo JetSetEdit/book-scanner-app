@@ -9,6 +9,46 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.60",
+    date: "2026-02-06",
+    title: "New feature",
+    changes: [
+      "User-facing changes (uncommitted changes detected)"
+    ],
+  },
+  {
+    version: "1.03.59",
+    date: "2026-01-30",
+    title: "New feature",
+    changes: [
+      "Gemini-first strategy with unified prompts"
+    ],
+  },
+  {
+    version: "1.03.58",
+    date: "2026-01-30",
+    title: "New feature",
+    changes: [
+      "Gemini-first strategy with unified prompts"
+    ],
+  },
+  {
+    version: "1.03.57",
+    date: "2026-01-29",
+    title: "New feature",
+    changes: [
+      "User-facing changes (uncommitted changes detected)"
+    ],
+  },
+  {
+    version: "1.03.56",
+    date: "2026-01-24",
+    title: "New feature",
+    changes: [
+      "Design book page, Settings layout selector+Preview, variant-check, reduce clutter, resolve-by-adding-book"
+    ],
+  },
+  {
     version: "1.03.55",
     date: "2026-01-22",
     title: "New features",

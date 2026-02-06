@@ -1,17 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/utils/admin-auth'
+import { getClientIP, isIpAllowlisted } from '@/lib/utils/rate-limiter'
 import fs from 'fs'
 import path from 'path'
 
 /**
  * POST /api/run-migration
- * Execute database migration
- * Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
+ * Execute database migration (LEGACY).
+ * Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET) and IP allowlist when configured.
+ *
+ * @deprecated Do not use for new migrations. Prefer Supabase MCP apply_migration with files in
+ *   supabase/migrations/ (see OpenSpec capability database-migrations and .cursorrules).
  */
 export async function POST(request: NextRequest) {
   const auth = requireAdmin(request);
   if (auth) return auth;
+  
+  const allowlistRaw = process.env.RATE_LIMIT_IP_ALLOWLIST || ''
+  if (allowlistRaw.trim().length > 0) {
+    const clientIP = getClientIP(request)
+    if (!isIpAllowlisted(clientIP)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+  }
+
   try {
     // Read the migration SQL from file
     const migrationPath = path.join(process.cwd(), 'scripts', '017_create_ai_audit_logs_table.sql')

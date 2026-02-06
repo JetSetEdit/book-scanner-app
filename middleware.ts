@@ -16,7 +16,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Check for access cookie (granted via welcome page) OR VIP cookie
+  // 2. Skip country gate when disabled (e.g. open internationally)
+  if (process.env.NEXT_PUBLIC_DISABLE_COUNTRY_GATE === 'true') {
+    return NextResponse.next();
+  }
+
+  // 3. Check for access cookie (granted via welcome page) OR VIP cookie
   const hasAccessCookie = request.cookies.has('subtext_access_granted');
   const hasVipCookie = request.cookies.has('subtext_vip');
   
@@ -24,7 +29,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. Check Country (AU is always allowed)
+  // 4. Check Country (AU is always allowed)
   // Allow testing via URL parameter: ?test-country=US
   const testCountry = request.nextUrl.searchParams.get('test-country');
   const country = testCountry || request.geo?.country || request.headers.get('x-vercel-ip-country');
@@ -42,7 +47,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 4. If not AU and no cookie, redirect to welcome page
+  // 5. If not AU and no cookie, redirect to welcome page
   const welcomeUrl = new URL('/welcome', request.url);
   return NextResponse.redirect(welcomeUrl);
 }

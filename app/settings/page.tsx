@@ -29,7 +29,7 @@ export default function SettingsPage() {
       <div className="container mx-auto px-4 py-12 max-w-2xl">
         <Link href="/">
           <Button variant="ghost" className="mb-6 text-muted-foreground hover:text-foreground -ml-2">
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-4 w-4" strokeWidth={1.5} />
             Back
           </Button>
         </Link>
@@ -45,7 +45,7 @@ export default function SettingsPage() {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Palette className="h-4 w-4" />
+              <Palette className="h-4 w-4" strokeWidth={1.5} />
               Appearance
             </CardTitle>
             <CardDescription>
@@ -63,7 +63,7 @@ export default function SettingsPage() {
                   onClick={() => setTheme("light")}
                   className="flex-1"
                 >
-                  <Sun className="h-4 w-4 mr-1.5" />
+                  <Sun className="h-4 w-4 mr-1.5" strokeWidth={1.5} />
                   Light
                 </Button>
                 <Button
@@ -72,7 +72,7 @@ export default function SettingsPage() {
                   onClick={() => setTheme("dark")}
                   className="flex-1"
                 >
-                  <Moon className="h-4 w-4 mr-1.5" />
+                  <Moon className="h-4 w-4 mr-1.5" strokeWidth={1.5} />
                   Dark
                 </Button>
                 <Button
@@ -81,7 +81,7 @@ export default function SettingsPage() {
                   onClick={() => setTheme("system")}
                   className="flex-1"
                 >
-                  <Monitor className="h-4 w-4 mr-1.5" />
+                  <Monitor className="h-4 w-4 mr-1.5" strokeWidth={1.5} />
                   System
                 </Button>
               </div>
@@ -111,7 +111,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       {pendingAesthetic === t.id && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <Check className="h-4 w-4 text-primary shrink-0" strokeWidth={1.5} />
                       )}
                     </div>
                   </button>
@@ -155,7 +155,7 @@ export default function SettingsPage() {
                   href={`/design/book-page?v=${preferences.bookPageLayoutPreview ?? "baseline"}`}
                   className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
                 >
-                  <LayoutTemplate className="h-4 w-4" />
+                  <LayoutTemplate className="h-4 w-4" strokeWidth={1.5} />
                   Preview
                 </Link>
               </div>

@@ -1,12 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { requireAdmin } from '@/lib/utils/admin-auth'
+import { getClientIP, isIpAllowlisted } from '@/lib/utils/rate-limiter'
 
 // Dev-only endpoint to delete a book and all related data
 // Requires x-admin-secret header (ADMIN_SECRET or DEBUG_IP_SECRET)
 export async function DELETE(request: NextRequest) {
   const auth = requireAdmin(request);
   if (auth) return auth;
+
+  const allowlistRaw = process.env.RATE_LIMIT_IP_ALLOWLIST || ''
+  if (allowlistRaw.trim().length > 0) {
+    const clientIP = getClientIP(request)
+    if (!isIpAllowlisted(clientIP)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+  }
 
   // Check if we're in dev mode
   const isDev = process.env.NODE_ENV === 'development' || 
@@ -63,7 +72,6 @@ export async function DELETE(request: NextRequest) {
     )
   }
 }
-
 
 
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processIsbnScan } from '@/lib/services/scan-service'
-import { isIpAllowlisted } from '@/lib/utils/rate-limiter'
+import { requireAdmin } from '@/lib/utils/admin-auth'
+import { getClientIP, isIpAllowlisted } from '@/lib/utils/rate-limiter'
 
 // Set max duration to 5 minutes (Vercel hobby limit is 10s for API routes, but this might run longer)
 // For long running tasks, we should ideally use background jobs, but for an admin tool
@@ -8,10 +9,15 @@ import { isIpAllowlisted } from '@/lib/utils/rate-limiter'
 export const maxDuration = 60; 
 
 export async function POST(req: NextRequest) {
-  // 1. IP Security Check
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1'
-  if (!await isIpAllowlisted(ip)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  const auth = requireAdmin(req)
+  if (auth) return auth
+  
+  const allowlistRaw = process.env.RATE_LIMIT_IP_ALLOWLIST || ''
+  if (allowlistRaw.trim().length > 0) {
+    const clientIP = getClientIP(req)
+    if (!isIpAllowlisted(clientIP)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
   }
 
   try {

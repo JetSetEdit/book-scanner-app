@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines our data sourcing policy to ensure legal compliance and avoid Terms of Service violations.
+This document outlines our data sourcing policy to ensure legal compliance and avoid Terms of Service violations. For **third-party psychology/NLP research code and reference datasets** (e.g. trigger-warning corpora, emotion-trigger datasets), see [THIRD_PARTY_RESOURCES.md](THIRD_PARTY_RESOURCES.md).
 
 ## Current Data Sources
 
