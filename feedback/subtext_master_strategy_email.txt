@@ -1,0 +1,145 @@
+Jordan,
+
+Great call. Here’s one cohesive Subtext strategy summary combining all prior notes into a single actionable plan.
+
+---
+
+SUBTEXT: MASTER STRATEGY (CONSOLIDATED)
+
+## 1) Core diagnosis
+
+You did NOT build the wrong product.
+The product works; the bottleneck is:
+
+1. Positioning is still too abstract for first-time users.
+2. Distribution is broad instead of persona-specific.
+3. Users don’t immediately see “what do I get right now?”
+4. Quick vs Deep tradeoff exists but needs clearer framing.
+
+---
+
+## 2) Recommended positioning (primary)
+
+Primary value proposition:
+Know what’s really in a book before assigning, recommending, or buying.
+
+Support line:
+Subtext gives teachers and parents a suitability check in under a minute, with clear content warnings and context.
+
+Alternative headline options:
+- Check what’s really in a book before it reaches your classroom.
+- When shelf labels and blurbs are misleading, scan for real content.
+- A suitability check in under a minute for teachers, parents, and BookTok readers.
+
+---
+
+## 3) Homepage structure (template-ready)
+
+### Hero
+- Headline: Know what’s really in a book in under a minute.
+- Subhead: Fast suitability checks for teachers and parents.
+- CTA 1: Scan a title now
+- CTA 2: See example scans
+- Microcopy: Quick Scan = fast triage. Deep Scan = higher-confidence analysis.
+
+### Problem section
+- Shelf/BookTok mismatch (YA labels can be misleading)
+- Classroom suitability uncertainty
+- Parents need context before buying
+
+### Solution section
+- Quick Scan (15–30s): first-pass triage
+- Deep Scan (90–120s): richer, higher-confidence output
+- Why explanations: transparent reasoning
+
+### Trust strip
+- Public beta (actively improving)
+- Transparent methodology
+- Indicative guidance (not official board classification)
+- Privacy clarity
+
+### How it works (3 steps)
+1) Search/scan
+2) Review warnings + age guidance + context
+3) Decide (assign, recommend, buy, or skip)
+
+### FAQ (must include)
+- How accurate is Subtext?
+- Quick vs Deep differences?
+- Is this replacing human judgment?
+- Is this an official rating?
+- Data/privacy handling?
+
+### Final CTA
+Run your first scan
+Subline: Free triage. Pay for depth.
+
+---
+
+## 4) Product/Monetization model
+
+Your Quick/Deep design is correct.
+
+Recommended packaging:
+- Free tier: limited Quick scans/day
+- Paid tier: Deep scans + richer outputs + exports
+- Optional credit packs for heavier users
+
+Principle:
+Free triage. Pay for depth.
+
+Ads (if used): keep out of active scan flow and warning blocks.
+Best locations: results footer, bookshelf/history page, digest emails.
+
+---
+
+## 5) Roleplay findings (combined)
+
+Across teacher/parent/librarian/student/book-club perspectives, the same pattern appeared:
+Users want action-ready outputs after analysis.
+
+Examples:
+- Teacher: lesson starter prompts
+- Parent: conversation prompts
+- Librarian: batch/CSV reporting
+- Student: deeper analysis mode
+- Book club: compare shortlist + discussion guide
+
+Meaning:
+Your engine is good; add “last-mile decision outputs” gradually as paid/deep features.
+
+---
+
+## 6) 14-day execution plan
+
+Week 1 (positioning + conversion)
+1. Update homepage copy to new value prop
+2. Add 3 concrete example scans above fold
+3. Add explicit Quick vs Deep explanation with confidence language
+4. Add FAQ trust section
+
+Week 2 (distribution)
+1. Pick one persona first (teachers)
+2. Run direct outreach to 20 teachers (not broad posting)
+3. Share short demos showing real before/after scan outcomes
+4. Capture 3–5 testimonials and add to homepage
+
+Success metrics for first sprint:
+- Scan start rate
+- Scan completion rate
+- Return usage (second scan)
+- Deep scan conversion intent
+
+---
+
+## 7) Final recommendation
+
+Do not rebuild the product.
+Reposition it around your real origin story:
+
+Teacher + BookTok mismatch is a real and relatable pain.
+
+You are close.
+This is now a messaging, packaging, and distribution refinement phase.
+
+— Clawbert

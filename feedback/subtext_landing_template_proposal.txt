@@ -1,0 +1,116 @@
+Subject: Subtext Landing Page Proposal (Template-Based)
+
+Jordan,
+
+Great call using that wireframe template. Below is a Subtext-specific proposal aligned to your teacher + BookTok use case.
+
+---
+
+## 1) Hero (replace generic lead form with instant action)
+
+Headline:
+Know what’s really in a book in under a minute.
+
+Subhead:
+Subtext helps teachers and parents quickly check suitability with clear content warnings, age guidance, and context.
+
+Primary CTA:
+Scan a title now
+
+Secondary CTA:
+See example scan
+
+Reassurance text:
+Quick Scan is built for fast triage. Deep Scan adds higher-confidence analysis.
+
+---
+
+## 2) The Problem (3 pain points)
+
+1. Shelf placement can be misleading
+BookTok and retail “YA” labels don’t always reflect explicit content.
+
+2. Classroom risk is hard to assess quickly
+Teachers need confidence before assigning or recommending texts.
+
+3. Parents need context before buying
+Blurb/reviews often miss the practical suitability concerns.
+
+---
+
+## 3) How We Solve This (feature + benefit)
+
+Quick Scan (15–30s)
+Get immediate warning triage for first-pass decision making.
+
+Deep Scan (90–120s)
+Get richer context and higher-confidence insights before final decisions.
+
+Clear “Why” Explanations
+Understand why something is flagged, not just that it is flagged.
+
+---
+
+## 4) Trust Section
+
+Suggested trust badges/copy:
+- Public Beta (actively improving)
+- Transparent methodology
+- Indicative guidance (not official board rating)
+- Privacy-first (no personal reading profile required)
+
+---
+
+## 5) How It Works (3 steps)
+
+1) Search or scan a title
+2) Review warnings + age guidance + context
+3) Decide to assign, recommend, buy, or skip
+
+---
+
+## 6) Product Proof Block
+
+Use 1 featured scan card + 3 key bullets:
+- Key Benefit: Better suitability decisions, faster
+- Key Advantage: Quick triage + deep confidence mode
+- Why Choose Us: Built for real mismatch cases (classroom + BookTok)
+
+---
+
+## 7) FAQ (high-conversion questions)
+
+- How accurate is Subtext?
+- What’s the difference between Quick and Deep Scan?
+- Is this replacing teacher/parent judgment?
+- Is this an official classification?
+- How is my data handled?
+
+---
+
+## 8) Final CTA
+
+Ready to check what’s really in a book?
+
+CTA:
+Run your first scan
+
+Subtext:
+Free triage. Pay for depth.
+
+---
+
+## 9) Recommended Launch Order
+
+1. Ship hero + problem + quick/deep explanation
+2. Add 3 real example scans
+3. Add FAQ + trust strip
+4. Run 14-day teacher-first test
+
+---
+
+If you want, next I can provide the exact same proposal as:
+- Paste-ready homepage copy blocks, and
+- A component map for Cursor/Next.js section-by-section.
+
+— Clawbert

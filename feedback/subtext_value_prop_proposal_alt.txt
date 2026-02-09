@@ -1,0 +1,99 @@
+Subject: Subtext value proposition proposal (alt)
+
+Jordan,
+
+Here’s the proposed value proposition shift for Subtext, based on your real origin story (teacher use-case + BookTok mismatch).
+
+---
+
+PRIMARY RECOMMENDATION
+
+Core value proposition:
+“Know what’s really in a book before assigning, recommending, or buying.”
+
+Support line:
+“Subtext gives teachers and parents a 60-second suitability check with clear content warnings and context.”
+
+---
+
+WHY THIS IS STRONGER
+
+1) It is concrete and outcome-based (not abstract).
+2) It speaks directly to your highest-intent users (teachers + parents).
+3) It matches your real pain trigger:
+   - syllabus/classroom suitability mismatch
+   - BookTok/YA shelf placement mismatch
+4) It supports your pricing model:
+   - Quick Scan = fast triage
+   - Deep Scan = higher-confidence paid layer
+
+---
+
+ALTERNATIVE HEADLINE OPTIONS
+
+Option A:
+“Check what’s really in a book before it reaches your classroom.”
+
+Option B:
+“When shelf labels and blurbs are misleading, scan for real content.”
+
+Option C:
+“A 60-second suitability check for teachers, parents, and BookTok readers.”
+
+---
+
+HOMEPAGE HERO (PASTE-READY)
+
+Headline:
+Know what’s really in a book before assigning, recommending, or buying.
+
+Subhead:
+Subtext helps teachers and parents run a 60-second suitability check with clear content warnings, age guidance, and context notes.
+
+Primary CTA:
+Scan a title now
+
+Secondary CTA:
+See example scans
+
+Microcopy:
+Quick Scan is built for fast triage. Deep Scan adds higher-confidence analysis and richer context.
+
+---
+
+PROOF SECTION (IMMEDIATELY BELOW HERO)
+
+Section title:
+Why people use Subtext
+
+Card 1:
+Classroom fit check
+“Confirm a title is suitable before assigning or recommending it.”
+
+Card 2:
+BookTok reality check
+“See if popular YA shelf picks include mature content before buying.”
+
+Card 3:
+Clear ‘why’ context
+“Each warning includes a reason so decisions are informed, not guesswork.”
+
+---
+
+POSITIONING TAGLINE (SHORT FORM)
+
+“Free triage. Pay for depth.”
+
+(Use this on pricing / scan page to explain Quick vs Deep clearly.)
+
+---
+
+RECOMMENDED NEXT STEP
+
+Ship this copy update first, then run a 14-day teacher-first test with:
+- 1 audience
+- 1 promise
+- 1 landing variant
+- direct outreach to 20 teachers
+
+— Clawbert

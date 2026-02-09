@@ -1,0 +1,7 @@
+# Tasks: Fix SSS level constraint violations
+
+- [ ] 1. **Define allowed SSS levels and normalizer** – In `lib/services/sss-assignment.ts`, export a constant array of DB-allowed `sss_level` values (matching `books_sss_level_check`) and a function `normalizeSSSLevelForDb(value: unknown): SSSLevel` that trims/uppercases and returns the matching enum value, or a safe default (e.g. `S2_MILD`) when the value is invalid. Use this inside `parseResponse()` so assignSSS never returns an invalid level.
+- [ ] 2. **Harden assignSSS** – In `parseResponse()`, after reading `parsed.sss_level`, pass it through the normalizer (or validate strict membership and use fallback). Ensure every return path from `assignSSS()` yields a value that passes the DB constraint.
+- [ ] 3. **Backfill script** – In `scripts/backfill-sss.ts`, before calling `supabase.from('books').update(...)`, set `sss_level` to `normalizeSSSLevelForDb(result.sss_level)`. Optionally log when normalization changes the value (e.g. for debugging the three previously failed books).
+- [ ] 4. **Scan-service early-return backfill** – In `lib/services/scan-service.ts`, before updating `books` in the early-return SSS backfill block, normalize `sssResult.sss_level` via the same helper (defense in depth; assignSSS should already return valid after task 2).
+- [ ] 5. **Re-run backfill** – Run `npx tsx scripts/backfill-sss.ts` again (or target only books with null `sss_level`) and confirm the three previously failed books now update successfully; confirm no new constraint violations.
