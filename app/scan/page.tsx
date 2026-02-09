@@ -25,7 +25,9 @@ import { ScanDebugSidebar } from "@/components/scan-debug-sidebar"
 import { RateLimitFeedbackDialog } from "@/components/rate-limit-feedback-dialog"
 import { BonusScanBadge } from "@/components/bonus-scan-badge"
 import { BonusClaimNotification } from "@/components/bonus-claim-notification"
-
+import { PaywallModal } from "@/components/paywall-modal"
+import { canRunScan } from "@/lib/entitlements"
+import { getDailyScanUsage, incrementDailyScanUsage } from "@/lib/utils/scan-usage"
 import { ScanningAnimation } from "@/components/scanning-animation"
 
 // Helper function to format status messages for display
@@ -178,6 +180,9 @@ function ScanTestPageContent() {
     unlimited?: boolean
   } | null>(null)
 
+  // Freemium paywall (daily scan limit)
+  const [showPaywall, setShowPaywall] = useState(false)
+
   useEffect(() => {
     setIsMounted(true)
   }, [])
@@ -230,6 +235,12 @@ function ScanTestPageContent() {
     forceRefreshOverride?: boolean
   ) => {
     console.log('[Scan] performScan called:', { isbnToScan, scanModeOverride, forceRefreshOverride })
+    const effectiveMode = scanModeOverride ?? scanMode
+    const { usedQuick, usedDeep } = getDailyScanUsage()
+    if (!canRunScan({ plan: "free", scanType: effectiveMode, usedQuick, usedDeep })) {
+      setShowPaywall(true)
+      return
+    }
     // Start timing
     const timer = startTiming()
     markStage('scan-initiated')
@@ -488,6 +499,9 @@ function ScanTestPageContent() {
 
       markStage('result-processed')
 
+      // Increment daily usage for freemium limit
+      incrementDailyScanUsage(effectiveMode)
+
       // Save to scan history
       if (result?.book) {
         try {
@@ -524,6 +538,7 @@ function ScanTestPageContent() {
         setLoading(false)
         return
       }
+      // Note: incrementDailyScanUsage already called above for non-redirect success path
 
       setLoading(false)
       return
@@ -673,6 +688,9 @@ function ScanTestPageContent() {
                 </div>
                 <p className="text-xs text-muted-foreground ml-6">
                   Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Deep scan (90–120s) uses {DEEP_SCAN_COST} scan credits from the same daily pool (Quick uses 1).
+                </p>
+                <p className="text-xs text-muted-foreground ml-6 font-medium">
+                  Free triage. Pay for depth.
                 </p>
               </div>
 
@@ -1218,6 +1236,8 @@ function ScanTestPageContent() {
               claimInfo={bonusClaimInfo}
               onDismiss={() => setBonusClaimInfo(null)}
             />
+
+            <PaywallModal open={showPaywall} onOpenChange={setShowPaywall} />
 
             {result && result.success && (
               <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">

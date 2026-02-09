@@ -15,6 +15,8 @@ import { BookAdminControls } from "@/components/book-admin-controls"
 import { BookCardAdmin } from "@/components/book-card-admin"
 import { CollectionFiltersWrapper } from "@/components/collection-filters-wrapper"
 import { FilterCounts } from "@/components/collection-filters"
+import { SponsoredCard } from "@/components/sponsored-card"
+import { monetizationConfig, defaultBookshelfSidebarSponsor } from "@/lib/config/monetization"
 
 // Helper function to extract classification rating from categories
 function getClassificationFromCategories(categories?: string[]): string | null {
@@ -536,6 +538,13 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               />
             )}
           </div>
+          {monetizationConfig.adsEnabled && monetizationConfig.placements.bookshelfSidebar && (
+            <aside className="hidden lg:block w-64 flex-shrink-0">
+              <div className="lg:sticky lg:top-4">
+                <SponsoredCard compact item={defaultBookshelfSidebarSponsor} />
+              </div>
+            </aside>
+          )}
         </div>
       </div>
     </div >

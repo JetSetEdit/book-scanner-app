@@ -15,10 +15,12 @@
  */
 
 import { BookDetails } from "@/components/book-details"
+import { SponsoredCard } from "@/components/sponsored-card"
 import { supabaseAdmin } from "@/lib/supabase/admin"
 import { fetchBookByISBN } from "@/lib/book-api"
 import { validateISBNWithChecksum } from "@/lib/isbn-validation"
 import { BookStubPage } from "@/components/book-stub-page"
+import { monetizationConfig, defaultResultsFooterSponsor } from "@/lib/config/monetization"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 
@@ -240,6 +242,11 @@ export default async function BookPage({ params }: BookPageProps) {
               analyzedAt: latestAudit.created_at || null,
             } : null}
           />
+          {monetizationConfig.adsEnabled && monetizationConfig.placements.resultsFooter && (
+            <div className="mt-8">
+              <SponsoredCard item={defaultResultsFooterSponsor} />
+            </div>
+          )}
         </div>
       </div>
     </main>
