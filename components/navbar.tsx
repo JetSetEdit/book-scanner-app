@@ -24,8 +24,11 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 
-const navigation = [
+const publicNavigation = [
   { name: "Home", href: "/", icon: BookOpen },
+]
+
+const productNavigation = [
   { name: "Scan", href: "/scan", icon: ScanBarcode },
   { name: "Bookshelf", href: "/collection", icon: Library },
   { name: "Settings", href: "/settings", icon: Settings },
@@ -98,10 +101,14 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
     }
   }, [])
 
-  // Navigation items (RLHF removed - backed up in backups/rlhf-backup-*)
+  // Only show product navigation (Scan, Bookshelf, Settings) for VIP/admin users
+  const hasProductAccess = userMode === 'admin' || userMode === 'vip'
+
   const visibleNavigation = useMemo(() => {
-    return navigation
-  }, [])
+    return hasProductAccess
+      ? [...publicNavigation, ...productNavigation]
+      : publicNavigation
+  }, [hasProductAccess])
 
   const toggleAuditTrail = () => {
     const newValue = !showAuditTrail
@@ -155,15 +162,19 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
               <span className="text-2xl md:text-3xl font-serif font-normal tracking-tight text-foreground hidden sm:inline" style={{ fontFamily: 'var(--font-serif)' }}>{getVariantConfig().name}</span>
             </Link>
 
-            {/* Search - Desktop */}
-            <div className="hidden md:flex flex-1 max-w-md mx-4">
-              <SearchComponent placeholder="Search title, author, ISBN..." />
-            </div>
+            {/* Search - Desktop (only for users with product access) */}
+            {hasProductAccess && (
+              <div className="hidden md:flex flex-1 max-w-md mx-4">
+                <SearchComponent placeholder="Search title, author, ISBN..." />
+              </div>
+            )}
 
-            {/* Search - Mobile */}
-            <div className="md:hidden flex-1 max-w-xs mx-2">
-              <SearchComponent placeholder="Search..." />
-            </div>
+            {/* Search - Mobile (only for users with product access) */}
+            {hasProductAccess && (
+              <div className="md:hidden flex-1 max-w-xs mx-2">
+                <SearchComponent placeholder="Search..." />
+              </div>
+            )}
 
 
             {/* Navigation Links - Desktop */}
@@ -227,7 +238,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                   {getVariantId()}
                 </Badge>
               )}
-              <BonusScanBadge variant="nav" />
+              {hasProductAccess && <BonusScanBadge variant="nav" />}
               <Popover>
                 <PopoverTrigger asChild>
                   <button type="button" className="ml-1">

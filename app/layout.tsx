@@ -72,6 +72,11 @@ export default async function RootLayout({
   
   const userMode = isAdmin ? 'admin' : (isVip ? 'vip' : 'regular')
 
+  // Hide navbar/footer on landing pages (homepage, login) for regular users
+  const currentPath = headerList.get('x-pathname') || '/'
+  const isLandingPage = currentPath === '/' || currentPath === '/login'
+  const showChrome = !isLandingPage || userMode !== 'regular'
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable} ${libreBaskerville.variable} flex flex-col min-h-screen`}>
@@ -82,11 +87,11 @@ export default async function RootLayout({
           disableTransitionOnChange={false}
         >
           <AestheticThemeApplicator />
-          <Navbar userMode={userMode} />
-          <main className="flex-1 pb-16 md:pb-0">
+          {showChrome && <Navbar userMode={userMode} />}
+          <main className={showChrome ? "flex-1 pb-16 md:pb-0" : "flex-1"}>
             {children}
           </main>
-          <Footer />
+          {showChrome && <Footer />}
           <PWARegister />
           <PWAInstallPrompt />
           <BetaOnboardingModal />
