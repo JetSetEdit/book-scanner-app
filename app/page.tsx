@@ -212,9 +212,9 @@ export default async function HomePage() {
       </section>
 
       {/* How it Works — visual steps */}
-      <section className="border-t border-border/50 bg-muted/30 py-16 px-4">
+      <section className="border-t border-border/50 bg-muted/30 py-12 px-4">
         <div className="container max-w-4xl mx-auto">
-          <h2 className="text-lg font-semibold text-foreground text-center mb-10">How It Works</h2>
+          <h2 className="text-lg font-semibold text-foreground text-center mb-6">How It Works</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
@@ -244,7 +244,7 @@ export default async function HomePage() {
                   <item.icon className="h-5 w-5 text-primary" strokeWidth={1.5} />
                 </div>
                 <h3 className="font-medium text-foreground text-sm">{item.title}</h3>
-                <p className="text-sm text-muted-foreground">{item.body}</p>
+                <p className="text-[15px] text-muted-foreground leading-relaxed">{item.body}</p>
               </div>
             ))}
           </div>
@@ -252,9 +252,9 @@ export default async function HomePage() {
       </section>
 
       {/* Why Subtext? — value prop cards */}
-      <section className="border-t border-border/50 py-16 px-4">
+      <section className="border-t border-border/50 py-12 px-4">
         <div className="container max-w-4xl mx-auto">
-          <h2 className="text-lg font-semibold text-foreground text-center mb-10">Why Subtext?</h2>
+          <h2 className="text-lg font-semibold text-foreground text-center mb-6">Why Subtext?</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
               {
@@ -278,7 +278,7 @@ export default async function HomePage() {
                   <item.icon className="h-5 w-5 text-primary" strokeWidth={1.5} />
                 </div>
                 <h3 className="font-medium text-foreground text-sm">{item.title}</h3>
-                <p className="text-sm text-muted-foreground">{item.body}</p>
+                <p className="text-[15px] text-muted-foreground leading-relaxed">{item.body}</p>
               </div>
             ))}
           </div>
@@ -286,7 +286,7 @@ export default async function HomePage() {
       </section>
 
       {/* Trust strip */}
-      <section className="border-t border-border/50 bg-muted/30 py-10 px-4">
+      <section className="border-t border-border/50 bg-muted/30 py-6 px-4">
         <div className="container max-w-3xl mx-auto">
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-sm text-muted-foreground">
             {[
@@ -305,7 +305,7 @@ export default async function HomePage() {
       </section>
 
       {/* Branded tagline footer */}
-      <section className="py-10 px-4 text-center">
+      <section className="py-8 px-4 text-center">
         <p className="text-base text-muted-foreground">
           Read informed. Recommend confidently. That&apos;s{" "}
           <span className="font-serif italic font-medium text-foreground" style={{ fontFamily: "var(--font-serif)" }}>
