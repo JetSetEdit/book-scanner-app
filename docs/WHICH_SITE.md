@@ -4,30 +4,31 @@
 
 ---
 
-## For you (and Super Testers): use production
+## One production site
 
-| Purpose | URL | When to use |
-|--------|-----|-------------|
-| **Production (canonical)** | **https://www.subtextscanner.com.au** | Real users, testers, demos, support links. This is the only URL you need for “the actual site.” |
+| Purpose | URL |
+|--------|-----|
+| **Production (only site)** | **https://www.subtextscanner.com.au** |
 
 Also valid: **https://subtextscanner.com.au** (redirects to www).
 
+- **Gate:** International visitors see the welcome page; the only way past the gate is an **invite code**. Australian visitors go straight to the app.
+- **Preview:** We do not use a separate preview domain. Same codebase deploys to production only. (If you had preview.subtextscanner.com.au in Vercel, you can remove it or point it at the same deployment.)
+
 ---
 
-## Other URLs (avoid for day-to-day use)
+## Other URLs
 
-| URL | What it is | Use only when |
-|-----|------------|----------------|
-| **preview.subtextscanner.com.au** | Vercel preview (e.g. PR previews) | Testing a specific branch/PR before merge. |
-| **\*.vercel.app** (e.g. subtext-books.vercel.app, book-scanner-app-eta.vercel.app) | Old/default Vercel project URLs | Ignore for normal use. Some docs/scripts still mention them; production is subtextscanner.com.au. |
-| **localhost:3000** | Local dev | When running `npm run dev` on your machine. |
+| URL | Use |
+|-----|-----|
+| **\*.vercel.app** | Ignore; legacy. Use subtextscanner.com.au. |
+| **localhost:3000** | Local dev when running `npm run dev`. |
 
 ---
 
 ## Summary
 
-- **Give testers and stakeholders:** https://www.subtextscanner.com.au  
-- **Give Super Testers:** The VIP invite link (e.g. `https://www.subtextscanner.com.au/api/invite/<code>`) so they get VIP access and higher scan limits.  
-- **Don’t** send people to random vercel.app URLs; they’re legacy and confusing.
+- **One site:** https://www.subtextscanner.com.au (gate + full app).
+- **Access past the gate:** Invite code only (no country-join). Give testers a code or the link: `https://www.subtextscanner.com.au/api/invite/<code>`.
 
 *Last updated: March 2026*

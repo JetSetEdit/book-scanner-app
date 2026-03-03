@@ -1,5 +1,3 @@
-import { getSupportedCountries } from '@/app/actions/access-control'
-import { AccessGateForm } from '@/components/access-gate-form'
 import { InviteCodeForm } from '@/components/invite-code-form'
 import { Metadata } from 'next'
 
@@ -8,25 +6,7 @@ export const metadata: Metadata = {
   robots: 'noindex, nofollow',
 }
 
-export default async function WelcomePage() {
-  // Use fallback countries by default - will be overridden if DB query succeeds
-  let countries = [
-    { country_code: 'US', country_name: 'United States', allowed_count: 100 },
-    { country_code: 'GB', country_name: 'United Kingdom', allowed_count: 50 },
-    { country_code: 'CA', country_name: 'Canada', allowed_count: 50 },
-    { country_code: 'NZ', country_name: 'New Zealand', allowed_count: 50 },
-  ]
-
-  try {
-    const dbCountries = await getSupportedCountries()
-    if (Array.isArray(dbCountries) && dbCountries.length > 0) {
-      countries = dbCountries
-    }
-  } catch (error: any) {
-    // Silently use fallback - error already logged in getSupportedCountries
-    console.error('Welcome page: Error loading countries, using fallback:', error?.message || error)
-  }
-
+export default function WelcomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F9F7F1] text-[#2C2416] font-sans">
       <div className="max-w-md w-full text-center bg-white p-8 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-[#E8E5DF]">
@@ -75,23 +55,17 @@ export default async function WelcomePage() {
                 </g>
               </svg>
           </div>
-          <h1 className="font-serif text-3xl mb-2 text-[#2C2416]">Subtext International</h1>
+          <h1 className="font-serif text-3xl mb-2 text-[#2C2416]">Welcome to Subtext</h1>
           <p className="text-[#4A4A4A] mb-2">
-            Subtext is currently in beta for Australian users.
+            Subtext is in beta. Access is by invite code only.
           </p>
-          <p className="text-[#4A4A4A]">
-            We are opening limited spots for international readers.
+          <p className="text-[#4A4A4A] text-sm">
+            Enter the code from your invite to continue.
           </p>
         </div>
 
-        <div className="border-t border-[#E8E5DF] pt-6 mt-6">
-          <p className="text-sm font-medium text-[#2C2416] mb-1">Have an invite code?</p>
+        <div className="pt-2">
           <InviteCodeForm />
-        </div>
-
-        <div className="border-t border-[#E8E5DF] pt-6 mt-6">
-          <p className="text-sm font-medium text-[#4A4A4A] mb-2">Or join the beta by region</p>
-          <AccessGateForm countries={countries} />
         </div>
       </div>
     </div>
