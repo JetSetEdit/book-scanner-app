@@ -15,12 +15,11 @@ export async function GET(
   }
 
   try {
-    // 1. Check if code exists and is unused
+    // 1. Check if code exists and is valid (unused, or reusable master)
     const { data, error } = await supabaseAdmin
       .from('vip_codes')
-      .select('*')
+      .select('code, is_used, reusable')
       .eq('code', code)
-      .eq('is_used', false)
       .single()
 
     if (error || !data) {
@@ -31,18 +30,29 @@ export async function GET(
       )
     }
 
-    // 2. Mark code as used (Burn after reading)
-    const { error: updateError } = await supabaseAdmin
-      .from('vip_codes')
-      .update({ is_used: true })
-      .eq('code', code)
-
-    if (updateError) {
-      console.error('Failed to mark code as used:', updateError)
+    const reusable = data.reusable === true
+    const valid = !data.is_used || reusable
+    if (!valid) {
       return NextResponse.json(
-        { error: 'System error processing invite.' },
-        { status: 500 }
+        { error: 'This invite link is invalid or has already been used.' },
+        { status: 403 }
       )
+    }
+
+    // 2. Mark code as used only if not reusable (master codes never burn)
+    if (!reusable) {
+      const { error: updateError } = await supabaseAdmin
+        .from('vip_codes')
+        .update({ is_used: true })
+        .eq('code', code)
+
+      if (updateError) {
+        console.error('Failed to mark code as used:', updateError)
+        return NextResponse.json(
+          { error: 'System error processing invite.' },
+          { status: 500 }
+        )
+      }
     }
 
     // 3. Set the VIP cookie

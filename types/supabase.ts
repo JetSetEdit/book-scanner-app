@@ -242,16 +242,19 @@ export interface Database {
           code: string
           is_used: boolean
           created_at: string
+          reusable?: boolean
         }
         Insert: {
           code: string
           is_used?: boolean
           created_at?: string
+          reusable?: boolean
         }
         Update: {
           code?: string
           is_used?: boolean
           created_at?: string
+          reusable?: boolean
         }
         Relationships: []
       }

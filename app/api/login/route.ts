@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     // Check the code against vip_codes table
     const { data, error } = await supabaseAdmin
       .from('vip_codes')
-      .select('code, is_used')
+      .select('code, is_used, reusable')
       .eq('code', trimmedCode)
       .single()
 
@@ -31,18 +31,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (data.is_used) {
+    const reusable = data.reusable === true
+    const valid = !data.is_used || reusable
+    if (!valid) {
       return NextResponse.json(
         { ok: false, error: { code: 'CODE_USED', message: 'This invite code has already been used.' } },
         { status: 401 }
       )
     }
 
-    // Mark code as used
-    await supabaseAdmin
-      .from('vip_codes')
-      .update({ is_used: true })
-      .eq('code', trimmedCode)
+    // Mark code as used only if not reusable (master codes never burn)
+    if (!reusable) {
+      await supabaseAdmin
+        .from('vip_codes')
+        .update({ is_used: true })
+        .eq('code', trimmedCode)
+    }
 
     // Set VIP cookie (same cookie the middleware already checks)
     const response = NextResponse.json(

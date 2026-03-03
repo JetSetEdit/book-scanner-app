@@ -22,22 +22,29 @@ export async function redeemInviteCode(formData: FormData): Promise<{ error?: st
   try {
     const { data, error } = await supabaseAdmin
       .from('vip_codes')
-      .select('code')
+      .select('code, is_used, reusable')
       .eq('code', code)
-      .eq('is_used', false)
       .single()
 
     if (error || !data) {
       return { error: 'This invite code is invalid or has already been used.' }
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from('vip_codes')
-      .update({ is_used: true })
-      .eq('code', code)
+    const reusable = data.reusable === true
+    const valid = !data.is_used || reusable
+    if (!valid) {
+      return { error: 'This invite code is invalid or has already been used.' }
+    }
 
-    if (updateError) {
-      return { error: 'Something went wrong. Please try again.' }
+    if (!reusable) {
+      const { error: updateError } = await supabaseAdmin
+        .from('vip_codes')
+        .update({ is_used: true })
+        .eq('code', code)
+
+      if (updateError) {
+        return { error: 'Something went wrong. Please try again.' }
+      }
     }
 
     const cookieStore = await cookies()
