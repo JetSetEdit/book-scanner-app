@@ -23,10 +23,21 @@ interface SearchResult {
     mild: number
   }
   hasWarnings: boolean
+  source?: 'database' | 'external_api'
+}
+
+interface ExternalSearchResult {
+  isbn: string
+  title: string
+  author: string | null
+  cover_url: string | null
+  description: string | null
+  source: 'external_api'
 }
 
 interface SearchResponse {
   books: SearchResult[]
+  externalResults?: ExternalSearchResult[]
   total: number
   query: string
   isISBN?: boolean
@@ -42,6 +53,7 @@ export function SearchComponent({ className }: SearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
+  const [externalResults, setExternalResults] = useState<ExternalSearchResult[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [showResults, setShowResults] = useState(false)
@@ -87,6 +99,7 @@ export function SearchComponent({ className }: SearchProps) {
         const response = await fetch(url)
         const data: SearchResponse = await response.json()
         setResults(data.books || [])
+        setExternalResults(data.externalResults || [])
         setSearchMeta({
           isISBN: data.isISBN,
           isbnNotFound: data.isbnNotFound,
@@ -112,6 +125,7 @@ export function SearchComponent({ className }: SearchProps) {
   const handleClear = () => {
     setQuery("")
     setResults([])
+    setExternalResults([])
     setShowResults(false)
     inputRef.current?.focus()
   }
@@ -125,8 +139,9 @@ export function SearchComponent({ className }: SearchProps) {
     if (e.key === "Escape") {
       setShowResults(false)
       inputRef.current?.blur()
-    } else if (e.key === "Enter" && results.length > 0) {
-      router.push(`/book/${results[0].isbn}`)
+    } else if (e.key === "Enter" && (results.length > 0 || externalResults.length > 0)) {
+      if (results.length > 0) router.push(`/book/${results[0].isbn}`)
+      else router.push(`/scan?isbn=${encodeURIComponent(externalResults[0].isbn)}`)
       handleResultClick()
     }
   }
@@ -143,7 +158,7 @@ export function SearchComponent({ className }: SearchProps) {
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
-            if (results.length > 0) setShowResults(true)
+            if (results.length > 0 || externalResults.length > 0) setShowResults(true)
           }}
           onKeyDown={handleKeyDown}
           className="pl-10 pr-10 w-full"
@@ -165,7 +180,7 @@ export function SearchComponent({ className }: SearchProps) {
       </div>
 
       {/* Search Results Dropdown */}
-      {showResults && (query.length >= 2 || results.length > 0) && (
+      {showResults && (query.length >= 2 || results.length > 0 || externalResults.length > 0) && (
         <div className="absolute top-full left-0 right-0 mt-2 bg-popover border border-border rounded-lg shadow-lg z-[100] max-h-[500px] overflow-y-auto">
           {/* Severity Filters */}
           {query.length >= 2 && (
@@ -223,7 +238,13 @@ export function SearchComponent({ className }: SearchProps) {
             </div>
           )}
           
-          {results.length === 0 && !isLoading && query.length >= 2 ? (
+          {isLoading && results.length === 0 && externalResults.length === 0 && query.length >= 3 ? (
+            <div className="p-4 text-center space-y-2">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground">Searching our library...</p>
+              <p className="text-xs text-muted-foreground">Also checking external sources...</p>
+            </div>
+          ) : results.length === 0 && externalResults.length === 0 && !isLoading && query.length >= 2 ? (
             <div className="p-4">
               {searchMeta.isbnNotFound && searchMeta.normalizedISBN ? (
                 <div className="text-center space-y-3">
@@ -252,76 +273,129 @@ export function SearchComponent({ className }: SearchProps) {
                 </div>
               )}
             </div>
-          ) : results.length > 0 ? (
+          ) : (results.length > 0 || externalResults.length > 0) ? (
             <div className="py-2">
-              {results.map((book) => (
-                <Link
-                  key={book.id}
-                  href={`/book/${book.isbn}`}
-                  onClick={handleResultClick}
-                  className="flex items-start gap-3 px-4 py-3 hover:bg-accent transition-colors border-b border-border last:border-b-0"
-                >
-                  {/* Cover */}
-                  <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
-                    {book.cover_url ? (
-                      <Image
-                        src={book.cover_url.startsWith('http') 
-                          ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
-                          : book.cover_url}
-                        alt={`Cover of ${book.title}`}
-                        fill
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <BookOpen className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Book Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm text-foreground truncate">
-                      {book.title}
-                    </h3>
-                    {book.author && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">
-                        {book.author}
-                      </p>
-                    )}
-                    {book.hasWarnings && (
-                      <div className="flex items-center gap-2 mt-2">
-                        {book.warningSummary.severe > 0 && (
-                          <span className="text-[10px] font-medium text-red-600">
-                            {book.warningSummary.severe} severe
-                          </span>
-                        )}
-                        {book.warningSummary.moderate > 0 && (
-                          <span className="text-[10px] font-medium text-orange-600">
-                            {book.warningSummary.moderate} moderate
-                          </span>
-                        )}
-                        {book.warningSummary.mild > 0 && (
-                          <span className="text-[10px] font-medium text-yellow-600">
-                            {book.warningSummary.mild} mild
-                          </span>
+              {/* Database results */}
+              {results.length > 0 && (
+                <>
+                  {results.map((book) => (
+                    <Link
+                      key={book.id}
+                      href={`/book/${book.isbn}`}
+                      onClick={handleResultClick}
+                      className="flex items-start gap-3 px-4 py-3 hover:bg-accent transition-colors border-b border-border"
+                    >
+                      <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
+                        {book.cover_url ? (
+                          <Image
+                            src={book.cover_url.startsWith('http') 
+                              ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                              : book.cover_url}
+                            alt={`Cover of ${book.title}`}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <BookOpen className="h-6 w-6 text-muted-foreground" />
+                          </div>
                         )}
                       </div>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm text-foreground truncate">{book.title}</h3>
+                        {book.author && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{book.author}</p>
+                        )}
+                        {book.hasWarnings && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {book.warningSummary.severe > 0 && (
+                              <span className="text-[10px] font-medium text-red-600">{book.warningSummary.severe} severe</span>
+                            )}
+                            {book.warningSummary.moderate > 0 && (
+                              <span className="text-[10px] font-medium text-orange-600">{book.warningSummary.moderate} moderate</span>
+                            )}
+                            {book.warningSummary.mild > 0 && (
+                              <span className="text-[10px] font-medium text-yellow-600">{book.warningSummary.mild} mild</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+                  ))}
+                  {results.length >= 20 && (
+                    <div className="px-4 py-2 border-b border-border text-xs text-muted-foreground text-center">
+                      Showing top 20 results
+                    </div>
+                  )}
+                </>
+              )}
+              {/* External API results (Google Books) — not yet in our DB */}
+              {isLoading && results.length > 0 && externalResults.length === 0 && query.length >= 3 && (
+                <div className="px-4 py-3 border-b border-border bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">Searching external sources...</p>
                   </div>
-                </Link>
-              ))}
-              {results.length >= 20 && (
-                <div className="px-4 py-2 border-t border-border text-xs text-muted-foreground text-center">
-                  Showing top 20 results
                 </div>
               )}
-              {/* Google Books Attribution for search results */}
-              <div className="px-4 py-2 border-t border-border">
-                <p className="text-[10px] text-stone-400 dark:text-stone-500 text-center">
-                  Data sourced via Google Books
-                </p>
-              </div>
+              {externalResults.length > 0 && (
+                <>
+                  {results.length > 0 && (
+                    <div className="px-4 py-2 border-b border-border bg-muted/30">
+                      <p className="text-xs font-medium text-muted-foreground">Not yet scanned</p>
+                    </div>
+                  )}
+                  {externalResults.map((book) => (
+                    <div
+                      key={book.isbn}
+                      className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0 bg-muted/20"
+                    >
+                      <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
+                        {book.cover_url ? (
+                          <Image
+                            src={book.cover_url}
+                            alt={`Cover of ${book.title}`}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <BookOpen className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm text-foreground truncate">{book.title}</h3>
+                        {book.author && (
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{book.author}</p>
+                        )}
+                        {book.description && (
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{book.description}</p>
+                        )}
+                        <Button
+                          onClick={() => {
+                            router.push(`/scan?isbn=${encodeURIComponent(book.isbn)}`)
+                            handleResultClick()
+                          }}
+                          size="sm"
+                          className="mt-2 gap-2"
+                          variant="outline"
+                        >
+                          <BookOpen className="h-3 w-3" />
+                          Scan this book
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+              {(results.length > 0 || externalResults.length > 0) && (
+                <div className="px-4 py-2 border-t border-border">
+                  <p className="text-[10px] text-stone-400 dark:text-stone-500 text-center">
+                    Data sourced via Google Books
+                  </p>
+                </div>
+              )}
             </div>
           ) : null}
         </div>

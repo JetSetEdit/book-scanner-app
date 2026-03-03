@@ -13,7 +13,8 @@
 Also valid: **https://subtextscanner.com.au** (redirects to www).
 
 - **Gate:** International visitors see the welcome page; the only way past the gate is an **invite code**. Australian visitors go straight to the app.
-- **Preview:** We do not use a separate preview domain. Same codebase deploys to production only. (If you had preview.subtextscanner.com.au in Vercel, you can remove it or point it at the same deployment.)
+- **Preview:** We do not use a separate preview domain. Same codebase deploys to production only. (If you had preview.subtextscanner.com.au in Vercel, remove it under **Project → Settings → Domains** to avoid confusion.)
+- **Removing outdated deployments:** In Vercel dashboard go to **Deployments**, filter by branch or status, and delete old preview deployments if you want to clean up. Production is always the latest deployment from `main`.
 
 ---
 

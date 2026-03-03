@@ -16,6 +16,17 @@ interface OpenLibraryBook {
 import { isPlaceholderTitle, filterPlaceholderCandidates } from './utils/placeholder-detection'
 import { normalizeISBN } from './isbn-validation'
 
+/** Fetch with one retry on 429 (rate limit). Waits 2s then retries. */
+async function fetchWith429Retry(url: string, options: RequestInit = {}): Promise<Response> {
+  const res = await fetch(url, options)
+  if (res.status === 429) {
+    console.warn('[Book API] Google Books 429 rate limit, retrying after 2s...')
+    await new Promise((r) => setTimeout(r, 2000))
+    return fetch(url, options)
+  }
+  return res
+}
+
 interface BookData {
   isbn: string
   title: string
@@ -46,9 +57,13 @@ export async function fetchCandidatesByISBN(isbn: string): Promise<BookCandidate
 
   const candidates: BookCandidate[] = []
 
-  // Add Open Library result if successful
-  if (openLibResult.status === 'fulfilled' && openLibResult.value) {
-    candidates.push({ ...openLibResult.value, source: 'openlibrary' })
+  // Add Open Library result if successful (books API, or search API fallback)
+  let openLibBook: BookData | null = openLibResult.status === 'fulfilled' ? openLibResult.value : null
+  if (!openLibBook && openLibResult.status === 'fulfilled') {
+    openLibBook = await fetchFromOpenLibrarySearch(cleanIsbn)
+  }
+  if (openLibBook) {
+    candidates.push({ ...openLibBook, source: 'openlibrary' })
   }
 
   // Add Google Books candidates if successful
@@ -72,11 +87,12 @@ export async function fetchCandidatesByISBN(isbn: string): Promise<BookCandidate
 }
 
 /**
- * Extract and normalize ISBNs from Google Books industryIdentifiers
+ * Extract and normalize ISBNs from Google Books industryIdentifiers.
+ * Exported for use by search API (external API search fallback).
  */
-function extractISBNsFromGoogleBooks(industryIdentifiers: any[] | undefined): string[] {
+export function extractISBNsFromGoogleBooks(industryIdentifiers: any[] | undefined): string[] {
   if (!industryIdentifiers) return []
-  
+
   return industryIdentifiers
     .filter((id: any) => id.type === 'ISBN_10' || id.type === 'ISBN_13')
     .map((id: any) => normalizeISBN(id.identifier))
@@ -94,10 +110,10 @@ function isbnMatches(scannedIsbn: string, returnedISBNs: string[]): boolean {
 async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandidate[]> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`, {
-      next: { revalidate: 86400 },
-      headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
-    })
+    const response = await fetchWith429Retry(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`,
+      { next: { revalidate: 86400 }, headers: { 'User-Agent': 'Book-Scanner-App/1.0' } }
+    )
 
     if (!response.ok) return []
 
@@ -109,13 +125,13 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
       .map((item: any) => {
         const book = item.volumeInfo
         const returnedISBNs = extractISBNsFromGoogleBooks(book.industryIdentifiers)
-        
+
         // CRITICAL: Only include if ISBN matches the scanned ISBN
         if (!isbnMatches(cleanScannedIsbn, returnedISBNs)) {
           console.warn(`[Book API] Google Books returned book "${book.title}" with ISBNs ${returnedISBNs.join(', ')} which doesn't match scanned ISBN ${cleanScannedIsbn}. Skipping.`)
           return null
         }
-        
+
         return {
           isbn: cleanScannedIsbn, // Always use the scanned ISBN, not what Google Books returned
           title: book.title || 'Unknown Title',
@@ -135,7 +151,7 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
         }
       })
       .filter((candidate): candidate is BookCandidate => candidate !== null)
-    
+
     // Filter out placeholder titles (like "Untitled TBC 202325")
     return filterPlaceholderCandidates(candidates).filter((b: BookCandidate) => b.title !== 'Unknown Title')
   } catch (error) {
@@ -143,6 +159,49 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
     return []
   }
 }
+
+// --- OPEN LIBRARY WORKS API HELPERS ---
+/** Helper to fetch description from Open Library Works API using a work key */
+async function fetchOpenLibraryWorkDescriptionByKey(workKey: string): Promise<string | undefined> {
+  try {
+    const workRes = await fetch(`https://openlibrary.org${workKey}.json`, {
+      next: { revalidate: 86400 },
+      headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
+    });
+    if (!workRes.ok) return undefined;
+    const workData = await workRes.json();
+
+    if (workData.description) {
+      if (typeof workData.description === 'string') return workData.description;
+      if (workData.description.value) return workData.description.value;
+    }
+  } catch (error) {
+    console.warn(`[Book API] Failed to fetch Open Library work description for ${workKey}:`, error);
+  }
+  return undefined;
+}
+
+/** Helper to fetch description from Open Library Works API when ISBN lookup fails */
+async function fetchOpenLibraryWorkDescription(isbn: string): Promise<string | undefined> {
+  try {
+    const searchRes = await fetch(`https://openlibrary.org/search.json?isbn=${isbn}&fields=key`, {
+      next: { revalidate: 86400 },
+      headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
+    });
+    if (!searchRes.ok) return undefined;
+    const searchData = await searchRes.json();
+    if (!searchData.docs || searchData.docs.length === 0) return undefined;
+
+    const workKey = searchData.docs[0].key;
+    if (!workKey) return undefined;
+
+    return await fetchOpenLibraryWorkDescriptionByKey(workKey);
+  } catch (error) {
+    console.warn(`[Book API] Failed to fetch Open Library work key for ${isbn}:`, error);
+  }
+  return undefined;
+}
+// --------------------------------------
 
 export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
   // Clean ISBN (remove hyphens and spaces)
@@ -164,7 +223,7 @@ export async function fetchBookByISBN(isbn: string): Promise<BookData | null> {
     // Both succeeded - prefer the one with longer description (better for AI analysis)
     const openLibDescLength = openLibBook.description?.length || 0
     const googleDescLength = googleBook.description?.length || 0
-    
+
     if (googleDescLength > openLibDescLength && googleDescLength > 100) {
       console.log(`[Book API] ✅ Found book via Google Books (better description: ${googleDescLength} chars): ${googleBook.title}`)
       return googleBook
@@ -223,6 +282,17 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
       return null
     }
 
+    let description = typeof bookData.excerpts?.[0]?.text === 'string' && bookData.excerpts[0].text.length > 50
+      ? bookData.excerpts[0].text
+      : undefined;
+
+    if (!description) {
+      description = await fetchOpenLibraryWorkDescription(isbn);
+      if (description) {
+        console.log(`[Book API] ✅ Recovered description from Open Library Works API for ${isbn} (${description.length} chars)`);
+      }
+    }
+
     return {
       isbn,
       title: bookData.title,
@@ -242,11 +312,7 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
         }
         return undefined;
       })(),
-      // Open Library provides excerpts, but we can also try to get full description from work API
-      // For now, use excerpts (which are often substantial) or undefined
-      description: typeof bookData.excerpts?.[0]?.text === 'string' && bookData.excerpts[0].text.length > 50
-        ? bookData.excerpts[0].text
-        : undefined,
+      description,
       publisher: bookData.publishers?.[0]?.name,
       published_date: bookData.publish_date,
       page_count: bookData.number_of_pages,
@@ -259,15 +325,59 @@ async function fetchFromOpenLibrary(isbn: string): Promise<BookData | null> {
   }
 }
 
+/** Fallback when books API has no record: try Open Library Search by ISBN. */
+async function fetchFromOpenLibrarySearch(isbn: string): Promise<BookData | null> {
+  try {
+    const res = await fetch(
+      `https://openlibrary.org/search.json?isbn=${isbn}&fields=key,title,author_name,isbn,cover_i,first_publish_year`,
+      { next: { revalidate: 86400 }, headers: { 'User-Agent': 'Book-Scanner-App/1.0' } }
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const docs = data.docs || []
+    const normalizedIsbn = normalizeISBN(isbn)
+    const doc = docs.find((d: any) =>
+      Array.isArray(d.isbn) && d.isbn.some((id: string) => normalizeISBN(id) === normalizedIsbn)
+    )
+    if (!doc || !doc.title) return null
+    const author = Array.isArray(doc.author_name) ? doc.author_name[0] : undefined
+    const coverUrl = doc.cover_i
+      ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-M.jpg`
+      : undefined
+    let description = undefined;
+    if (doc.key) {
+      description = await fetchOpenLibraryWorkDescriptionByKey(doc.key);
+      if (description) {
+        console.log(`[Book API] ✅ Recovered description from Open Library Works API for ${doc.title} (${description.length} chars)`);
+      }
+    }
+
+    console.log(`[Book API] ✅ Found book via Open Library Search fallback: ${doc.title}`)
+    return {
+      isbn: normalizedIsbn,
+      title: doc.title,
+      author,
+      cover_url: coverUrl,
+      description,
+      published_date: doc.first_publish_year ? String(doc.first_publish_year) : undefined,
+      source: 'openlibrary'
+    }
+  } catch (e) {
+    console.warn('[Book API] Open Library Search fallback error:', e)
+    return null
+  }
+}
+
 async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`, {
-      next: { revalidate: 86400 },
-      headers: {
-        'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)'
+    const response = await fetchWith429Retry(
+      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`,
+      {
+        next: { revalidate: 86400 },
+        headers: { 'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)' }
       }
-    })
+    )
 
     if (!response.ok) {
       throw new Error(`Google Books API request failed: ${response.status}`)
@@ -407,7 +517,7 @@ async function validateImageUrl(url: string): Promise<boolean> {
     const magicBytes = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 
     // Valid image formats: JPEG (FF D8 FF), PNG (89 50 4E 47), GIF (47 49 46 38), WebP (52 49 46 46)
-    const isValidImage = 
+    const isValidImage =
       magicBytes.startsWith('ffd8ff') || // JPEG
       magicBytes.startsWith('89504e47') || // PNG
       magicBytes.startsWith('47494638') || // GIF

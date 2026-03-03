@@ -6,12 +6,12 @@
 import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 
-const TEST_ISBN = '9780439023481' // The Hunger Games (known book)
+const TEST_ISBN = '9780064430173' // Goodnight Moon (gentle kids book, likely unscanned)
 
 async function main() {
-  console.log('🧪 Testing Scan Flow with Known Book')
+  console.log('🧪 Testing Scan Flow — New Book (No Warnings Expected)')
   console.log('='.repeat(80))
-  console.log(`📖 ISBN: ${TEST_ISBN} (The Hunger Games)`)
+  console.log(`📖 ISBN: ${TEST_ISBN} (Goodnight Moon)`)
   console.log('')
 
   const { processIsbnScan } = await import('../lib/services/scan-service')

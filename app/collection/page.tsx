@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle, ScanBarcode, HelpCircle } from "lucide-react"
+import { BookOpen, Library, Shield, AlertTriangle, Info, AlertCircle, ScanBarcode, HelpCircle, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
@@ -49,7 +49,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
   // Build base query for counting total books
   let countQuery = supabase.from("books").select("*", { count: "exact", head: true })
-  
+
   // Build query with optional filters
   let query = supabase
     .from("books")
@@ -83,7 +83,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
   // Check if we need to fetch all books for severity sorting
   const needsSeveritySort = sortOption === "severity-desc" || sortOption === "severity-asc"
-  
+
   if (!needsSeveritySort) {
     // Apply database sorting for non-severity sorts
     switch (sortOption) {
@@ -122,7 +122,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
   // Apply client-side sorting for severity (since it requires complex calculation)
   let sortedBooks = books || []
   if (sortOption === "severity-desc") {
-    sortedBooks = [...sortedBooks].sort((a, b) => 
+    sortedBooks = [...sortedBooks].sort((a, b) =>
       compareBySeverity(
         { warnings: a.content_warnings || [] },
         { warnings: b.content_warnings || [] }
@@ -133,7 +133,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
     const to = from + BOOKS_PER_PAGE
     sortedBooks = sortedBooks.slice(from, to)
   } else if (sortOption === "severity-asc") {
-    sortedBooks = [...sortedBooks].sort((a, b) => 
+    sortedBooks = [...sortedBooks].sort((a, b) =>
       compareBySeverity(
         { warnings: b.content_warnings || [] },
         { warnings: a.content_warnings || [] }
@@ -197,8 +197,8 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
               <p className="text-muted-foreground">
                 {totalBooks || 0} {authorFilter || searchQuery ? "book" : "books"} {authorFilter || searchQuery ? "found" : "with content warnings available"}
                 {authorFilter && (
-                  <Link 
-                    href="/collection" 
+                  <Link
+                    href="/collection"
                     className="ml-2 text-sm text-primary hover:underline"
                   >
                     (View all books)
@@ -259,13 +259,21 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
             {sortedBooks.map((book) => {
               const warningSummary = getContentWarningSummary(book.content_warnings)
               const hasWarnings = warningSummary.severe > 0 || warningSummary.moderate > 0 || warningSummary.mild > 0
-              
+
+              const displayTitle = book.title?.replace(/\s+:\s+/g, ': ') || 'Unknown Title'
+
+              let displayDate = book.published_date
+              if (displayDate) {
+                const yearMatch = displayDate.match(/\b(19|20)\d{2}\b/)
+                if (yearMatch) displayDate = yearMatch[0]
+              }
+
               // Check if book has been analyzed
               // Analysis is complete if:
               // 1. There's an audit log with 'warnings_generated' or 'no_warnings', OR
               // 2. There are AI-generated warnings (even without audit log - indicates analysis was done)
               const auditLogs = (book.ai_audit_logs as any[]) || []
-              const hasAuditLog = auditLogs.length > 0 && auditLogs.some(log => 
+              const hasAuditLog = auditLogs.length > 0 && auditLogs.some(log =>
                 log.decision_type === 'warnings_generated' || log.decision_type === 'no_warnings'
               )
               const hasAiWarnings = (book.content_warnings as any[])?.some((w: any) => w.source === 'ai_generated') || false
@@ -273,40 +281,40 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
 
               return (
                 <Link key={book.id} href={`/book/${book.isbn}`} className="block h-full relative">
-                    <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                      <BookCardAdmin isbn={book.isbn} title={book.title} />
-                      <CardContent className="p-6 flex flex-col h-full">
-                        <div className="flex gap-4 flex-1">
-                          {/* Book Cover */}
-                          <div className="flex-shrink-0">
-                            <div className="w-20 h-32 bg-muted rounded-lg overflow-hidden relative">
-                              {book.cover_url ? (
-                                <Image
-                                  src={book.cover_url.startsWith('http') 
-                                    ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
-                                    : book.cover_url}
-                                  alt={`Cover of ${book.title}`}
-                                  fill
-                                  className="object-cover"
-                                />
-                              ) : (
-                                <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground">
-                                  <BookOpen className="h-6 w-6" />
-                                  <span className="text-[10px]">No cover</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Book Details */}
-                          <div className="flex-1 space-y-2">
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex-1">
-                                <h3 className="font-bold text-lg text-balance leading-tight mb-1">{book.title}</h3>
-                                {book.author && <p className="text-sm text-muted-foreground">by {book.author}</p>}
+                  <Card className="h-full overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col">
+                    <BookCardAdmin isbn={book.isbn} title={displayTitle} />
+                    <CardContent className="p-6 flex flex-col h-full flex-1">
+                      <div className="flex gap-4 flex-1">
+                        {/* Book Cover */}
+                        <div className="flex-shrink-0">
+                          <div className="w-20 h-32 bg-muted rounded-lg overflow-hidden relative border border-slate-200">
+                            {book.cover_url ? (
+                              <Image
+                                src={book.cover_url.startsWith('http')
+                                  ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
+                                  : book.cover_url}
+                                alt={`Cover of ${displayTitle}`}
+                                fill
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground bg-slate-50">
+                                <BookOpen className="h-6 w-6 text-slate-300" />
+                                <span className="text-[10px] font-medium text-slate-400">No cover</span>
                               </div>
-                              <RefreshBookButtonWrapper isbn={book.isbn} />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Book Details */}
+                        <div className="flex-1 flex flex-col space-y-2">
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1">
+                              <h3 className="font-bold text-lg text-balance leading-tight mb-1">{displayTitle}</h3>
+                              {book.author && <p className="text-sm text-muted-foreground">by {book.author}</p>}
                             </div>
+                            <RefreshBookButtonWrapper isbn={book.isbn} />
+                          </div>
 
                           {/* Content Warnings Summary */}
                           {hasWarnings ? (
@@ -348,7 +356,14 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                                 <Shield className="h-3 w-3" />
                                 <span className="text-xs font-medium">Content Warnings:</span>
                               </div>
-                              <p className="text-xs text-muted-foreground pl-5">No specific warnings</p>
+                              <ul className="text-xs space-y-0.5 mt-1">
+                                <li className="flex items-center gap-2">
+                                  <div className="p-0.5 rounded-full bg-emerald-50 text-emerald-600">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  </div>
+                                  <span className="text-muted-foreground">No specific warnings</span>
+                                </li>
+                              </ul>
                             </div>
                           ) : (
                             <div className="space-y-1">
@@ -366,7 +381,7 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                             return classificationRating && (
                               <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium">Classification:</span>
-                                <span className="text-xs bg-muted px-2 py-1 rounded">
+                                <span className="text-xs bg-muted/80 px-2 py-0.5 rounded font-semibold">
                                   {classificationRating}
                                 </span>
                               </div>
@@ -374,9 +389,9 @@ export default async function CollectionPage({ searchParams }: CollectionPagePro
                           })()}
 
                           {/* Metadata */}
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            {book.publisher && <div>Publisher: {book.publisher}</div>}
-                            {book.published_date && <div>Published: {book.published_date}</div>}
+                          <div className="mt-auto pt-2 text-xs text-muted-foreground space-y-1.5 flex flex-col justify-end">
+                            {book.publisher && <div className="line-clamp-1 flex-shrink-0">Publisher: {book.publisher}</div>}
+                            {displayDate && <div className="flex-shrink-0">Published: {displayDate}</div>}
                           </div>
                         </div>
                       </div>

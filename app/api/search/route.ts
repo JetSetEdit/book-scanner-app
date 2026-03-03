@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { validateISBN, normalizeISBN } from "@/lib/isbn-validation"
+import { extractISBNsFromGoogleBooks } from "@/lib/book-api"
 
 export async function GET(request: NextRequest) {
   try {
@@ -175,8 +176,90 @@ export async function GET(request: NextRequest) {
     const isISBN = validateISBN(query)
     const isNotFound = booksWithWarnings?.length === 0
 
+    /**
+     * External API search fallback
+     * Only when database returns < 3 results, query length >= 3, and not an ISBN query.
+     * Gracefully degrades on 429, timeout, or other API errors.
+     */
+    let externalResults: Array<{
+      isbn: string
+      title: string
+      author: string | null
+      cover_url: string | null
+      description: string | null
+      source: 'external_api'
+    }> = []
+
+    if (booksWithWarnings.length < 3 && query.length >= 3 && !isISBN) {
+      try {
+        const apiKey = process.env.GOOGLE_BOOKS_API_KEY
+        const searchQuery = query.trim()
+        const url = new URL('https://www.googleapis.com/books/v1/volumes')
+        url.searchParams.append('q', searchQuery)
+        url.searchParams.append('maxResults', '10')
+        if (apiKey) {
+          url.searchParams.append('key', apiKey)
+        }
+
+        const externalResponse = await fetch(url.toString(), {
+          headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+          signal: AbortSignal.timeout(5000),
+        })
+
+        if (externalResponse.ok) {
+          const externalData = await externalResponse.json()
+          if (externalData.items?.length > 0) {
+            const existingISBNs = new Set(
+              booksWithWarnings.map((book) => normalizeISBN(book.isbn)).filter(Boolean)
+            )
+            for (const item of externalData.items.slice(0, 10)) {
+              const volumeInfo = item.volumeInfo
+              if (!volumeInfo?.title) continue
+              const returnedISBNs = extractISBNsFromGoogleBooks(volumeInfo.industryIdentifiers)
+              if (returnedISBNs.length === 0) continue
+              const bookISBN = normalizeISBN(returnedISBNs[0])
+              if (!bookISBN || existingISBNs.has(bookISBN)) continue
+              let coverUrl: string | null = null
+              if (volumeInfo.imageLinks) {
+                coverUrl =
+                  volumeInfo.imageLinks.thumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') ||
+                  volumeInfo.imageLinks.smallThumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') ||
+                  null
+              }
+              let description: string | null = null
+              if (volumeInfo.description) {
+                description =
+                  volumeInfo.description.length > 100
+                    ? volumeInfo.description.substring(0, 100) + '...'
+                    : volumeInfo.description
+              }
+              externalResults.push({
+                isbn: bookISBN,
+                title: volumeInfo.title,
+                author: volumeInfo.authors?.[0] || null,
+                cover_url: coverUrl,
+                description,
+                source: 'external_api',
+              })
+            }
+          }
+        } else if (externalResponse.status === 429) {
+          console.warn('[Search API] Google Books API rate limited (429), returning database results only')
+        } else {
+          console.warn(`[Search API] Google Books API search failed: ${externalResponse.status}`)
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn('[Search API] Google Books API request timed out (5s limit)')
+        } else {
+          console.warn('[Search API] External API search error:', error)
+        }
+      }
+    }
+
     return NextResponse.json({
       books: booksWithWarnings || [],
+      externalResults,
       total: booksWithWarnings?.length || 0,
       query,
       isISBN: isISBN,
