@@ -209,13 +209,32 @@ function ScanTestPageContent() {
       const normalizedIsbn = isbnParam.trim()
       setIsbn(normalizedIsbn)
       setHasAutoScanned(true)
-      console.log('[Auto-scan] Triggering scan for ISBN:', normalizedIsbn, 'mode:', scanModeParam)
-      // Small delay to ensure component is fully mounted and state is set
+      let searchCandidate: unknown = undefined
+      try {
+        const raw = sessionStorage.getItem('scanSearchCandidate')
+        if (raw) {
+          const parsed = JSON.parse(raw) as { isbn?: string; title?: string; author?: string; cover_url?: string; description?: string; source?: string }
+          const storedIsbn = parsed?.isbn?.replace?.(/[\s-]/g, '')
+          const matchIsbn = normalizedIsbn.replace(/[\s-]/g, '')
+          if (storedIsbn && matchIsbn && storedIsbn === matchIsbn && parsed.title) {
+            searchCandidate = {
+              isbn: normalizedIsbn,
+              title: parsed.title,
+              author: parsed.author,
+              cover_url: parsed.cover_url,
+              description: parsed.description,
+              source: (parsed.source === 'openlibrary' ? 'openlibrary' : 'googlebooks') as 'openlibrary' | 'googlebooks',
+            }
+            sessionStorage.removeItem('scanSearchCandidate')
+          }
+        }
+      } catch (_) {}
+      console.log('[Auto-scan] Triggering scan for ISBN:', normalizedIsbn, 'mode:', scanModeParam, 'searchCandidate:', !!searchCandidate)
       const timeoutId = setTimeout(() => {
         console.log('[Auto-scan] Executing performScan after timeout')
         performScan(
           normalizedIsbn,
-          undefined,
+          searchCandidate as any,
           scanModeParam === 'quick' || scanModeParam === 'deep' ? scanModeParam : undefined,
           forceRefreshFromUrl ? true : undefined
         )

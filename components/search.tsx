@@ -253,6 +253,9 @@ export function SearchComponent({ className }: SearchProps) {
                   </p>
                   <Button
                     onClick={() => {
+                      try {
+                        sessionStorage.removeItem('scanSearchCandidate')
+                      } catch (_) {}
                       router.push(`/scan?isbn=${encodeURIComponent(searchMeta.normalizedISBN!)}`)
                       handleResultClick()
                     }}
@@ -374,6 +377,19 @@ export function SearchComponent({ className }: SearchProps) {
                         )}
                         <Button
                           onClick={() => {
+                            try {
+                              sessionStorage.setItem(
+                                'scanSearchCandidate',
+                                JSON.stringify({
+                                  isbn: book.isbn,
+                                  title: book.title,
+                                  author: book.author ?? undefined,
+                                  cover_url: book.cover_url ?? undefined,
+                                  description: book.description ?? undefined,
+                                  source: 'googlebooks' as const,
+                                })
+                              )
+                            } catch (_) {}
                             router.push(`/scan?isbn=${encodeURIComponent(book.isbn)}`)
                             handleResultClick()
                           }}
