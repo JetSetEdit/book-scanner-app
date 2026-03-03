@@ -70,6 +70,10 @@ interface ContentWarningsListProps {
   isbn?: string // ISBN for analysis requests
   noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
   focusWarningId?: string | null
+  /** When set, show author's content warnings link as the first section (author above AI). */
+  authorContentWarningsUrl?: string | null
+  /** Parsed list of warning strings from author's page; when set, display on site. */
+  authorContentWarningsList?: string[] | null
 }
 
 const categoryLabels: Record<string, string> = {
@@ -162,13 +166,14 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId, authorContentWarningsUrl, authorContentWarningsList }: ContentWarningsListProps) {
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
   const [requestSent, setRequestSent] = useState(false)
   const [userState, setUserState] = useState<string | null>(null)
   const [stateServices, setStateServices] = useState<any>(null)
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
+  const [authorListOpen, setAuthorListOpen] = useState(false)
   const showReasoning = getVariantConfig().flags?.showReasoningInWarnings !== false
 
   // Handle focus request
@@ -763,6 +768,53 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
             </div>
           </div>
         </div>
+      )}
+
+      {/* Author's own content warnings page (shown first: author above AI) */}
+      {authorContentWarningsUrl && authorContentWarningsUrl.trim() !== "" && (
+        <section>
+          <div className="flex items-center gap-2 mb-4 text-amber-600 dark:text-amber-500">
+            <CheckCircle className="h-4 w-4" />
+            <h3 className="font-semibold text-sm uppercase tracking-wide">Author&apos;s content warnings</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-2">
+            The author provides their own content warnings for this book (may contain spoilers).
+          </p>
+          {authorContentWarningsList && authorContentWarningsList.length > 0 ? (
+            <Collapsible open={authorListOpen} onOpenChange={setAuthorListOpen} className="space-y-2">
+              <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+                Show list ({authorContentWarningsList.length} items; may contain spoilers)
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", authorListOpen && "rotate-180")} aria-hidden />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <ul className="list-disc pl-5 space-y-1.5 text-sm text-foreground mt-3 mb-3">
+                  {authorContentWarningsList.map((item, i) => (
+                    <li key={i}>{item}</li>
+                  ))}
+                </ul>
+                <a
+                  href={authorContentWarningsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                >
+                  Source: author&apos;s page
+                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                </a>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : (
+            <a
+              href={authorContentWarningsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+            >
+              View author&apos;s content warnings
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+            </a>
+          )}
+        </section>
       )}
 
       {/* Official Author/Publisher Warnings (Gold Standard) */}

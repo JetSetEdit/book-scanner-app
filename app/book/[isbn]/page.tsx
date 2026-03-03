@@ -225,6 +225,10 @@ export default async function BookPage({ params }: BookPageProps) {
     return Array.from(byKey.values())
   })()
 
+  // Use stored author list when provided (no scraping)
+  const rawList = (book as { author_content_warnings_list?: string[] | null }).author_content_warnings_list
+  const authorContentWarningsList = Array.isArray(rawList) ? rawList : []
+
   return (
     <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -235,6 +239,7 @@ export default async function BookPage({ params }: BookPageProps) {
             analysisStatus={analysisStatus}
             metadataIssues={metadataIssues}
             noWarningsReasoning={noWarningsReasoning}
+            authorContentWarningsList={authorContentWarningsList}
             analysisMeta={latestAudit ? {
               hadThinMetadata: !!latestAudit.had_thin_metadata,
               usedWebSearch: !!latestAudit.used_web_search,

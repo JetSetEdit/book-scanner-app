@@ -33,6 +33,8 @@ export interface Database {
           sss_level: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
           sss_notes: string | null
           content_warnings_needs_review: boolean
+          author_content_warnings_url: string | null
+          author_content_warnings_list: string[] | null
         }
         Insert: {
           id?: string
@@ -57,6 +59,8 @@ export interface Database {
           sss_level?: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
           sss_notes?: string | null
           content_warnings_needs_review?: boolean
+          author_content_warnings_url?: string | null
+          author_content_warnings_list?: string[] | null
         }
         Update: {
           id?: string
@@ -81,6 +85,8 @@ export interface Database {
           sss_level?: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
           sss_notes?: string | null
           content_warnings_needs_review?: boolean
+          author_content_warnings_url?: string | null
+          author_content_warnings_list?: string[] | null
         }
         Relationships: []
       }
@@ -243,18 +249,21 @@ export interface Database {
           is_used: boolean
           created_at: string
           reusable?: boolean
+          label?: string | null
         }
         Insert: {
           code: string
           is_used?: boolean
           created_at?: string
           reusable?: boolean
+          label?: string | null
         }
         Update: {
           code?: string
           is_used?: boolean
           created_at?: string
           reusable?: boolean
+          label?: string | null
         }
         Relationships: []
       }

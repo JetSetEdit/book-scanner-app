@@ -37,6 +37,7 @@ interface BookDetailsProps {
     bookInfoIssues?: string[]
   } | null
   noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
+  authorContentWarningsList?: string[] | null // Parsed list from author_content_warnings_url
   analysisMeta?: {
     hadThinMetadata: boolean
     usedWebSearch: boolean
@@ -55,7 +56,7 @@ function isDevMode(): boolean {
   )
 }
 
-export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning, analysisMeta }: BookDetailsProps) {
+export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning, authorContentWarningsList, analysisMeta }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
@@ -684,7 +685,6 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 </div>
               )}
 
-
               <ContentWarningsList
                 warnings={warnings}
                 isAuthorApproved={warnings.some((w: any) => w.is_author_approved === true)}
@@ -692,6 +692,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 isbn={book.isbn}
                 noWarningsReasoning={noWarningsReasoning}
                 focusWarningId={focusWarningId}
+                authorContentWarningsUrl={book?.author_content_warnings_url ?? null}
+                authorContentWarningsList={authorContentWarningsList ?? null}
               />
 
               {/* Feedback / Report Section */}
