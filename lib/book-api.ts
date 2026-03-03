@@ -110,14 +110,26 @@ function isbnMatches(scannedIsbn: string, returnedISBNs: string[]): boolean {
 async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandidate[]> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
-    const response = await fetchWith429Retry(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`,
-      { next: { revalidate: 86400 }, headers: { 'User-Agent': 'Book-Scanner-App/1.0' } }
-    )
+    let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}&maxResults=5`
+    let response = await fetchWith429Retry(url, {
+      next: { revalidate: 86400 },
+      headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+    })
 
-    if (!response.ok) return []
+    let data: { items?: any[] } = {}
+    if (response.ok) {
+      data = await response.json()
+    }
+    // Fallback when isbn: fails (429, empty, etc.): try plain number search so we still get a chance to find the book
+    if (!response.ok || !data.items || data.items.length === 0) {
+      url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanScannedIsbn)}&maxResults=5`
+      response = await fetchWith429Retry(url, {
+        next: { revalidate: 86400 },
+        headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+      })
+      if (response.ok) data = await response.json()
+    }
 
-    const data = await response.json()
     if (!data.items || data.items.length === 0) return []
 
     // Map top 3 results, validate ISBN match, and filter out placeholder titles
