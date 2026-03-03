@@ -1,8 +1,5 @@
 "use client"
 
-
-
-
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, BookOpen, Loader2 } from "lucide-react"
@@ -50,10 +47,9 @@ interface SearchResponse {
 
 interface SearchProps {
   className?: string
-  placeholder?: string
 }
 
-export function SearchComponent({ className, placeholder }: SearchProps) {
+export function SearchComponent({ className }: SearchProps) {
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<SearchResult[]>([])
@@ -98,17 +94,12 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
           .filter(([_, enabled]) => enabled)
           .map(([severity]) => severity)
           .join(",")
-
+        
         const url = `/api/search?q=${encodeURIComponent(query)}${severityParams ? `&severity=${severityParams}` : ""}`
         const response = await fetch(url)
         const data: SearchResponse = await response.json()
         setResults(data.books || [])
         setExternalResults(data.externalResults || [])
-        console.log('[Search Component] Results:', {
-          database: data.books?.length || 0,
-          external: data.externalResults?.length || 0,
-          total: (data.books?.length || 0) + (data.externalResults?.length || 0)
-        })
         setSearchMeta({
           isISBN: data.isISBN,
           isbnNotFound: data.isbnNotFound,
@@ -148,8 +139,9 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
     if (e.key === "Escape") {
       setShowResults(false)
       inputRef.current?.blur()
-    } else if (e.key === "Enter" && results.length > 0) {
-      router.push(`/book/${results[0].isbn}`)
+    } else if (e.key === "Enter" && (results.length > 0 || externalResults.length > 0)) {
+      if (results.length > 0) router.push(`/book/${results[0].isbn}`)
+      else router.push(`/scan?isbn=${encodeURIComponent(externalResults[0].isbn)}`)
       handleResultClick()
     }
   }
@@ -158,11 +150,11 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
     <div ref={searchRef} className={cn("relative w-full max-w-md", className)}>
       {/* Search Input */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground/50 pointer-events-none" strokeWidth={1.5} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         <Input
           ref={inputRef}
           type="text"
-          placeholder={placeholder || "Search by title, author, or ISBN (e.g. ‘Fourth Wing’ or 9781649374042)"}
+          placeholder="Search by title, author, ISBN, genre..."
           value={query}
           onChange={handleInputChange}
           onFocus={() => {
@@ -177,7 +169,7 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             aria-label="Clear search"
           >
-            <X className="h-4 w-4" strokeWidth={1.5} />
+            <X className="h-4 w-4" />
           </button>
         )}
         {isLoading && (
@@ -245,18 +237,12 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
               </div>
             </div>
           )}
-
+          
           {isLoading && results.length === 0 && externalResults.length === 0 && query.length >= 3 ? (
             <div className="p-4 text-center space-y-2">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground mx-auto" />
-              <p className="text-sm text-muted-foreground">
-                Searching our library...
-              </p>
-              {query.length >= 3 && (
-                <p className="text-xs text-muted-foreground">
-                  Also checking external sources...
-                </p>
-              )}
+              <p className="text-sm text-muted-foreground">Searching our library...</p>
+              <p className="text-xs text-muted-foreground">Also checking external sources...</p>
             </div>
           ) : results.length === 0 && externalResults.length === 0 && !isLoading && query.length >= 2 ? (
             <div className="p-4">
@@ -289,7 +275,7 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
             </div>
           ) : (results.length > 0 || externalResults.length > 0) ? (
             <div className="py-2">
-              {/* Database Results */}
+              {/* Database results */}
               {results.length > 0 && (
                 <>
                   {results.map((book) => (
@@ -299,11 +285,10 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                       onClick={handleResultClick}
                       className="flex items-start gap-3 px-4 py-3 hover:bg-accent transition-colors border-b border-border"
                     >
-                      {/* Cover */}
                       <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
                         {book.cover_url ? (
                           <Image
-                            src={book.cover_url.startsWith('http')
+                            src={book.cover_url.startsWith('http') 
                               ? `/api/book-cover?url=${encodeURIComponent(book.cover_url)}`
                               : book.cover_url}
                             alt={`Cover of ${book.title}`}
@@ -316,33 +301,21 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                           </div>
                         )}
                       </div>
-
-                      {/* Book Info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm text-foreground truncate">
-                          {book.title}
-                        </h3>
+                        <h3 className="font-medium text-sm text-foreground truncate">{book.title}</h3>
                         {book.author && (
-                          <p className="text-xs text-muted-foreground mt-1 truncate">
-                            {book.author}
-                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{book.author}</p>
                         )}
                         {book.hasWarnings && (
                           <div className="flex items-center gap-2 mt-2">
                             {book.warningSummary.severe > 0 && (
-                              <span className="text-[10px] font-medium text-red-600">
-                                {book.warningSummary.severe} severe
-                              </span>
+                              <span className="text-[10px] font-medium text-red-600">{book.warningSummary.severe} severe</span>
                             )}
                             {book.warningSummary.moderate > 0 && (
-                              <span className="text-[10px] font-medium text-orange-600">
-                                {book.warningSummary.moderate} moderate
-                              </span>
+                              <span className="text-[10px] font-medium text-orange-600">{book.warningSummary.moderate} moderate</span>
                             )}
                             {book.warningSummary.mild > 0 && (
-                              <span className="text-[10px] font-medium text-yellow-600">
-                                {book.warningSummary.mild} mild
-                              </span>
+                              <span className="text-[10px] font-medium text-yellow-600">{book.warningSummary.mild} mild</span>
                             )}
                           </div>
                         )}
@@ -356,15 +329,12 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                   )}
                 </>
               )}
-
-              {/* External API Results */}
+              {/* External API results (Google Books) — not yet in our DB */}
               {isLoading && results.length > 0 && externalResults.length === 0 && query.length >= 3 && (
                 <div className="px-4 py-3 border-b border-border bg-muted/30">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">
-                      Searching external sources...
-                    </p>
+                    <p className="text-xs text-muted-foreground">Searching external sources...</p>
                   </div>
                 </div>
               )}
@@ -372,9 +342,7 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                 <>
                   {results.length > 0 && (
                     <div className="px-4 py-2 border-b border-border bg-muted/30">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        Not yet scanned
-                      </p>
+                      <p className="text-xs font-medium text-muted-foreground">Not yet scanned</p>
                     </div>
                   )}
                   {externalResults.map((book) => (
@@ -382,7 +350,6 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                       key={book.isbn}
                       className="flex items-start gap-3 px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border last:border-b-0 bg-muted/20"
                     >
-                      {/* Cover */}
                       <div className="flex-shrink-0 w-12 h-16 bg-muted rounded overflow-hidden relative">
                         {book.cover_url ? (
                           <Image
@@ -397,21 +364,13 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                           </div>
                         )}
                       </div>
-
-                      {/* Book Info */}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-sm text-foreground truncate">
-                          {book.title}
-                        </h3>
+                        <h3 className="font-medium text-sm text-foreground truncate">{book.title}</h3>
                         {book.author && (
-                          <p className="text-xs text-muted-foreground mt-1 truncate">
-                            {book.author}
-                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">{book.author}</p>
                         )}
                         {book.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {book.description}
-                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{book.description}</p>
                         )}
                         <Button
                           onClick={() => {
@@ -430,8 +389,6 @@ export function SearchComponent({ className, placeholder }: SearchProps) {
                   ))}
                 </>
               )}
-
-              {/* Google Books Attribution */}
               {(results.length > 0 || externalResults.length > 0) && (
                 <div className="px-4 py-2 border-t border-border">
                   <p className="text-[10px] text-stone-400 dark:text-stone-500 text-center">

@@ -5,7 +5,6 @@ import { Database } from '@/types/supabase'
 import { isStale, refreshBookMetadata } from '@/lib/book-cache'
 import { MODEL_VERSION, TAXONOMY_VERSION, normalizeCategorySubcategory, getCategoryById } from '@/lib/config/taxonomy-v2'
 import { assessMetadataQuality, type MetadataQuality } from '@/lib/utils/metadata-quality'
-import { S0_NO_INPUT_SSS_RESULT } from '@/lib/services/sss-assignment'
 
 // Helper to validate cover URL is not a placeholder
 async function validateCoverUrl(url: string | null | undefined): Promise<string | null> {
@@ -360,7 +359,7 @@ export async function processIsbnScan(
 
           // Log for manual handling
           try {
-            await supabaseAdmin
+            await (supabaseAdmin as any)
               .from('manual_handling_scans')
               .insert({
                 isbn: cleanIsbn,
@@ -411,12 +410,13 @@ export async function processIsbnScan(
 
     if (!bookData) {
       // No book data found - don't create a record, return error instead
-      console.log('Book not found in external APIs')
+      // Single searchable line for production logs (Vercel truncates long messages)
+      console.log('[Scan] book_not_found isbn=' + cleanIsbn + ' pipelinePath=not_found')
       onProgress?.('❌ Book not found in any external library (Open Library, Google Books)')
 
       // Log for manual handling
       try {
-        await supabaseAdmin
+        await (supabaseAdmin as any)
           .from('manual_handling_scans')
           .insert({
             isbn: cleanIsbn,
@@ -701,7 +701,7 @@ export async function processIsbnScan(
           .eq('book_id', bookId)
           .limit(1)
 
-        const hasWarnings = existingWarnings && existingWarnings.length > 0
+        const hasWarnings = existingWarnings ? existingWarnings.length > 0 : false
 
         timings.total = performance.now() - overallStartTime
 
@@ -724,7 +724,7 @@ export async function processIsbnScan(
 
         return {
           success: true,
-          status: 'complete',
+          status: 'success',
           book: fullBook || currentBook,
           scan: scanRecord,
           isNewBook: false,
@@ -1000,15 +1000,13 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
         const { analyzeBookWithMultiModel } = await import('./multi-model-analysis')
 
         // Build effective analysis options (Quick mode defaults, with optional overrides)
-        // Use Gemini-first strategy for Quick scans: try Gemini first, fallback to OpenAI on rate limit
-        const quickForceOpenAI = scanMode === 'quick' && modelAssignment === 'openai'
+        // Apply IP-based model assignment for Quick scans only
         const effectiveAnalysisOptions: import('./multi-model-analysis').AnalysisOptions =
           scanMode === 'quick'
             ? {
-              // Gemini-first by default, but honor model assignment (OpenAI-only when assigned).
-              geminiFirst: !quickForceOpenAI,
-              enableOpenAI: true,
-              enableGemini: !quickForceOpenAI,
+              // IP-based assignment: use assigned model only (unless explicitly overridden)
+              enableOpenAI: analysisOptions?.enableOpenAI ?? (modelAssignment === 'openai'),
+              enableGemini: analysisOptions?.enableGemini ?? (modelAssignment === 'gemini'),
               enableAdversarial: analysisOptions?.enableAdversarial ?? false,
               enableVerification: analysisOptions?.enableVerification ?? false,
               enableWebEnrichment:
@@ -1022,7 +1020,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               model: modelToUse,
             }
             : {
-              // Deep scans: use multi-model parallel execution (quality priority)
+              // Deep scans: ignore IP assignment, use multi-model (quality priority)
               ...(analysisOptions || {}),
               model: modelToUse,
             }
@@ -1059,7 +1057,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
         }
 
         // Increment Gemini usage counter if Gemini was successfully used
-        if (geminiEnabled && geminiSucceeded) {
+        if (modelAssignment === 'gemini' && geminiSucceeded) {
           const { incrementGeminiUsage, getDailyGeminiUsage } = await import('@/lib/utils/rate-limiter')
           incrementGeminiUsage()
           console.log(`[Gemini Usage] Incremented counter (now at ${getDailyGeminiUsage()}/day)`)
@@ -1094,11 +1092,6 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
 
         // Store no_warnings_reasoning for use in audit log if no warnings found
         const noWarningsReasoning = analysisResult.noWarningsReasoning
-        const needsReview = (analysisResult as { needsReview?: boolean }).needsReview === true
-        const enrichmentCombinedText = (analysisResult as { web_enrichment?: { combinedText?: string } }).web_enrichment?.combinedText
-        const hasAnyInput =
-          (descriptionForAnalysis?.trim().length ?? 0) > 0 ||
-          (enrichmentCombinedText?.trim().length ?? 0) > 0
 
         timings.aiContentWarningGeneration = performance.now() - analysisStartTime
 
@@ -1350,36 +1343,6 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               // Don't fail the scan if age rating calculation fails
             }
 
-            // SSS (Subtext Suitability Scale): assign reader-focused emotional intensity and persist
-            try {
-              const sssDescription = descriptionForAnalysis || enrichmentCombinedText || `${bookForAnalysis.title || 'Unknown'} by ${bookForAnalysis.author || 'Unknown'}`
-              const { assignSSS } = await import('@/lib/services/sss-assignment')
-              const sssResult = await assignSSS({
-                warnings: analysisResult.warnings,
-                title: bookForAnalysis.title || 'Unknown',
-                author: bookForAnalysis.author,
-                description: sssDescription,
-              })
-              const { error: sssError } = await supabaseAdmin
-                .from('books')
-                .update({
-                  sss_level: sssResult.sss_level,
-                  sss_notes: sssResult.sss_notes,
-                  content_warnings_needs_review: false,
-                })
-                .eq('id', bookId)
-              if (sssError) {
-                console.error('Failed to update SSS:', sssError)
-              } else {
-                if (currentBook) {
-                  (currentBook as any).sss_level = sssResult.sss_level
-                  ;(currentBook as any).sss_notes = sssResult.sss_notes
-                }
-              }
-            } catch (sssErr) {
-              console.error('SSS assignment failed:', sssErr)
-            }
-
             // Log audit decision: warnings were generated
             await logAuditDecision({
               bookId: bookId,
@@ -1403,41 +1366,6 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
         } else {
           onProgress?.('ℹ️ No content warnings identified by AI analysis')
           console.log('Analysis returned 0 warnings for book:', bookForAnalysis.title)
-
-          // SSS: when no input to assess, set S0_NO_INPUT; otherwise assign via AI
-          try {
-            const sssResult = !hasAnyInput
-              ? S0_NO_INPUT_SSS_RESULT
-              : await (async () => {
-                  const { assignSSS } = await import('@/lib/services/sss-assignment')
-                  const sssDescription =
-                    descriptionForAnalysis ||
-                    enrichmentCombinedText ||
-                    `${bookForAnalysis.title || 'Unknown'} by ${bookForAnalysis.author || 'Unknown'}`
-                  return assignSSS({
-                    warnings: [],
-                    title: bookForAnalysis.title || 'Unknown',
-                    author: bookForAnalysis.author,
-                    description: sssDescription,
-                  })
-                })()
-            if (bookId) {
-              const { error: sssError } = await supabaseAdmin
-                .from('books')
-                .update({
-                  sss_level: sssResult.sss_level,
-                  sss_notes: sssResult.sss_notes,
-                  content_warnings_needs_review: needsReview,
-                })
-                .eq('id', bookId)
-              if (!sssError && currentBook) {
-                (currentBook as any).sss_level = sssResult.sss_level
-                ;(currentBook as any).sss_notes = sssResult.sss_notes
-              }
-            }
-          } catch (sssErr) {
-            console.error('SSS assignment (no-warnings) failed:', sssErr)
-          }
 
           // Initialize variables for web search verification
           let webSearchFoundWarnings = false
@@ -1527,7 +1455,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
               return null
             })
 
-            timings.webSearch += performance.now() - webSearchStartTime
+            timings.webSearch = performance.now() - webSearchStartTime
 
             if (searchResponse) {
               const messageContent = searchResponse.choices[0]?.message?.content || ''
@@ -1549,7 +1477,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 console.warn('[Web Search] TOS Compliance: Rejected response containing retailer content')
                 onProgress?.('⚠️ Web search response contained retailer content - rejected for TOS compliance')
                 // Don't use retailer content - skip to avoid TOS violation
-                timings.webSearch += performance.now() - webSearchStartTime
+                timings.webSearch = performance.now() - webSearchStartTime
                 usedWebSearch = false
                 webSearchContext = '' // Clear any retailer content
                 // Skip to end of try block - don't process this response
@@ -1564,7 +1492,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 )
 
                 // Also check for negative indicators (safe, cozy, light, etc.)
-                const safeIndicators = ['safe', 'cozy', 'light', 'comedy', 'no warnings', 'no content warnings', 'family-friendly']
+                const safeIndicators = ['safe', 'cozy', 'light', 'romance', 'comedy', 'no warnings', 'no content warnings', 'family-friendly']
                 const hasSafeIndicators = safeIndicators.some(indicator =>
                   messageContent.toLowerCase().includes(indicator)
                 )
@@ -1668,7 +1596,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           } catch (webSearchError) {
             console.error('Web search verification error:', webSearchError)
             onProgress?.('⚠️ Web search verification failed, continuing without verification')
-            timings.webSearch += performance.now() - webSearchStartTime
+            timings.webSearch = performance.now() - webSearchStartTime
             // Don't set usedWebSearch = true if it failed
           }
 
@@ -1693,7 +1621,9 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
               cat.toLowerCase().includes('romance')
             ) || bookForAnalysis.description?.toLowerCase().includes('romance') || false
 
-            if (isRomanceBook && !usedWebSearch) {
+            if (isMinimalDescription) {
+              reasoning = 'Analysis could not identify warnings because the book description is missing or too short. The book may still contain sensitive content.'
+            } else if (isRomanceBook && !usedWebSearch) {
               reasoning += ' Analysis based on blurb only; community reviews on Romance.io or The StoryGraph may indicate different heat/spice levels or tropes not mentioned in the description.'
             } else if (usedWebSearch) {
               reasoning += ' Web search verification (using open sources only, TOS-compliant) confirmed the book appears safe for general reading.'
@@ -1704,10 +1634,10 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
             await logAuditDecision({
               bookId: bookId,
               isbn: cleanIsbn,
-              decisionType: 'no_warnings',
+              decisionType: isMinimalDescription ? 'metadata_thin' : 'no_warnings',
               warningsCount: 0,
               aiReasoning: reasoning,
-              confidenceLevel: usedWebSearch ? 'high' : 'medium', // Higher confidence if web search verified
+              confidenceLevel: isMinimalDescription ? 'low' : (usedWebSearch ? 'high' : 'medium'),
               bookTitle: bookForAnalysis.title,
               bookAuthor: bookForAnalysis.author,
               descriptionLength: descriptionForAnalysis.length,
@@ -1756,6 +1686,8 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                 is_rate_limit: isRateLimit
               }
             })
+
+          Object.defineProperty(analysisError, 'manualHandlingLogged', { value: true, enumerable: false });
         } catch (logError) {
           console.error('Failed to log manual handling scan:', logError)
         }
@@ -1782,25 +1714,27 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
     timings.aiContentWarningGeneration = performance.now() - analysisStartTime
 
     // Log for manual handling
-    try {
-      await supabaseAdmin
-        .from('manual_handling_scans')
-        .insert({
-          isbn: cleanIsbn,
-          reason: 'analysis_failed',
-          status: 'pending',
-          error_message: analysisError.message,
-          metadata: {
-            book_id: bookId,
-            book_title: currentBook?.title,
-            attempted_at: new Date().toISOString(),
-            source: 'scan_service',
-            error_type: analysisError.constructor.name,
-            model: modelToUse || MODEL_VERSION
-          }
-        })
-    } catch (logError) {
-      console.error('Failed to log manual handling scan:', logError)
+    if (!(analysisError as any).manualHandlingLogged) {
+      try {
+        await (supabaseAdmin as any)
+          .from('manual_handling_scans')
+          .insert({
+            isbn: cleanIsbn,
+            reason: 'analysis_failed',
+            status: 'pending',
+            error_message: analysisError.message,
+            metadata: {
+              book_id: bookId,
+              book_title: currentBook?.title,
+              attempted_at: new Date().toISOString(),
+              source: 'scan_service',
+              error_type: analysisError.constructor.name,
+              model: modelToUse || MODEL_VERSION
+            }
+          })
+      } catch (logError) {
+        console.error('Failed to log manual handling scan (outer):', logError)
+      }
     }
   } finally {
     // Mark analysis as completed if we got here without throwing
@@ -1837,10 +1771,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
   }
 
   // Only mark as successful if analysis completed OR book already had warnings
-  const hasExistingWarnings = bookId ? (await supabaseAdmin
-    .from('content_warnings')
-    .select('id', { count: 'exact', head: true })
-    .eq('book_id', bookId)).count || 0 > 0 : false
+  const hasExistingWarnings = bookId ? ((await supabaseAdmin.from('content_warnings').select('id', { count: 'exact', head: true }).eq('book_id', bookId)).count || 0) > 0 : false
 
   if (analysisCompleted || hasExistingWarnings) {
     onProgress?.('✅ Scan completed successfully.')
@@ -1852,14 +1783,15 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
 
   // SAFETY CHECK: Ensure audit log was created if analysis ran
   // This prevents books from being marked as "Unknown" when they were actually analyzed
+  // ONLY run this if analysis successfully completed and did not encounter an error
   const bookForSafetyCheck = currentBook || existingBook
-  if (bookId && bookForSafetyCheck && bookForSafetyCheck.title) {
+  if (bookId && bookForSafetyCheck && bookForSafetyCheck.title && analysisCompleted && !analysisError) {
     try {
       const { data: existingAuditLog } = await supabaseAdmin
         .from('ai_audit_logs')
         .select('id')
         .eq('book_id', bookId)
-        .in('decision_type', ['warnings_generated', 'no_warnings'])
+        .in('decision_type', ['warnings_generated', 'no_warnings', 'metadata_thin'])
         .limit(1)
 
       if (!existingAuditLog || existingAuditLog.length === 0) {
@@ -1872,19 +1804,28 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
           .select('id', { count: 'exact', head: true })
           .eq('book_id', bookId)).count || 0 : 0
 
+        const isThin = !bookForSafetyCheck.description || bookForSafetyCheck.description.length < 150
+
+        let safeDecisionType: 'warnings_generated' | 'no_warnings' | 'metadata_thin' = warningCount > 0 ? 'warnings_generated' : 'no_warnings'
+        if (warningCount === 0 && isThin) {
+          safeDecisionType = 'metadata_thin'
+        }
+
         await logAuditDecision({
           bookId: bookId,
           isbn: cleanIsbn,
-          decisionType: warningCount > 0 ? 'warnings_generated' : 'no_warnings',
+          decisionType: safeDecisionType,
           warningsCount: warningCount,
           aiReasoning: warningCount > 0
             ? `AI analysis identified ${warningCount} content warning(s) for this book. Analysis completed successfully. (Audit log created via safety check)`
-            : `AI analysis completed and found no content warnings. The book appears safe for general reading. (Audit log created via safety check)`,
-          confidenceLevel: 'medium', // Lower confidence since this is a safety check
+            : (isThin
+              ? `Analysis could not identify warnings because the book description is missing or too short. (Audit log created via safety check)`
+              : `AI analysis completed and found no content warnings. The book appears safe for general reading. (Audit log created via safety check)`),
+          confidenceLevel: isThin ? 'low' : 'medium', // Lower confidence since this is a safety check or thin metadata
           bookTitle: bookForSafetyCheck.title,
           bookAuthor: bookForSafetyCheck.author,
           descriptionLength: bookForSafetyCheck.description?.length || null,
-          hadThinMetadata: !bookForSafetyCheck.description || bookForSafetyCheck.description.length < 150,
+          hadThinMetadata: isThin,
           usedWebSearch: usedWebSearch,
           modelVersion: MODEL_VERSION,
           taxonomyVersion: TAXONOMY_VERSION,

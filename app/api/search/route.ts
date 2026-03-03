@@ -178,19 +178,8 @@ export async function GET(request: NextRequest) {
 
     /**
      * External API search fallback
-     * 
-     * Strategy: Database-first approach for performance and cost efficiency
-     * - Only search external APIs if database search returns < 3 results
-     * - Requires query length >= 3 characters to avoid too many API calls
-     * - Skip external search for ISBN queries (handled separately)
-     * 
-     * Rate limiting: Gracefully degrades to database-only results if:
-     * - Google Books API returns 429 (rate limit)
-     * - Network timeout (5 seconds)
-     * - Any other API error
-     * 
-     * Duplicate filtering: External results are filtered to exclude books
-     * already in the database (by ISBN) to avoid showing duplicates.
+     * Only when database returns < 3 results, query length >= 3, and not an ISBN query.
+     * Gracefully degrades on 429, timeout, or other API errors.
      */
     let externalResults: Array<{
       isbn: string
@@ -203,7 +192,6 @@ export async function GET(request: NextRequest) {
 
     if (booksWithWarnings.length < 3 && query.length >= 3 && !isISBN) {
       try {
-        // Search Google Books API by title/author
         const apiKey = process.env.GOOGLE_BOOKS_API_KEY
         const searchQuery = query.trim()
         const url = new URL('https://www.googleapis.com/books/v1/volumes')
@@ -213,109 +201,65 @@ export async function GET(request: NextRequest) {
           url.searchParams.append('key', apiKey)
         }
 
-        console.log(`[Search API] Searching external API for: "${searchQuery}"`)
-
         const externalResponse = await fetch(url.toString(), {
-          headers: {
-            'User-Agent': 'Book-Scanner-App/1.0'
-          },
-          signal: AbortSignal.timeout(5000) // 5 second timeout
+          headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+          signal: AbortSignal.timeout(5000),
         })
 
         if (externalResponse.ok) {
           const externalData = await externalResponse.json()
-          console.log(`[Search API] External API returned ${externalData.items?.length || 0} items`)
-          
-          if (externalData.items && externalData.items.length > 0) {
-            // Get all ISBNs from database books to filter duplicates
+          if (externalData.items?.length > 0) {
             const existingISBNs = new Set(
-              booksWithWarnings.map(book => normalizeISBN(book.isbn)).filter(Boolean)
+              booksWithWarnings.map((book) => normalizeISBN(book.isbn)).filter(Boolean)
             )
-
-            // Extract results from Google Books
             for (const item of externalData.items.slice(0, 10)) {
               const volumeInfo = item.volumeInfo
-              if (!volumeInfo || !volumeInfo.title) {
-                console.log(`[Search API] Skipping item: missing title`)
-                continue
-              }
-
-              // Extract ISBNs from the book
+              if (!volumeInfo?.title) continue
               const returnedISBNs = extractISBNsFromGoogleBooks(volumeInfo.industryIdentifiers)
-              if (returnedISBNs.length === 0) {
-                console.log(`[Search API] Skipping "${volumeInfo.title}": no ISBN found`)
-                continue
-              }
-
-              // Use the first valid ISBN
+              if (returnedISBNs.length === 0) continue
               const bookISBN = normalizeISBN(returnedISBNs[0])
-              if (!bookISBN) {
-                console.log(`[Search API] Skipping "${volumeInfo.title}": invalid ISBN`)
-                continue
-              }
-
-              // Skip if already in database
-              if (existingISBNs.has(bookISBN)) {
-                console.log(`[Search API] Skipping "${volumeInfo.title}": already in database`)
-                continue
-              }
-
-              // Get cover image
+              if (!bookISBN || existingISBNs.has(bookISBN)) continue
               let coverUrl: string | null = null
               if (volumeInfo.imageLinks) {
-                coverUrl = volumeInfo.imageLinks.thumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') || 
-                          volumeInfo.imageLinks.smallThumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') || 
-                          null
+                coverUrl =
+                  volumeInfo.imageLinks.thumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') ||
+                  volumeInfo.imageLinks.smallThumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') ||
+                  null
               }
-
-              // Get description (truncate to 100 chars for preview)
               let description: string | null = null
               if (volumeInfo.description) {
-                description = volumeInfo.description.length > 100 
-                  ? volumeInfo.description.substring(0, 100) + '...'
-                  : volumeInfo.description
+                description =
+                  volumeInfo.description.length > 100
+                    ? volumeInfo.description.substring(0, 100) + '...'
+                    : volumeInfo.description
               }
-
-              console.log(`[Search API] Adding external result: "${volumeInfo.title}" (ISBN: ${bookISBN})`)
               externalResults.push({
                 isbn: bookISBN,
                 title: volumeInfo.title,
                 author: volumeInfo.authors?.[0] || null,
                 cover_url: coverUrl,
                 description,
-                source: 'external_api'
+                source: 'external_api',
               })
             }
-            console.log(`[Search API] Total external results: ${externalResults.length}`)
-          } else {
-            console.log(`[Search API] No items returned from external API`)
           }
         } else if (externalResponse.status === 429) {
-          // Rate limit: gracefully degrade to database-only results
-          // User experience is not impacted - search still works
           console.warn('[Search API] Google Books API rate limited (429), returning database results only')
         } else {
-          // Other API errors: log but don't break search
           console.warn(`[Search API] Google Books API search failed: ${externalResponse.status}`)
         }
       } catch (error) {
-        /**
-         * Graceful degradation: if external API fails for any reason,
-         * return database results only. Search functionality remains intact.
-         */
         if (error instanceof Error && error.name === 'AbortError') {
           console.warn('[Search API] Google Books API request timed out (5s limit)')
         } else {
           console.warn('[Search API] External API search error:', error)
         }
       }
-    } else {
-      console.log(`[Search API] Skipping external search: booksWithWarnings=${booksWithWarnings.length}, query.length=${query.length}, isISBN=${isISBN}`)
     }
 
     return NextResponse.json({
       books: booksWithWarnings || [],
-      externalResults: externalResults || [],
+      externalResults,
       total: booksWithWarnings?.length || 0,
       query,
       isISBN: isISBN,

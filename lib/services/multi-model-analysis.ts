@@ -1,13 +1,8 @@
 /**
  * Multi-Model Analysis Service
- *
+ * 
  * Analyzes books using both OpenAI and Gemini with Taxonomy v2.5.0
- * Combines results and provides progress updates.
- *
- * We attribute conceptual alignment with trigger-warning / violence classification
- * to acl23-trigger-warning-assignment (Matti Wiegmann, MIT): institutional-style
- * multi-label trigger warnings. No acl23 code or data is used yet; see
- * docs/THIRD_PARTY_RESOURCES.md for what "acl23-informed" means.
+ * Combines results and provides progress updates
  */
 
 import OpenAI from 'openai'
@@ -54,36 +49,12 @@ export interface AnalysisOptions {
   includeReasoning?: boolean
   /** Truncate description to N characters for this analysis */
   maxDescriptionChars?: number
-  /** 
-   * Use Gemini as the primary model, falling back to OpenAI on rate limit errors.
-   * When true, ignores enableOpenAI/enableGemini and uses sequential execution.
-   * (default: false - uses parallel execution based on enableOpenAI/enableGemini)
-   */
-  geminiFirst?: boolean
-}
-
-/**
- * Detect if an error is a rate limit or quota error that should trigger fallback
- */
-function isRateLimitError(error: unknown): boolean {
-  if (error instanceof Error) {
-    const msg = error.message.toLowerCase()
-    return msg.includes('429') ||
-      msg.includes('quota') ||
-      msg.includes('rate limit') ||
-      msg.includes('rate_limit') ||
-      msg.includes('resource exhausted') ||
-      msg.includes('too many requests')
-  }
-  return false
 }
 
 type WebEnrichmentInfo = {
   attempted: boolean
   used: boolean
   added_warnings: number
-  /** Enrichment combined text for SSS description fallback when book description is empty. */
-  combinedText?: string
 }
 
 function applyDescriptionTruncation(metadata: BookMetadata, maxChars?: number): BookMetadata {
@@ -657,22 +628,7 @@ async function analyzeWithGemini(
     ? `\nIMPORTANT: Omit the per-warning \"reasoning\" field (or keep it to one short sentence max).`
     : ''
 
-  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}, following the Australian Classification Board's methodology.${maxWarningsInstruction}${reasoningInstruction}
-
-Official References:
-- Guidelines for the Classification of Publications 2005 (F2008C00129)
-- National Classification Code (F2013C00006)
-- https://www.classification.gov.au/classification-ratings/how-rating-decided
-
-The Board assesses content based on six classifiable elements: themes, violence, language, drug use, nudity, and sex. Ratings are determined by the IMPACT of these elements (very mild, mild, moderate, strong, high).
-
-Per the Publications Guidelines (p.124-129), impact is assessed through:
-- Emphasis: How prominently the element is featured
-- Tone: The manner in which content is presented
-- Frequency: How often the element appears
-- Context: The setting and justification for the content
-- Detail: The amount of visual or written detail
-- Cumulative effect: How elements combine to create overall impact
+  const prompt = `Analyze this book for content warnings using Taxonomy v${TAXONOMY_VERSION}.${maxWarningsInstruction}${reasoningInstruction}
 
 Book Information:
 - Title: ${metadata.title}
@@ -686,7 +642,6 @@ ${metadata.description}
 Available Categories and Subcategories:
 ${taxonomyContext}
 ${modifiersList}
-
 
 Instructions:
 0. **PRIORITY EXCEPTION: CANON KNOWLEDGE (Literary Classics)**
@@ -1684,8 +1639,6 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
   web_enrichment?: WebEnrichmentInfo
-  /** True when enrichment was used but analysis returned zero warnings (safety net for UI). */
-  needsReview?: boolean
 }> {
   const options: AnalysisOptions =
     typeof modelOrOptions === 'string'
@@ -1713,122 +1666,41 @@ export async function analyzeBookWithMultiModel(
   const effectiveMetadata = applyDescriptionTruncation(metadata, effectiveOptions.maxDescriptionChars)
   const isCanonical = isCanonicalBook(metadata.title, metadata.author)
 
-  // Upfront enrichment when description is missing or minimal so the first analysis pass sees combined text.
-  const descriptionMinimal = !effectiveMetadata.description?.trim() || effectiveMetadata.description.trim().length < 100
-  let upfrontEnrichment: Awaited<ReturnType<typeof import('./web-search-enrichment').enrichWithWebSearch>> | null = null
-  if (effectiveOptions.enableWebEnrichment && descriptionMinimal) {
-    onProgress?.('🔍 Fetching community content-warning context before analysis...')
-    try {
-      const { enrichWithWebSearch } = await import('./web-search-enrichment')
-      upfrontEnrichment = await enrichWithWebSearch(effectiveMetadata, 0, onProgress)
-    } catch (e) {
-      console.warn('[Multi-Model] Upfront enrichment failed:', e)
-    }
-  }
+  // Run both OpenAI and Gemini in parallel for cross-validation
+  // IMPORTANT: Don't catch errors here - let them propagate to scan-service
+  // If we catch and return empty array, it will be treated as "no warnings" which is wrong
+  // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
 
-  const baseDescription = effectiveMetadata.description?.trim() || `${effectiveMetadata.title} by ${effectiveMetadata.author || 'Unknown'}`
-  const inputDescription = upfrontEnrichment?.hadResults && upfrontEnrichment.combinedText
-    ? `${baseDescription}\n\nAdditional context from community content-warnings and reviews:\n${upfrontEnrichment.combinedText}`
-    : baseDescription
+  // Run enabled models in parallel (when both enabled)
+  const openaiPromise = effectiveOptions.enableOpenAI
+    ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
+    : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
 
-  // Short-circuit only when there is no description and no enrichment (no analysable input).
-  if (!effectiveMetadata.description?.trim() && !upfrontEnrichment?.hadResults) {
-    return {
-      warnings: [],
-      noWarningsReasoning: 'No content warnings found because there was no description or external context to analyze.',
-      analysis: {
-        agreement_score: 1,
-        unique_to_openai: [],
-        unique_to_gemini: [],
-        severity_differences: [],
-        verification_metrics: undefined
-      },
-      model_results: { openai: [], gemini: [] },
-      web_enrichment: undefined,
-      needsReview: false
-    }
-  }
-
-  const metadataForFirstPass: BookMetadata = { ...effectiveMetadata, description: inputDescription }
-
-  let openaiWarnings: EnhancedContentWarning[] = []
-  let geminiWarnings: EnhancedContentWarning[] = []
-  let openaiNoWarningsReasoning: string | undefined = undefined
-  let usedFallback = false
-
-  // GEMINI-FIRST MODE: Try Gemini first, fallback to OpenAI on rate limit
-  if (effectiveOptions.geminiFirst) {
-    onProgress?.('⏳ Analyzing content with Gemini...')
-
-    try {
-      geminiWarnings = await analyzeWithGemini(metadataForFirstPass, onProgress, effectiveOptions, isCanonical)
-      onProgress?.(`✓ Gemini analysis complete (found ${geminiWarnings.length} warning${geminiWarnings.length === 1 ? '' : 's'})`)
-    } catch (geminiError) {
-      if (isRateLimitError(geminiError)) {
-        console.warn('[Multi-Model] Gemini rate limited, falling back to OpenAI:', geminiError)
-        onProgress?.('⚠️ Gemini rate limited - switching to OpenAI...')
-        usedFallback = true
-
-        // Fallback to OpenAI
-        try {
-          const openaiResult = await analyzeWithOpenAI(metadataForFirstPass, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
-          openaiWarnings = openaiResult.warnings
-          openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
-          onProgress?.(`✓ OpenAI analysis complete (found ${openaiWarnings.length} warning${openaiWarnings.length === 1 ? '' : 's'})`)
-        } catch (openaiError) {
-          console.error('[Multi-Model] OpenAI fallback also failed:', openaiError)
-          throw openaiError // Let scan-service handle this
-        }
-      } else {
-        // Non-rate-limit errors: try OpenAI as fallback anyway
-        console.warn('[Multi-Model] Gemini failed (non-rate-limit), falling back to OpenAI:', geminiError)
-        onProgress?.('⚠️ Gemini unavailable - switching to OpenAI...')
-        usedFallback = true
-
-        try {
-          const openaiResult = await analyzeWithOpenAI(metadataForFirstPass, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
-          openaiWarnings = openaiResult.warnings
-          openaiNoWarningsReasoning = openaiResult.noWarningsReasoning
-          onProgress?.(`✓ OpenAI analysis complete (found ${openaiWarnings.length} warning${openaiWarnings.length === 1 ? '' : 's'})`)
-        } catch (openaiError) {
-          console.error('[Multi-Model] OpenAI fallback also failed:', openaiError)
-          throw openaiError
-        }
+  const geminiPromise = effectiveOptions.enableGemini
+    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical).catch(err => {
+      if (!effectiveOptions.enableOpenAI) {
+        // If OpenAI is disabled, Gemini is the only model. Failure here is fatal.
+        console.error('[Multi-Model] Gemini analysis failed and it is the only model enabled. Throwing error:', err)
+        throw err
       }
-    }
-  } else {
-    // PARALLEL MODE: Run both OpenAI and Gemini in parallel for cross-validation
-    // IMPORTANT: Don't catch errors here - let them propagate to scan-service
-    // If we catch and return empty array, it will be treated as "no warnings" which is wrong
-    // Rate limit errors should cause the book to show as "Unknown" (not analyzed), not "Comfort Read" (analyzed and safe)
+      // Gemini failures are non-fatal - log and continue with OpenAI only
+      console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
+      return []
+    })
+    : Promise.resolve([])
 
-    // Run enabled models in parallel (when both enabled)
-    const openaiPromise = effectiveOptions.enableOpenAI
-      ? analyzeWithOpenAI(metadataForFirstPass, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
-      : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
+  const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
 
-    const geminiPromise = effectiveOptions.enableGemini
-      ? analyzeWithGemini(metadataForFirstPass, onProgress, effectiveOptions, isCanonical).catch(err => {
-        // Gemini failures are non-fatal - log and continue with OpenAI only
-        console.warn('[Multi-Model] Gemini analysis failed, continuing:', err)
-        return []
-      })
-      : Promise.resolve([])
+  const openaiWarnings = openaiResult.status === 'fulfilled'
+    ? openaiResult.value.warnings
+    : []
+  const openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
+    ? openaiResult.value.noWarningsReasoning
+    : undefined
 
-    const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
-
-    openaiWarnings = openaiResult.status === 'fulfilled'
-      ? openaiResult.value.warnings
-      : []
-    openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
-      ? openaiResult.value.noWarningsReasoning
-      : undefined
-
-    geminiWarnings = geminiResult.status === 'fulfilled'
-      ? geminiResult.value
-      : []
-  }
-
+  const geminiWarnings = geminiResult.status === 'fulfilled'
+    ? geminiResult.value
+    : []
 
   // Log cross-validation status
   if (geminiWarnings.length > 0) {
@@ -1877,17 +1749,15 @@ export async function analyzeBookWithMultiModel(
   let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
   let webEnrichment: WebEnrichmentInfo | undefined = undefined
-  if (upfrontEnrichment?.hadResults) {
-    webEnrichment = { attempted: true, used: true, added_warnings: 0, combinedText: upfrontEnrichment.combinedText }
-  }
-  let postPassEnrichmentText: string | null = null
 
   if (effectiveOptions.enableVerification && allUniqueWarnings.length > 0) {
-    // Use the opposite model for verification (if OpenAI found it, verify with Gemini, and vice versa)
-    // This provides cross-validation: warnings found by one model are verified by the other
-    const verifierModel = analysis.unique_to_openai.length > 0 && geminiWarnings.length > 0
-      ? 'gemini' // If OpenAI found unique warnings and Gemini is available, use Gemini to verify
-      : 'openai' // Otherwise use OpenAI (more reliable fallback)
+    // Use the opposite model for verification when both ran (cross-validation).
+    // When OpenAI failed (e.g. 429 quota) we only have Gemini results — use Gemini for verification
+    // so the scan can complete instead of calling OpenAI again and failing.
+    const verifierModel =
+      geminiWarnings.length > 0
+        ? 'gemini' // Prefer Gemini when available (avoids OpenAI 429 on verification when OpenAI already failed)
+        : 'openai'
 
     const { verified, metrics } = await verifyUniqueWarnings(
       allUniqueWarnings,
@@ -2013,9 +1883,8 @@ export async function analyzeBookWithMultiModel(
 
         // IMPORTANT: Don't require the snippets to literally contain "content warning" language.
         // If we got any enrichment context, it can still help the second-pass analysis.
-        if (enrichmentResult.enrichedContext ?? enrichmentResult.combinedText) {
-          enrichedContextText = enrichmentResult.enrichedContext ?? enrichmentResult.combinedText ?? null
-          postPassEnrichmentText = enrichedContextText
+        if (enrichmentResult.enrichedContext) {
+          enrichedContextText = enrichmentResult.enrichedContext
           onProgress?.('⏳ Gathering additional information from community sources...')
 
           // Create enriched metadata with community-sourced context
@@ -2044,7 +1913,6 @@ export async function analyzeBookWithMultiModel(
             if (webEnrichment) {
               webEnrichment.used = true
               webEnrichment.added_warnings = Math.max(0, finalWarnings.length - originalWarningCount)
-              if (enrichedContextText) webEnrichment.combinedText = enrichedContextText
             }
 
             // Update noWarningsReasoning if we now have warnings
@@ -2054,7 +1922,6 @@ export async function analyzeBookWithMultiModel(
           } else {
             onProgress?.('ℹ️ Enrichment did not find additional warnings beyond initial scan')
           }
-          if (webEnrichment && enrichedContextText) webEnrichment.combinedText = enrichedContextText
         }
 
         // Post-enrichment validation: Check for missed classifications using enriched context
@@ -2170,11 +2037,6 @@ export async function analyzeBookWithMultiModel(
     finalWarnings = finalWarnings.map(w => ({ ...w, reasoning: undefined }))
   }
 
-  const usedEnrichment = (upfrontEnrichment?.hadResults === true) || (webEnrichment?.used === true)
-  if (webEnrichment && !webEnrichment.combinedText && (upfrontEnrichment?.combinedText ?? postPassEnrichmentText)) {
-    webEnrichment.combinedText = upfrontEnrichment?.combinedText ?? postPassEnrichmentText ?? undefined
-  }
-
   return {
     warnings: finalWarnings,
     noWarningsReasoning: finalWarnings.length === 0 ? openaiNoWarningsReasoning : undefined,
@@ -2186,8 +2048,7 @@ export async function analyzeBookWithMultiModel(
       openai: openaiWarnings,
       gemini: geminiWarnings
     },
-    web_enrichment: webEnrichment,
-    needsReview: usedEnrichment && finalWarnings.length === 0
+    web_enrichment: webEnrichment
   }
 }
 

@@ -16,11 +16,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Check for access cookie (invite code or legacy country-join) OR VIP cookie
-  const hasAccessCookie = request.cookies.has('subtext_access_granted');
+  // 2. Check for access: VIP (invite code) or legacy cookie (no longer issued)
   const hasVipCookie = request.cookies.has('subtext_vip');
+  const hasLegacyAccessCookie = request.cookies.has('subtext_access_granted');
   
-  if (hasAccessCookie || hasVipCookie) {
+  if (hasVipCookie || hasLegacyAccessCookie) {
     return NextResponse.next();
   }
 

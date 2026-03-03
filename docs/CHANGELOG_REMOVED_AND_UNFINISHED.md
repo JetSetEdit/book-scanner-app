@@ -51,7 +51,8 @@ Single reference for what’s been removed, what’s unfinished, and what’s de
 
 ### APIs & models
 - **`gemini-pro`** – Deprecated; use `gemini-1.5-flash` (or current Gemini model). See `lib/services/multi-model-analysis.ts`, `docs/IMPLEMENTATION_REVIEW.md`, `docs/GEMINI_FIX.md`.
-- **Geo-block** – Replaced by country-based waitlist/access gate and `/welcome` (AU direct; international via quota + cookie). See `middleware.ts`, `app/actions/access-control.ts`.
+- **Geo-block** – Replaced by invite-code-only gate. See `middleware.ts`.
+- **Country-join (access_grants)** – Removed. Access is now **invite code only** (VIP). `grantAccess()`, `getSupportedCountries()`, and `AccessGateForm` were removed. The `subtext_access_granted` cookie is still accepted for existing users; no new grants are issued.
 
 ### URLs / environments
 - **Canonical production** – **https://www.subtextscanner.com.au** (use this for testers and real users).
