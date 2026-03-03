@@ -182,9 +182,18 @@ function ScanTestPageContent() {
 
   // Freemium paywall (daily scan limit)
   const [showPaywall, setShowPaywall] = useState(false)
+  // VIP/invite users have unlimited scans; we can't read httpOnly cookie on client so we ask the API
+  const [isUnlimited, setIsUnlimited] = useState<boolean | null>(null)
 
   useEffect(() => {
     setIsMounted(true)
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/entitlements')
+      .then((r) => r.json())
+      .then((data) => setIsUnlimited(data?.ok && data?.unlimited === true))
+      .catch(() => setIsUnlimited(false))
   }, [])
 
   // NOTE: We intentionally do NOT clear `error` when opening the scanner.
@@ -255,10 +264,13 @@ function ScanTestPageContent() {
   ) => {
     console.log('[Scan] performScan called:', { isbnToScan, scanModeOverride, forceRefreshOverride })
     const effectiveMode = scanModeOverride ?? scanMode
-    const { usedQuick, usedDeep } = getDailyScanUsage()
-    if (!canRunScan({ plan: "free", scanType: effectiveMode, usedQuick, usedDeep })) {
-      setShowPaywall(true)
-      return
+    // VIP/invite users have unlimited scans; skip client-side limit check. When unknown (null), allow request—API will enforce.
+    if (isUnlimited === false) {
+      const { usedQuick, usedDeep } = getDailyScanUsage()
+      if (!canRunScan({ plan: "free", scanType: effectiveMode, usedQuick, usedDeep })) {
+        setShowPaywall(true)
+        return
+      }
     }
     // Start timing
     const timer = startTiming()
