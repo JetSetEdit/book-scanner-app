@@ -1,5 +1,6 @@
 import { getSupportedCountries } from '@/app/actions/access-control'
 import { AccessGateForm } from '@/components/access-gate-form'
+import { InviteCodeForm } from '@/components/invite-code-form'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -83,7 +84,15 @@ export default async function WelcomePage() {
           </p>
         </div>
 
-        <AccessGateForm countries={countries} />
+        <div className="border-t border-[#E8E5DF] pt-6 mt-6">
+          <p className="text-sm font-medium text-[#2C2416] mb-1">Have an invite code?</p>
+          <InviteCodeForm />
+        </div>
+
+        <div className="border-t border-[#E8E5DF] pt-6 mt-6">
+          <p className="text-sm font-medium text-[#4A4A4A] mb-2">Or join the beta by region</p>
+          <AccessGateForm countries={countries} />
+        </div>
       </div>
     </div>
   )
