@@ -38,18 +38,18 @@ export async function POST(req: NextRequest) {
     // Get active bonus scans (if any)
     const bonusScans = await getActiveBonusScans(userId);
 
-    // Dev/Admin IPs are truly unlimited
+    // Dev/Admin IPs and VIPs (invite code) are unlimited
     const isDev = isIpAllowlisted(clientIP);
+    const isUnlimited = isDev || hasVipPass;
 
-    // VIPs get a higher limit (e.g. 50), Regular users get standard limit (e.g. 5)
-    const VIP_LIMIT = 50;
-    const baseLimit = hasVipPass ? VIP_LIMIT : SCAN_CREDITS_PER_DAY;
+    const baseLimit = hasVipPass ? 50 : SCAN_CREDITS_PER_DAY; // used only when !isUnlimited
 
-    // Check status based on effective limit (base + bonus)
-    // Note: checkRateLimitWithCost will add bonus scans to the limit
-    const rateLimitCheck = await checkRateLimitWithCost(clientIP, baseLimit, timezone, scanCost, userId, bonusScans);
+    // Check status based on effective limit (base + bonus); skip check for unlimited users
+    const rateLimitCheck = isUnlimited
+      ? { allowed: true, remaining: 999, resetAt: Date.now() + 86400000, effectiveLimit: 999 }
+      : await checkRateLimitWithCost(clientIP, baseLimit, timezone, scanCost, userId, bonusScans);
 
-    const rateLimit = isDev
+    const rateLimit = isUnlimited
       ? {
         allowed: true,
         remaining: 999,
@@ -61,9 +61,6 @@ export async function POST(req: NextRequest) {
       }
       : {
         ...rateLimitCheck,
-        // If VIP, we show 'unlimited' as false, but with high remaining
-        // OR we can show unlimited=true if we want to hide the counter?
-        // Let's treat VIPs as "Limited but High Cap"
         unlimited: false,
         limit: rateLimitCheck.effectiveLimit
       };
@@ -178,9 +175,8 @@ export async function POST(req: NextRequest) {
         let bonusClaimInfo: any = null // Initialize outside to ensure scope visibility
 
         if (result.success) {
-          // Only increment if NOT a Dev (Truly Unlimited)
-          // VIPs (Limited but High Cap) DO increment their counter
-          if (!isDev) {
+          // Only increment for users who have a limit (not dev IPs, not VIPs)
+          if (!isUnlimited) {
             incrementRateLimitBy(clientIP, timezone, scanCost)
           }
 
@@ -224,15 +220,17 @@ export async function POST(req: NextRequest) {
 
         // Include rate limit info in response (re-fetch bonus scans in case they changed)
         const currentBonusScans = await getActiveBonusScans(userId)
-        const updatedRateLimit = await checkRateLimit(clientIP, baseLimit, timezone, userId, currentBonusScans)
+        const updatedRateLimit = isUnlimited
+          ? { effectiveLimit: 999, remaining: 999, resetAt: Date.now() + 86400000 }
+          : await checkRateLimit(clientIP, baseLimit, timezone, userId, currentBonusScans)
         const responseResult = {
           ...result,
           rateLimit: {
             limit: updatedRateLimit.effectiveLimit,
-            remaining: isDev ? 999 : updatedRateLimit.remaining,
+            remaining: isUnlimited ? 999 : updatedRateLimit.remaining,
             resetAt: updatedRateLimit.resetAt,
             cost: scanCost,
-            unlimited: isDev,
+            unlimited: isUnlimited,
           },
           bonusClaimInfo, // Include bonus claim info for client-side notification
         }
