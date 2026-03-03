@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // 1. Define paths that are always allowed (static files, API, next internals)
+  // 1. Define paths that are always allowed (static files, API, next internals, gate)
   const pathname = request.nextUrl.pathname;
   if (
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api') ||
     pathname.startsWith('/static') ||
+    pathname === '/' ||
     pathname === '/welcome' ||
     pathname === '/favicon.ico' ||
     pathname.match(/\.(svg|png|jpg|jpeg|gif|webp)$/)
@@ -15,7 +16,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Check for access cookie (granted via welcome page) OR VIP cookie
+  // 2. Check for access cookie (invite code or legacy country-join) OR VIP cookie
   const hasAccessCookie = request.cookies.has('subtext_access_granted');
   const hasVipCookie = request.cookies.has('subtext_vip');
   
@@ -23,12 +24,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // 3. Check Country (AU is always allowed)
-  // Allow testing via URL parameter: ?test-country=US
-  const testCountry = request.nextUrl.searchParams.get('test-country');
-  const country = testCountry || request.geo?.country || request.headers.get('x-vercel-ip-country');
-  
-  // During development, allow localhost
+  // 3. During development, allow localhost (no gate)
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isLocalhost = request.headers.get('host')?.includes('localhost') || 
                       request.headers.get('host')?.includes('127.0.0.1');
@@ -36,14 +32,10 @@ export function middleware(request: NextRequest) {
   if (isDevelopment && isLocalhost) {
     return NextResponse.next();
   }
-  
-  if (country === 'AU') {
-    return NextResponse.next();
-  }
 
-  // 4. If not AU and no cookie, redirect to welcome page
-  const welcomeUrl = new URL('/welcome', request.url);
-  return NextResponse.redirect(welcomeUrl);
+  // 4. No cookie: redirect to gate (homepage shows gate; only way past is access code)
+  const gateUrl = new URL('/', request.url);
+  return NextResponse.redirect(gateUrl);
 }
 
 // Apply middleware to all routes

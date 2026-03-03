@@ -1,11 +1,20 @@
+import { cookies } from 'next/headers'
 import { Shield, Users, ScanBarcode, Search, Brain } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { RecentScans } from "@/components/recent-scans"
 import { getVariantConfig } from "@/lib/config/variants"
+import { HomepageGate } from "@/components/homepage-gate"
 
-export default function HomePage() {
+export default async function HomePage() {
+  const cookieStore = await cookies()
+  const hasAccess = cookieStore.has('subtext_vip') || cookieStore.has('subtext_access_granted')
+
+  if (!hasAccess) {
+    return <HomepageGate />
+  }
+
   const v = getVariantConfig()
   return (
     <main className="min-h-screen bg-background flex flex-col">
