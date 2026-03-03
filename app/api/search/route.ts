@@ -257,6 +257,57 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // When user searches by ISBN and book is not in our DB, still try Google Books by ISBN
+    // so we can show one external result and pass it as scan candidate (avoids "not found" on scan).
+    if (isISBN && isNotFound && normalizedQuery) {
+      try {
+        const url = new URL('https://www.googleapis.com/books/v1/volumes')
+        url.searchParams.append('q', `isbn:${normalizedQuery}`)
+        url.searchParams.append('maxResults', '5')
+        if (process.env.GOOGLE_BOOKS_API_KEY) {
+          url.searchParams.append('key', process.env.GOOGLE_BOOKS_API_KEY)
+        }
+        const res = await fetch(url.toString(), {
+          headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
+          signal: AbortSignal.timeout(5000),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          const item = data.items?.[0]
+          const volumeInfo = item?.volumeInfo
+          if (volumeInfo?.title) {
+            const returnedISBNs = extractISBNsFromGoogleBooks(volumeInfo.industryIdentifiers)
+            const bookISBN = returnedISBNs.length > 0 ? normalizeISBN(returnedISBNs[0]) : normalizedQuery
+            let coverUrl: string | null = null
+            if (volumeInfo.imageLinks) {
+              coverUrl =
+                volumeInfo.imageLinks.thumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') ||
+                volumeInfo.imageLinks.smallThumbnail?.replace('http:', 'https:')?.replace('&edge=curl', '') ||
+                null
+            }
+            let description: string | null = null
+            if (volumeInfo.description) {
+              description = volumeInfo.description.length > 100
+                ? volumeInfo.description.substring(0, 100) + '...'
+                : volumeInfo.description
+            }
+            externalResults.push({
+              isbn: bookISBN,
+              title: volumeInfo.title,
+              author: volumeInfo.authors?.[0] || null,
+              cover_url: coverUrl,
+              description,
+              source: 'external_api',
+            })
+          }
+        }
+      } catch (e) {
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Search API] ISBN lookup fallback error:', e)
+        }
+      }
+    }
+
     return NextResponse.json({
       books: booksWithWarnings || [],
       externalResults,
