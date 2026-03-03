@@ -540,3 +540,71 @@ async function validateImageUrl(url: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Fetch book by ISBN with format retry (clean then hyphenated 13-digit).
+ * Used by admin resolve-by-adding-book and scripts.
+ */
+export async function fetchBookByISBNWithRetry(isbn: string): Promise<BookData | null> {
+  const clean = normalizeISBN(isbn)
+  let result = await fetchBookByISBN(clean)
+  if (result) return result
+  // Try hyphenated 13-digit form (978-X-XXX-XXXXX-X)
+  if (clean.length === 13 && clean.startsWith('978')) {
+    const hyphenated = `${clean.slice(0, 3)}-${clean.slice(3, 4)}-${clean.slice(4, 7)}-${clean.slice(7, 12)}-${clean.slice(12)}`
+    result = await fetchBookByISBN(hyphenated)
+  }
+  return result ?? null
+}
+
+/**
+ * Search Google Books by title and author; return BookData for the first result
+ * whose industryIdentifiers match the given ISBN hint. Used when ISBN lookup
+ * fails but user provided title/author (e.g. resolve-by-adding-book).
+ */
+export async function fetchByTitleAuthor(
+  isbnHint: string,
+  title: string,
+  author?: string
+): Promise<BookData | null> {
+  const cleanHint = normalizeISBN(isbnHint)
+  const q = [
+    title ? `intitle:${JSON.stringify(title.trim())}` : '',
+    author?.trim() ? `inauthor:${JSON.stringify(author.trim())}` : '',
+  ].filter(Boolean).join(' ')
+  if (!q) return null
+  try {
+    const response = await fetchWith429Retry(
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}`,
+      { next: { revalidate: 86400 }, headers: { 'User-Agent': 'Book-Scanner-App/1.0' } }
+    )
+    if (!response.ok) return null
+    const data = await response.json()
+    if (!data.items?.length) return null
+    for (const item of data.items) {
+      const volumeInfo = item.volumeInfo
+      if (!volumeInfo?.title || isPlaceholderTitle(volumeInfo.title)) continue
+      const returnedISBNs = extractISBNsFromGoogleBooks(volumeInfo.industryIdentifiers)
+      if (!isbnMatches(cleanHint, returnedISBNs)) continue
+      const coverUrl = volumeInfo.imageLinks
+        ? (volumeInfo.imageLinks.extraLarge || volumeInfo.imageLinks.large || volumeInfo.imageLinks.medium || volumeInfo.imageLinks.small || volumeInfo.imageLinks.thumbnail)
+            ?.replace?.('http:', 'https:')
+        : undefined
+      return {
+        isbn: cleanHint,
+        title: volumeInfo.title,
+        author: volumeInfo.authors?.[0],
+        cover_url: coverUrl,
+        description: volumeInfo.description,
+        publisher: volumeInfo.publisher,
+        published_date: volumeInfo.publishedDate,
+        page_count: volumeInfo.pageCount,
+        categories: volumeInfo.categories?.slice(0, 5),
+        source: 'googlebooks',
+      }
+    }
+  } catch (e) {
+    console.warn('[Book API] fetchByTitleAuthor error:', e)
+  }
+  return null
+}
