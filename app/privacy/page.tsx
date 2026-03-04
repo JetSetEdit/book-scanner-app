@@ -13,10 +13,10 @@ export default function PrivacyPage() {
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         {/* Header */}
         <div className="mb-12">
-          <Link href="/">
+          <Link href="/help">
             <Button variant="ghost" className="mb-6 text-muted-foreground hover:text-foreground">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Home
+              Back to Knowledge base
             </Button>
           </Link>
           <h1 className="font-serif text-4xl md:text-5xl font-medium tracking-tight text-foreground mb-4">
@@ -210,6 +210,11 @@ export default function PrivacyPage() {
         {/* Footer */}
         <div className="mt-16 pt-8 border-t border-border">
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link href="/help">
+              <Button variant="outline" className="w-full sm:w-auto">
+                Knowledge base
+              </Button>
+            </Link>
             <Link href="/">
               <Button variant="outline" className="w-full sm:w-auto">
                 Back to Home

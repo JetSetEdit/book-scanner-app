@@ -446,4 +446,37 @@
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Spoiler tags (variant): [text](/spoiler) or [text](#s) — hover to reveal */
+  .spoiler-tag,
+  a[href$="/spoiler"],
+  a[href$="#spoiler"],
+  a[href$="/s"],
+  a[href$="#s"] {
+    background: #000 !important;
+    color: #000 !important;
+    border-radius: 2px;
+  }
+  .spoiler-tag:hover,
+  a[href$="/spoiler"]:hover,
+  a[href$="#spoiler"]:hover,
+  a[href$="/s"]:hover,
+  a[href$="#s"]:hover {
+    color: #fff !important;
+  }
+  .dark .spoiler-tag,
+  .dark a[href$="/spoiler"],
+  .dark a[href$="#spoiler"],
+  .dark a[href$="/s"],
+  .dark a[href$="#s"] {
+    background: var(--background) !important;
+    color: var(--background) !important;
+  }
+  .dark .spoiler-tag:hover,
+  .dark a[href$="/spoiler"]:hover,
+  .dark a[href$="#spoiler"]:hover,
+  .dark a[href$="/s"]:hover,
+  .dark a[href$="#s"]:hover {
+    color: var(--foreground) !important;
+  }
 }

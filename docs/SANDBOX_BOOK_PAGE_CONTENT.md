@@ -74,7 +74,7 @@ What appears on `/sandbox/book/[isbn]` (e.g. Love on the Brain), in order.
 - **ContentWarningsList** (sandbox uses disclosure variant):
   - **Author’s content warnings** (if URL or list set): collapsible list + “Source: author’s page”.
   - **Official Author Notes** (if any verified warnings).
-  - **Detailed content warnings** – disclosure rows: “Content warning: [Category] — [Severity]” → expand for description, Why?, thumbs.
+  - **Detailed content warnings** – grouped by parent category (e.g. Violence, Sexual Content). Each category is an expandable row (severity bar + icon + category name + count + chevron); expanding shows the specific warnings underneath (e.g. Violence — Graphic Violence, Violence — Domestic Violence), each with its own disclosure for description, Why?, thumbs.
   - **Community Reports** – same disclosure pattern (if any).
   - **Support resources** – by theme (mental health, DV/sexual assault, LGBTIQA+, substance, grief, bullying, racism) when relevant; optional state-specific services; rounded block with border; crisis links have hover/focus underline and ≥44px touch targets; "In an emergency, call 000" prominent.
   - **Quick Exit** (when relevant and user preference on).

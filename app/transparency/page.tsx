@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, BookOpen, Search, Sparkles, CheckCircle, Shield, ExternalLink, CheckCircle2, Clock, Users } from "lucide-react"
+import { ArrowLeft, ArrowRight, BookOpen, Search, Sparkles, CheckCircle, Shield, ExternalLink, CheckCircle2, Clock, Users } from "lucide-react"
 import { getVariantConfig } from "@/lib/config/variants"
 
 export default function TransparencyPage() {
@@ -9,6 +9,19 @@ export default function TransparencyPage() {
     <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-16 max-w-4xl">
         {/* Header */}
+        <div className="mb-12">
+          <Link href="/help">
+            <Button variant="ghost" className="mb-6 text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Knowledge base
+            </Button>
+          </Link>
+          <p className="text-sm text-muted-foreground mb-2" aria-label="Breadcrumb">
+            <Link href="/help" className="hover:text-foreground transition-colors">Knowledge base</Link>
+            <span className="mx-2">›</span>
+            <span className="text-foreground">How we work</span>
+          </p>
+        </div>
         <div className="mb-16 text-center">
           <h1 className="font-serif text-4xl md:text-5xl font-medium tracking-tight text-foreground mb-4">
             Our Roadmap
@@ -22,7 +35,7 @@ export default function TransparencyPage() {
         <div className="mb-20 bg-card border border-border border-l-4 border-l-gold rounded-lg p-6">
           <h2 className="font-serif text-xl text-foreground mb-4">How Subtext Works</h2>
           <p className="text-muted-foreground leading-relaxed mb-3">
-            Subtext analyses publicly available book text and metadata to identify common sensitive themes (such as violence, abuse, or discrimination).
+            Subtext analyses publicly available book descriptions and metadata to identify common sensitive themes (such as violence, abuse, or discrimination).
           </p>
           <p className="text-muted-foreground leading-relaxed mb-3">
             It uses automated language analysis to surface patterns and provides severity and age guidance to help readers make informed choices.
@@ -246,7 +259,12 @@ export default function TransparencyPage() {
                 Start Scanning
               </Button>
             </Link>
-            <Link href="/collection">
+            <Link href="/help">
+              <Button variant="outline" className="border-border">
+                Knowledge base
+              </Button>
+            </Link>
+            <Link href="/bookshelf">
               <Button variant="outline" className="border-border">
                 Browse Bookshelf
               </Button>

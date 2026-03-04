@@ -63,6 +63,8 @@ function isDevMode(): boolean {
 export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning, authorContentWarningsList, contentDisplayVariant = 'default', liveBookHref, analysisMeta }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  // Sandbox: always use cards (disclosure) variant so "Detailed content warnings" layout is consistent
+  const displayVariant = liveBookHref ? (contentDisplayVariant || 'cards') : contentDisplayVariant
   const [isAuditOpen, setIsAuditOpen] = useState(false)
   const [isDev, setIsDev] = useState(false)
   const [showAuditTrail, setShowAuditTrail] = useState(false)
@@ -185,14 +187,37 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               )}
             </section>
 
-            {/* Content at a glance: severity bar + counts under cover, above Specifications */}
+            {/* Content at a glance: severity bar + counts + age classification (above Specifications) */}
             {(() => {
               const hasWarnings = Array.isArray(warnings) && warnings.length > 0
               const noWarningsComplete = analysisStatus === 'complete' && Array.isArray(warnings) && warnings.length === 0
-              if (!hasWarnings && !noWarningsComplete) return null
+              const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
+              const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
+              const showBlock = hasWarnings || noWarningsComplete || classificationRating
+              if (!showBlock) return null
+
               const mildCount = hasWarnings ? warnings.filter((w: any) => w.severity !== 'moderate' && w.severity !== 'severe').length : 0
               const moderateCount = hasWarnings ? warnings.filter((w: any) => w.severity === 'moderate').length : 0
               const severeCount = hasWarnings ? warnings.filter((w: any) => w.severity === 'severe').length : 0
+              const ageRecommendations: Record<string, string> = {
+                'G': 'All ages',
+                'PG': 'Ages 8+',
+                'M': 'Ages 13+',
+                'MA15+': 'Ages 15+',
+                'R18+': 'Ages 18+',
+                'RC': 'Extreme content'
+              }
+              const ageLine = classificationRating ? (ageRecommendations[classificationRating] || classificationRating) : null
+              const pillClass = classificationRating === 'G' || classificationRating === 'PG'
+                ? 'bg-emerald-100 dark:bg-emerald-900/50 border-emerald-400/50 text-emerald-800 dark:text-emerald-200'
+                : classificationRating === 'M'
+                  ? 'bg-amber-100 dark:bg-amber-900/50 border-amber-400/50 text-amber-800 dark:text-amber-200'
+                  : classificationRating === 'MA15+'
+                    ? 'bg-orange-100 dark:bg-orange-900/50 border-orange-400/50 text-orange-800 dark:text-orange-200'
+                    : classificationRating === 'R18+' || classificationRating === 'RC'
+                      ? 'bg-red-100 dark:bg-red-900/50 border-red-400/50 text-red-800 dark:text-red-200'
+                      : 'bg-primary/10 border-primary/50 text-primary'
+
               return (
                 <div
                   className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
@@ -221,6 +246,17 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                     </>
                   ) : (
                     <p className="text-xs text-muted-foreground">No content warnings</p>
+                  )}
+                  {classificationRating && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold border ${pillClass}`}
+                        aria-label={`Content rating: ${classificationRating}`}
+                      >
+                        {classificationRating}
+                      </span>
+                      {ageLine && <span className="text-xs text-muted-foreground">{ageLine}</span>}
+                    </div>
                   )}
                   <a
                     href="#content-analysis"
@@ -314,7 +350,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                     by{" "}
                     {book.author ? (
                       <Link
-                        href={`/collection?author=${encodeURIComponent(book.author)}`}
+                        href={`/bookshelf?author=${encodeURIComponent(book.author)}`}
                         className="hover:text-foreground transition-colors underline-offset-4 hover:underline"
                       >
                         {book.author}
@@ -397,77 +433,6 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                                 <p className="text-xs text-muted-foreground border-t border-border pt-2">
                                   The Subtext Suitability Scale (SSS) reflects how emotionally intense a book may feel to sensitive readers.
                                 </p>
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </div>
-                    )
-                  })()}
-                  {/* Australian Classification Rating */}
-                  {(() => {
-                    const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
-                    const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
-
-                    // Generate explanation based on classification and warnings
-                    const getClassificationExplanation = (rating: string): { main: string; process: string; disclaimer: string } => {
-                      const severeCount = warnings.filter((w: any) => w.severity === 'severe').length
-                      const moderateCount = warnings.filter((w: any) => w.severity === 'moderate').length
-                      const mildCount = warnings.filter((w: any) => w.severity === 'mild').length
-
-                      let mainExplanation = ''
-                      switch (rating) {
-                        case 'G':
-                          mainExplanation = 'General: Suitable for all ages. Contains no material likely to offend or harm.'
-                          break
-                        case 'PG':
-                          mainExplanation = `Parental Guidance: May contain mild themes or content. ${mildCount > 0 ? `Includes ${mildCount} mild content warning${mildCount > 1 ? 's' : ''}.` : 'No specific content warnings.'}`
-                          break
-                        case 'M':
-                          mainExplanation = `Mature: Recommended for ages 15+. ${moderateCount > 0 ? `Contains ${moderateCount} moderate content warning${moderateCount > 1 ? 's' : ''}.` : severeCount > 0 ? `Contains ${severeCount} severe content warning${severeCount > 1 ? 's' : ''}.` : 'Contains mature themes.'}`
-                          break
-                        case 'MA15+':
-                          mainExplanation = `Mature Accompanied: Restricted to ages 15+. ${severeCount > 0 ? `Contains ${severeCount} severe content warning${severeCount > 1 ? 's' : ''} including graphic or intense content.` : moderateCount > 0 ? `Contains ${moderateCount} moderate content warning${moderateCount > 1 ? 's' : ''} with mature themes.` : 'Contains intense or graphic content.'}`
-                          break
-                        case 'R18+':
-                          mainExplanation = `Restricted: Adults only (18+). Contains explicit content including ${severeCount > 0 ? `${severeCount} severe warning${severeCount > 1 ? 's' : ''}` : 'graphic material'} that may be disturbing or offensive.`
-                          break
-                        default:
-                          mainExplanation = `Content Rating: ${rating}. Based on content analysis.`
-                      }
-
-                      const processExplanation = 'How it works: Our system analyzes the book\'s content and assigns severity scores (0.0-1.0) to each warning. The classification is determined by the highest severity found—severe warnings indicate MA15+/R18+, moderate indicates M, mild indicates PG, and no warnings indicates G.'
-
-                      const disclaimer = 'This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.'
-
-                      return { main: mainExplanation, process: processExplanation, disclaimer }
-                    }
-
-                    // When liveBookHref is set (sandbox), skip the small pill here; Age Recommendation box below is the single place for rating.
-                    return classificationRating && !liveBookHref && (
-                      <div className="flex items-center gap-2 mt-4">
-                        <span className="text-sm font-medium text-muted-foreground">Content Rating:</span>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="flex items-center gap-1.5 cursor-help">
-                                <span className="text-sm font-semibold bg-primary/10 text-primary px-3 py-1 rounded-full border border-primary/20">
-                                  {classificationRating}
-                                </span>
-                                <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent side="right" className="max-w-sm">
-                              <div className="text-sm space-y-3">
-                                <p>{getClassificationExplanation(classificationRating).main}</p>
-                                <div className="border-t border-border pt-2">
-                                  <p className="text-xs text-muted-foreground mb-2">
-                                    {getClassificationExplanation(classificationRating).process}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground italic">
-                                    {getClassificationExplanation(classificationRating).disclaimer}
-                                  </p>
-                                </div>
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -644,92 +609,6 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <BooktokWarningsSummary warnings={warnings} onWarningClick={handleWarningClick} />
               )}
 
-              {/* Age Rating - Prominent Display for Parents */}
-              {(() => {
-                const classificationTag = book.categories?.find((c: string) => c.startsWith('CLASSIFICATION:'))
-                const classificationRating = classificationTag ? classificationTag.replace('CLASSIFICATION:', '') : null
-
-                if (!classificationRating) {
-                  // Age rating will be calculated server-side during scan
-                  // If not present, it means the book hasn't been scanned with the new version yet
-                  return null
-                }
-
-                // Calculate age recommendation from rating
-                const ageRecommendations: Record<string, string> = {
-                  'G': 'Suitable for all ages',
-                  'PG': 'Recommended for ages 8+',
-                  'M': 'Recommended for ages 13+',
-                  'MA15+': 'Recommended for ages 15+',
-                  'R18+': 'Recommended for ages 18+',
-                  'RC': 'Not recommended - contains extreme content'
-                }
-                const ageRecommendation = ageRecommendations[classificationRating] || 'See content warnings below'
-
-                // Get key elements for display
-                const elementMap: Record<string, string> = {
-                  'violence': 'violence',
-                  'sexual_content': 'sex',
-                  'language': 'language',
-                  'substance_use_or_alcohol': 'drug use',
-                  'mental_health': 'themes',
-                  'abuse': 'themes',
-                  'emotional_abuse_or_toxic_relationships': 'themes',
-                  'death_or_grief': 'themes',
-                  'family_dynamics': 'themes'
-                }
-
-                const elementCounts: Record<string, number> = {}
-                warnings?.forEach((w: any) => {
-                  const cat = w.category_id || w.category || 'other'
-                  const element = elementMap[cat] || 'themes'
-                  elementCounts[element] = (elementCounts[element] || 0) + 1
-                })
-
-                const topElements = Object.entries(elementCounts)
-                  .sort(([, a], [, b]) => b - a)
-                  .slice(0, 3)
-                  .map(([element]) => element.charAt(0).toUpperCase() + element.slice(1))
-
-                const elementsText = topElements.length > 0 ? topElements.join(', ') : 'various themes'
-
-                return (
-                  <div
-                    className="mb-6 p-5 bg-primary/10 border-2 border-primary/30 rounded-xl max-w-2xl mx-auto"
-                    role="region"
-                    aria-label="Content age recommendation"
-                  >
-                    <div className="flex flex-wrap items-center gap-3 mb-3">
-                      <h3 className="text-base font-bold text-foreground uppercase tracking-wide">Age recommendation</h3>
-                      <span
-                        className="inline-flex items-center px-4 py-1.5 rounded-full text-xl font-bold bg-primary text-primary-foreground border-2 border-primary/50"
-                        aria-label={`Content rating: ${classificationRating}`}
-                      >
-                        {classificationRating}
-                      </span>
-                    </div>
-                    <p className="text-sm font-semibold text-foreground mb-2">{ageRecommendation}</p>
-                    <p className="text-xs text-foreground/80 mb-3">
-                      Based on analysis of {elementsText}.
-                    </p>
-                    <Collapsible className="group/rating">
-                      <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded px-1 -mx-1">
-                        How we determine this rating
-                        <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]/rating:rotate-180" aria-hidden />
-                      </CollapsibleTrigger>
-                      <CollapsibleContent className="mt-2 space-y-2">
-                        <p className="text-xs text-foreground/80 leading-relaxed">
-                          We follow Australian Classification Board methodology, assessing the six classifiable elements (themes, violence, sex, language, drug use, nudity) using impact factors such as emphasis, tone, frequency, context, and detail.
-                        </p>
-                        <p className="text-xs text-foreground/80 italic">
-                          This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.
-                        </p>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
-                )
-              })()}
-
               {/* Disclaimer (text-foreground/80 for WCAG AA contrast) */}
               <p className="text-sm text-foreground/80 italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
@@ -780,7 +659,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 focusWarningId={focusWarningId}
                 authorContentWarningsUrl={book?.author_content_warnings_url ?? null}
                 authorContentWarningsList={authorContentWarningsList ?? null}
-                displayVariant={contentDisplayVariant}
+                displayVariant={displayVariant}
               />
 
               {/* Feedback / Report Section */}

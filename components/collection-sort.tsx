@@ -22,7 +22,7 @@ export function CollectionSort() {
     } else {
       params.set("sort", value)
     }
-    router.push(`/collection?${params.toString()}`)
+    router.push(`/bookshelf?${params.toString()}`)
   }
 
   return (

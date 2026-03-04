@@ -9,10 +9,21 @@ export const runtime = 'nodejs'
  */
 export async function GET(req: NextRequest) {
   try {
-    // Get location from Vercel geo headers
-    const country = req.geo?.country || req.headers.get('x-vercel-ip-country')
-    const region = req.geo?.region || req.headers.get('x-vercel-ip-region')
+    // Get location from Vercel geo headers (absent on localhost)
+    let country = req.geo?.country || req.headers.get('x-vercel-ip-country')
+    let region = req.geo?.region || req.headers.get('x-vercel-ip-region')
     const city = req.geo?.city || req.headers.get('x-vercel-ip-city')
+
+    // Localhost / dev: no geo headers → treat as Australia so you're not "international"
+    const isLocal =
+      process.env.NODE_ENV !== 'production' ||
+      req.headers.get('host')?.startsWith('localhost') ||
+      req.headers.get('host')?.startsWith('127.0.0.1')
+    if (isLocal && !country) {
+      country = 'AU'
+      // Leave region null so state-specific services stay optional, or set e.g. 'NSW' to test state services
+      if (!region) region = null
+    }
 
     // Map Vercel region codes to Australian states
     // Vercel uses ISO region codes or city names

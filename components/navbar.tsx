@@ -30,7 +30,7 @@ const publicNavigation = [
 
 const productNavigation = [
   { name: "Scan", href: "/scan", icon: ScanBarcode },
-  { name: "Bookshelf", href: "/collection", icon: Library },
+  { name: "Bookshelf", href: "/bookshelf", icon: Library },
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
@@ -208,9 +208,9 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                   aria-label="Toggle theme"
                 >
                   {theme === 'dark' ? (
-                    <Sun className="h-4 w-4" />
+                    <Sun className="h-4 w-4" strokeWidth={1.5} />
                   ) : (
-                    <Moon className="h-4 w-4" />
+                    <Moon className="h-4 w-4" strokeWidth={1.5} />
                   )}
                 </Button>
               )}
@@ -246,16 +246,17 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       variant="outline"
                       className="font-mono text-[10px] text-muted-foreground hover:text-foreground cursor-pointer"
                       title="What’s new"
+                      suppressHydrationWarning
                     >
                       v{APP_VERSION}
                     </Badge>
                   </button>
                 </PopoverTrigger>
                 <PopoverContent align="end" className="w-80">
-                  <div className="space-y-3">
+                  <div className="space-y-3" suppressHydrationWarning>
                     <div className="flex items-baseline justify-between">
                       <div className="font-semibold text-sm">What’s new</div>
-                      <div className="text-[10px] text-muted-foreground font-mono">v{APP_VERSION}</div>
+                      <div className="text-[10px] text-muted-foreground font-mono" suppressHydrationWarning>v{APP_VERSION}</div>
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {APP_VERSION_LABEL} • Built {APP_BUILD_DATE}
@@ -287,13 +288,13 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       size="sm"
                       className="flex items-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
                     >
-                      <Code className="h-4 w-4" />
+                      <Code className="h-4 w-4" strokeWidth={1.5} />
                       <span className="hidden lg:inline">Dev</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel className="flex items-center gap-2">
-                      <Settings className="h-4 w-4" />
+                      <Settings className="h-4 w-4" strokeWidth={1.5} />
                       Developer Settings
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -301,7 +302,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       onClick={toggleAuditTrail}
                       className="flex items-center gap-2 cursor-pointer"
                     >
-                      <FileText className="h-4 w-4" />
+                      <FileText className="h-4 w-4" strokeWidth={1.5} />
                       <div className="flex-1">
                         <div className="font-medium">Show Audit Trail</div>
                         <div className="text-xs text-muted-foreground">
@@ -323,7 +324,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       onClick={toggleRefreshButton}
                       className="flex items-center gap-2 cursor-pointer"
                     >
-                      <RefreshCw className="h-4 w-4" />
+                      <RefreshCw className="h-4 w-4" strokeWidth={1.5} />
                       <div className="flex-1">
                         <div className="font-medium">Show Refresh Button</div>
                         <div className="text-xs text-muted-foreground">
@@ -345,7 +346,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       onClick={toggleSeverityScore}
                       className="flex items-center gap-2 cursor-pointer"
                     >
-                      <Calculator className="h-4 w-4" />
+                      <Calculator className="h-4 w-4" strokeWidth={1.5} />
                       <div className="flex-1">
                         <div className="font-medium">Show Severity Score</div>
                         <div className="text-xs text-muted-foreground">
@@ -368,7 +369,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                       onClick={toggleAdminControls}
                       className="flex items-center gap-2 cursor-pointer"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" strokeWidth={1.5} />
                       <div className="flex-1">
                         <div className="font-medium">Show Admin Controls</div>
                         <div className="text-xs text-muted-foreground">
@@ -389,7 +390,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href="/admin/batch-scan" className="flex items-center gap-2 cursor-pointer">
-                        <Layers className="h-4 w-4" />
+                        <Layers className="h-4 w-4" strokeWidth={1.5} />
                         <div className="flex-1">
                           <div className="font-medium">Batch Scanner</div>
                           <div className="text-xs text-muted-foreground">
@@ -401,7 +402,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href="/dev/check-covers" className="flex items-center gap-2 cursor-pointer">
-                        <ImageIcon className="h-4 w-4" />
+                        <ImageIcon className="h-4 w-4" strokeWidth={1.5} />
                         <div className="flex-1">
                           <div className="font-medium">Check Book Covers</div>
                           <div className="text-xs text-muted-foreground">
@@ -412,7 +413,7 @@ export function Navbar({ userMode = 'regular' }: { userMode?: 'admin' | 'vip' | 
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem className="flex items-center gap-2 cursor-default">
-                      <Info className="h-4 w-4" />
+                      <Info className="h-4 w-4" strokeWidth={1.5} />
                       <div className="flex-1">
                         <div className="font-medium">{APP_VERSION_LABEL}</div>
                         <div className="text-xs text-muted-foreground">

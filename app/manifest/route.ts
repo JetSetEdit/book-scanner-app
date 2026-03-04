@@ -37,7 +37,7 @@ export async function GET() {
         name: 'Bookshelf',
         short_name: 'Books',
         description: 'View your scanned books',
-        url: '/collection',
+        url: '/bookshelf',
         icons: [{ src: '/icon-192.png', sizes: '192x192' }],
       },
     ],

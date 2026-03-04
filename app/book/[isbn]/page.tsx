@@ -240,6 +240,7 @@ export default async function BookPage({ params }: BookPageProps) {
             metadataIssues={metadataIssues}
             noWarningsReasoning={noWarningsReasoning}
             authorContentWarningsList={authorContentWarningsList}
+            contentDisplayVariant="cards"
             analysisMeta={latestAudit ? {
               hadThinMetadata: !!latestAudit.had_thin_metadata,
               usedWebSearch: !!latestAudit.used_web_search,

@@ -377,7 +377,7 @@ export function RecentScans() {
           {scans.length > 8 && (
             <div className="mt-6 text-center">
               <Link
-                href="/collection"
+                href="/bookshelf"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
               >
                 View all scanned books →

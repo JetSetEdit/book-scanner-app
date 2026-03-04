@@ -52,6 +52,8 @@ export interface VariantConfig {
     showBookTokSummary?: boolean
     showReasoningInWarnings?: boolean
     showAffiliate?: boolean
+    /** Reddit-style spoiler tags: [text](/spoiler) or [text](#s) render as hover-to-reveal. */
+    showSpoilerTags?: boolean
   }
 }
 
@@ -100,6 +102,9 @@ const VARIANTS: Record<VariantId, VariantConfig> = {
       analysisSourceTitleCase: 'Automated',
       warningLabel: 'automated',
       reasoningSubject: "The system's",
+    },
+    flags: {
+      showSpoilerTags: true,
     },
   },
   libraries: {

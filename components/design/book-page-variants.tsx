@@ -164,7 +164,7 @@ export function BookPageSpacious({
             {book.title}
           </h1>
           <p className="text-xl md:text-2xl font-serif italic text-muted-foreground border-l-2 border-border pl-6 py-1">
-            by {book.author ? <Link href={`/collection?author=${encodeURIComponent(book.author)}`} className="hover:text-foreground">{book.author}</Link> : "Unknown Author"}
+            by {book.author ? <Link href={`/bookshelf?author=${encodeURIComponent(book.author)}`} className="hover:text-foreground">{book.author}</Link> : "Unknown Author"}
           </p>
           <div className="flex gap-2">
             <BuyButton isbn={book.isbn} />

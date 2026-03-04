@@ -106,7 +106,7 @@ export function BookAdminControls({ isbn, book, onDeleted }: BookAdminControlsPr
         onDeleted()
       } else {
         // Otherwise redirect to collection
-        router.push('/collection')
+        router.push('/bookshelf')
       }
     } catch (error) {
       console.error('Error deleting book:', error)

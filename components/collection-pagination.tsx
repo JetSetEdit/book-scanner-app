@@ -27,7 +27,7 @@ export function CollectionPagination({
     } else {
       params.set("page", page.toString())
     }
-    router.push(`/collection?${params.toString()}`)
+    router.push(`/bookshelf?${params.toString()}`)
     // Scroll to top of page
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }

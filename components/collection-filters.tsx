@@ -94,7 +94,7 @@ export function CollectionFilters({ counts, className }: CollectionFiltersProps)
         // Reset to page 1 when filters change
         params.delete("page")
 
-        router.push(`/collection?${params.toString()}`)
+        router.push(`/bookshelf?${params.toString()}`)
     }
 
     // Clear all filters
@@ -105,7 +105,7 @@ export function CollectionFilters({ counts, className }: CollectionFiltersProps)
         params.delete("category")
         params.delete("sss")
         params.delete("page")
-        router.push(`/collection?${params.toString()}`)
+        router.push(`/bookshelf?${params.toString()}`)
     }
 
     return (

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
@@ -28,8 +29,7 @@ import {
   Hash,
   Eye,
   EyeOff,
-  ChevronDown,
-  LogOut
+  ChevronDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ThumbsButtons } from "@/components/thumbs-buttons"
@@ -41,6 +41,7 @@ import { getVariantConfig } from "@/lib/config/variants"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { getWarningPhrase } from "@/lib/services/warning-phraser"
+import { SpoilerText } from "@/components/spoiler-text"
 
 interface ContentWarning {
   id: string
@@ -74,6 +75,8 @@ interface ContentWarningsListProps {
   authorContentWarningsUrl?: string | null
   /** Parsed list of warning strings from author's page; when set, display on site. */
   authorContentWarningsList?: string[] | null
+  /** Alternate layout: "cards" = disclosure list (one row per warning, expand for details; sandbox). */
+  displayVariant?: 'default' | 'cards'
 }
 
 const categoryLabels: Record<string, string> = {
@@ -166,7 +169,11 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId, authorContentWarningsUrl, authorContentWarningsList }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId, authorContentWarningsUrl, authorContentWarningsList, displayVariant = 'default' }: ContentWarningsListProps) {
+  const pathname = usePathname()
+  // Sandbox routes always use cards (disclosure rows with severity-colored bar)
+  const effectiveDisplayVariant = pathname?.includes("/sandbox/") ? "cards" : displayVariant
+
   const { preferences } = useUserPreferences()
   const tropeMode = preferences.tropeMode || 'both'
   const [requestSent, setRequestSent] = useState(false)
@@ -175,6 +182,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({})
   const [authorListOpen, setAuthorListOpen] = useState(false)
   const showReasoning = getVariantConfig().flags?.showReasoningInWarnings !== false
+  const showSpoilerTags = getVariantConfig().flags?.showSpoilerTags === true
 
   // Handle focus request
   useEffect(() => {
@@ -276,14 +284,6 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
     w.description.toLowerCase().includes('sexual violence')
   );
 
-  // Check for severe/moderate self-harm or suicide content for Quick Exit
-  const hasSevereSelfHarmOrSuicide = filteredWarnings.some(w => 
-    (w.category_id === 'mental_health' && w.subcategory_id && [
-      'suicide_minor', 'suicidal_ideation', 'self_harm'
-    ].includes(w.subcategory_id)) && 
-    (w.severity === 'moderate' || w.severity === 'severe')
-  );
-
   const hasLGBTIQAIssues = filteredWarnings.some(w =>
     // Check for LGBTQIA+ specific discrimination subcategories
     (w.category_id === 'discrimination' && w.subcategory_id && ['queerphobia', 'homophobia', 'transphobia', 'lesbophobia', 'biphobia', 'acephobia', 'misgendering'].includes(w.subcategory_id)) ||
@@ -347,14 +347,6 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
   const showSupportResources = hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief || hasBullying || hasRacism;
 
-  // Show quick exit button for highly sensitive content (domestic violence, sexual assault, abuse, suicide)
-  // Only show if user has enabled it in preferences
-  const showQuickExit = (hasAbuseOrViolence || hasSexualAssault || hasSevereSelfHarmOrSuicide) && (preferences.enableQuickExit !== false);
-
-  const handleQuickExit = () => {
-    window.location.href = 'https://www.google.com'
-  }
-
   // Fetch user location and state-specific services
   useEffect(() => {
     if (!showSupportResources) return
@@ -382,22 +374,6 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
         console.error('Failed to fetch user location:', err)
       })
   }, [showSupportResources])
-
-  // Handle Escape key for quick exit
-  useEffect(() => {
-    if (!showQuickExit) return
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleQuickExit()
-      }
-    }
-
-    window.addEventListener('keydown', handleEscape)
-    return () => {
-      window.removeEventListener('keydown', handleEscape)
-    }
-  }, [showQuickExit])
 
   const handleRequestAnalysis = async () => {
     if (requestSent) return
@@ -539,40 +515,8 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
   return (
     <TooltipProvider>
       <div className="space-y-16">
-      {/* Quick Exit Button - Floating for sensitive content */}
-      {showQuickExit && (
-        <div className="fixed top-4 right-4 z-50 md:top-6 md:right-6 pointer-events-auto">
-          <Button
-            onClick={handleQuickExit}
-            variant="outline"
-            size="sm"
-            className="bg-background/95 backdrop-blur-sm border-border/50 shadow-md hover:shadow-lg hover:border-destructive/50 hover:text-destructive transition-all animate-in fade-in slide-in-from-top-2 text-xs font-medium"
-            aria-label="Quick exit - leave this page immediately"
-            style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
-          >
-            <LogOut className="h-3.5 w-3.5 mr-1.5" />
-            Quick Exit
-          </Button>
-        </div>
-      )}
-
       {showSupportResources && (
-        <div className="bg-muted p-6 rounded-none border-l-2 border-border relative">
-          {/* Quick Exit Button - Inline for sensitive content */}
-          {showQuickExit && (
-            <div className="absolute top-4 right-4">
-              <Button
-                onClick={handleQuickExit}
-                variant="ghost"
-                size="sm"
-                className="text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
-                aria-label="Quick exit - leave this page immediately"
-              >
-                <LogOut className="h-3 w-3 mr-1.5" />
-                Quick Exit
-              </Button>
-            </div>
-          )}
+        <div className="bg-muted/50 dark:bg-muted/30 p-6 rounded-xl border border-border relative" role="region" aria-label="Support resources">
           <div className="flex items-start gap-4">
             <Phone className="h-5 w-5 text-foreground shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -590,25 +534,25 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                       <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
                     )}
                   </p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
                     {/* State-specific services first */}
                     {userState && stateServices?.mentalHealth && stateServices.mentalHealth.map((service: any, idx: number) => (
-                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                        {service.name}{service.phone && <span className="ml-1 font-semibold text-foreground tabular-nums">{service.phone}</span>}
                       </a>
                     ))}
                     {/* National services */}
-                <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
-                </a>
-                <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
-                </a>
-                <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                  Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
-                </a>
-                    <a href="https://mensline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      MensLine <span className="text-muted-foreground/60 ml-1">1300 78 99 78</span>
+                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Lifeline <span className="ml-1 font-semibold text-foreground tabular-nums">13 11 14</span>
+                    </a>
+                    <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Beyond Blue <span className="ml-1 font-semibold text-foreground tabular-nums">1300 22 4636</span>
+                    </a>
+                    <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Kids Helpline <span className="ml-1 font-semibold text-foreground tabular-nums">1800 55 1800</span>
+                    </a>
+                    <a href="https://mensline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      MensLine <span className="ml-1 font-semibold text-foreground tabular-nums">1300 78 99 78</span>
                     </a>
                   </div>
                 </div>
@@ -623,22 +567,20 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                       <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
                     )}
                   </p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {/* State-specific services first */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
                     {userState && stateServices?.domesticViolence && stateServices.domesticViolence.map((service: any, idx: number) => (
-                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                        {service.name}{service.phone && <span className="ml-1 font-semibold text-foreground tabular-nums">{service.phone}</span>}
                       </a>
                     ))}
-                    {/* National services */}
-                    <a href="https://www.1800respect.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      1800RESPECT <span className="text-muted-foreground/60 ml-1">1800 737 732</span>
+                    <a href="https://www.1800respect.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      1800RESPECT <span className="ml-1 font-semibold text-foreground tabular-nums">1800 737 732</span>
                     </a>
-                    <a href="https://www.dvconnect.org/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      DVConnect <span className="text-muted-foreground/60 ml-1">1800 811 811</span>
+                    <a href="https://www.dvconnect.org/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      DVConnect <span className="ml-1 font-semibold text-foreground tabular-nums">1800 811 811</span>
                     </a>
-                    <a href="https://www.safesteps.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Safe Steps <span className="text-muted-foreground/60 ml-1">1800 015 188</span>
+                    <a href="https://www.safesteps.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Safe Steps <span className="ml-1 font-semibold text-foreground tabular-nums">1800 015 188</span>
                     </a>
                   </div>
                 </div>
@@ -653,25 +595,23 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                       <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
                     )}
                   </p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {/* State-specific services first */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
                     {userState && stateServices?.lgbtqia && stateServices.lgbtqia.map((service: any, idx: number) => (
-                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                        {service.name}{service.phone && <span className="ml-1 font-semibold text-foreground tabular-nums">{service.phone}</span>}
                       </a>
                     ))}
-                    {/* National services */}
-                    <a href="https://qlife.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      QLife <span className="text-muted-foreground/60 ml-1">1800 184 527</span>
+                    <a href="https://qlife.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      QLife <span className="ml-1 font-semibold text-foreground tabular-nums">1800 184 527</span>
                     </a>
-                    <a href="https://www.minus18.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Minus18 <span className="text-muted-foreground/60 ml-1">Youth Support</span>
+                    <a href="https://www.minus18.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Minus18 <span className="ml-1 text-muted-foreground/80">Youth Support</span>
                     </a>
-                    <a href="https://switchboard.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Switchboard <span className="text-muted-foreground/60 ml-1">1800 184 527</span>
+                    <a href="https://switchboard.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Switchboard <span className="ml-1 font-semibold text-foreground tabular-nums">1800 184 527</span>
                     </a>
-                    <a href="https://www.transhub.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      TransHub <span className="text-muted-foreground/60 ml-1">Resources</span>
+                    <a href="https://www.transhub.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      TransHub <span className="ml-1 text-muted-foreground/80">Resources</span>
                     </a>
                   </div>
                 </div>
@@ -686,22 +626,20 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                       <span className="text-muted-foreground/60 ml-2 normal-case">({userState} services available)</span>
                     )}
                   </p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {/* State-specific services first */}
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
                     {userState && stateServices?.substanceUse && stateServices.substanceUse.map((service: any, idx: number) => (
-                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                        {service.name} {service.phone && <span className="text-muted-foreground/60 ml-1">{service.phone}</span>}
+                      <a key={idx} href={service.url} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                        {service.name}{service.phone && <span className="ml-1 font-semibold text-foreground tabular-nums">{service.phone}</span>}
                       </a>
                     ))}
-                    {/* National services */}
-                    <a href="https://adf.org.au/help-support/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Alcohol & Drug Foundation <span className="text-muted-foreground/60 ml-1">1300 85 85 84</span>
+                    <a href="https://adf.org.au/help-support/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Alcohol & Drug Foundation <span className="ml-1 font-semibold text-foreground tabular-nums">1300 85 85 84</span>
                     </a>
-                    <a href="https://www.directline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      DirectLine <span className="text-muted-foreground/60 ml-1">1800 888 236</span>
+                    <a href="https://www.directline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      DirectLine <span className="ml-1 font-semibold text-foreground tabular-nums">1800 888 236</span>
                     </a>
-                    <a href="https://www.counsellingonline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Counselling Online <span className="text-muted-foreground/60 ml-1">24/7 Support</span>
+                    <a href="https://www.counsellingonline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Counselling Online <span className="ml-1 text-muted-foreground/80">24/7 Support</span>
                     </a>
                   </div>
                 </div>
@@ -711,15 +649,15 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
               {hasGrief && (
                 <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse) ? "border-t border-border pt-4" : ""}>
                   <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Grief & Bereavement</p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <a href="https://www.griefline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      GriefLine <span className="text-muted-foreground/60 ml-1">1300 845 745</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
+                    <a href="https://www.griefline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      GriefLine <span className="ml-1 font-semibold text-foreground tabular-nums">1300 845 745</span>
                     </a>
-                    <a href="https://www.grief.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Australian Centre for Grief <span className="text-muted-foreground/60 ml-1">1800 642 066</span>
+                    <a href="https://www.grief.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Australian Centre for Grief <span className="ml-1 font-semibold text-foreground tabular-nums">1800 642 066</span>
                     </a>
-                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
+                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Lifeline <span className="ml-1 font-semibold text-foreground tabular-nums">13 11 14</span>
                     </a>
                   </div>
                 </div>
@@ -729,15 +667,15 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
               {hasBullying && (
                 <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief) ? "border-t border-border pt-4" : ""}>
                   <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Bullying Support</p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Kids Helpline <span className="text-muted-foreground/60 ml-1">1800 55 1800</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
+                    <a href="https://kidshelpline.com.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Kids Helpline <span className="ml-1 font-semibold text-foreground tabular-nums">1800 55 1800</span>
                     </a>
-                    <a href="https://www.esafety.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      eSafety <span className="text-muted-foreground/60 ml-1">Online Safety</span>
+                    <a href="https://www.esafety.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      eSafety <span className="ml-1 text-muted-foreground/80">Online Safety</span>
                     </a>
-                    <a href="https://bullyingnoway.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Bullying No Way <span className="text-muted-foreground/60 ml-1">Resources</span>
+                    <a href="https://bullyingnoway.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Bullying No Way <span className="ml-1 text-muted-foreground/80">Resources</span>
                     </a>
                   </div>
                 </div>
@@ -747,23 +685,23 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
               {hasRacism && (
                 <div className={(hasMentalHealth || hasAbuseOrViolence || hasSexualAssault || hasLGBTIQAIssues || hasSubstanceUse || hasGrief || hasBullying) ? "border-t border-border pt-4" : ""}>
                   <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wider">Racism & Discrimination</p>
-                  <div className="flex flex-wrap gap-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    <a href="https://humanrights.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Australian Human Rights <span className="text-muted-foreground/60 ml-1">1300 656 419</span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs font-medium text-muted-foreground">
+                    <a href="https://humanrights.gov.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Australian Human Rights <span className="ml-1 font-semibold text-foreground tabular-nums">1300 656 419</span>
                     </a>
-                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Lifeline <span className="text-muted-foreground/60 ml-1">13 11 14</span>
+                    <a href="https://www.lifeline.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Lifeline <span className="ml-1 font-semibold text-foreground tabular-nums">13 11 14</span>
                     </a>
-                    <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-                      Beyond Blue <span className="text-muted-foreground/60 ml-1">1300 22 4636</span>
+                    <a href="https://www.beyondblue.org.au/" target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline focus-visible:underline py-2.5 -my-2.5 px-1 -mx-1 rounded min-h-[44px] inline-flex items-center transition-colors">
+                      Beyond Blue <span className="ml-1 font-semibold text-foreground tabular-nums">1300 22 4636</span>
                     </a>
                   </div>
               </div>
               )}
 
               {/* General Support Note */}
-              <p className="text-[10px] text-muted-foreground/70 mt-4 italic">
-                All services are available 24/7. In an emergency, call 000.
+              <p className="text-xs text-muted-foreground mt-4">
+                All services are available 24/7. In an emergency, <strong className="text-foreground">call 000</strong>.
               </p>
             </div>
           </div>
@@ -782,14 +720,16 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
           </p>
           {authorContentWarningsList && authorContentWarningsList.length > 0 ? (
             <Collapsible open={authorListOpen} onOpenChange={setAuthorListOpen} className="space-y-2">
-              <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline">
+              <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded px-1 -mx-1">
                 Show list ({authorContentWarningsList.length} items; may contain spoilers)
                 <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-200", authorListOpen && "rotate-180")} aria-hidden />
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <ul className="list-disc pl-5 space-y-1.5 text-sm text-foreground mt-3 mb-3">
                   {authorContentWarningsList.map((item, i) => (
-                    <li key={i}>{item}</li>
+                    <li key={i}>
+                      {showSpoilerTags ? <SpoilerText text={item} /> : item}
+                    </li>
                   ))}
                 </ul>
                 <a
@@ -833,45 +773,107 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
         </section>
       )}
 
-      {/* Automated / system-generated warnings */}
-      {standardAiWarnings.length > 0 && (
-        <section>
+      {/* Automated / system-generated warnings — always show section in cards (sandbox) variant */}
+      {(standardAiWarnings.length > 0 || effectiveDisplayVariant === 'cards') && (
+        <section id="detailed-content-warnings" aria-labelledby="detailed-content-warnings-heading">
           <div className="flex items-center gap-2 mb-4 text-muted-foreground">
             <Sparkles className="h-4 w-4" />
-            <h3 className="font-semibold text-sm uppercase tracking-wide">Content analysis</h3>
+            <h3 id="detailed-content-warnings-heading" className="font-semibold text-sm uppercase tracking-wide">Detailed content warnings</h3>
           </div>
 
-          <div className="space-y-2">
-            {groupWarningsByCategory(standardAiWarnings).map((group) => (
-              <Collapsible 
-                key={group.category} 
-                open={openCategories[group.category] || false}
-                onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
-              >
-                <CollapsibleTrigger className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-muted/5 hover:bg-muted/40 transition-colors text-left">
-                  <div className="flex items-center gap-3">
-                    <CategoryIcon
-                      id={group.category}
-                      legacyCategory={group.category}
-                      className="h-4 w-4 text-muted-foreground"
-                    />
-                    <span className="font-medium text-sm">{group.categoryLabel}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {group.warnings.length}
-                    </Badge>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="min-w-0">
-                  <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
-                    {group.warnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} />
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </div>
+          {effectiveDisplayVariant === 'cards' ? (
+            <div className="space-y-3">
+              {standardAiWarnings.length > 0 ? (
+                (() => {
+                  const groups = groupWarningsByCategory(standardAiWarnings)
+                  return groups.map((group) => {
+                    const maxSeverity = group.warnings.some((w) => (w.severity ?? '').toString().toLowerCase() === 'severe')
+                      ? 'severe'
+                      : group.warnings.some((w) => (w.severity ?? '').toString().toLowerCase() === 'moderate')
+                        ? 'moderate'
+                        : 'mild'
+                    const severityBorder =
+                      maxSeverity === 'severe'
+                        ? 'border-l-red-500'
+                        : maxSeverity === 'moderate'
+                          ? 'border-l-orange-500'
+                          : 'border-l-amber-500'
+                    const severityBg =
+                      maxSeverity === 'severe'
+                        ? 'bg-red-500/5 dark:bg-red-500/10'
+                        : maxSeverity === 'moderate'
+                          ? 'bg-orange-500/5 dark:bg-orange-500/10'
+                          : 'bg-amber-500/5 dark:bg-amber-500/10'
+                    return (
+                      <Collapsible key={group.category} className="group/parent">
+                        <CollapsibleTrigger
+                          className={cn(
+                            "w-full flex items-center gap-3 rounded-tr-lg border border-border border-l-4 px-4 py-3.5 text-left transition-colors",
+                            severityBorder,
+                            "cursor-pointer list-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                            "bg-muted/30 hover:bg-muted/50 dark:bg-muted/20 dark:hover:bg-muted/40",
+                            severityBg
+                          )}
+                        >
+                          <CategoryIcon id={group.category} legacyCategory={group.category} className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="flex-1 text-sm font-medium text-foreground">
+                            <TagWithTooltip label={group.categoryLabel} className="inline-flex" showIcon={true} />
+                          </span>
+                          <Badge variant="secondary" className="text-xs font-normal shrink-0">
+                            {group.warnings.length}
+                          </Badge>
+                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 group-data-[state=open]/parent:rotate-180" aria-hidden />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="bg-muted/10 dark:bg-muted/5 pt-2 pb-3 px-3 space-y-2">
+                            {group.warnings.map((warning) => (
+                              <WarningDisclosure key={warning.id} warning={warning} isAi showReasoningInWarnings={showReasoning} />
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    )
+                  })
+                })()
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">No automated warnings for this book.</p>
+              )}
+            </div>
+          ) : (
+            standardAiWarnings.length > 0 && (
+              <div className="space-y-2">
+                {groupWarningsByCategory(standardAiWarnings).map((group) => (
+                  <Collapsible 
+                    key={group.category} 
+                    open={openCategories[group.category] || false}
+                    onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
+                  >
+                    <CollapsibleTrigger className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-muted/5 hover:bg-muted/40 transition-colors text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                      <div className="flex items-center gap-3">
+                        <CategoryIcon
+                          id={group.category}
+                          legacyCategory={group.category}
+                          className="h-4 w-4 text-muted-foreground"
+                        />
+                        <span className="font-medium text-sm">{group.categoryLabel}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          {group.warnings.length}
+                        </Badge>
+                      </div>
+                      <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="min-w-0">
+                      <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
+                        {group.warnings.map((warning) => (
+                          <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} />
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            )
+          )}
         </section>
       )}
 
@@ -883,37 +885,45 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
             <h3 className="font-semibold text-sm uppercase tracking-wide">Community Reports</h3>
           </div>
 
-          <div className="space-y-2">
-            {groupWarningsByCategory(communityWarnings).map((group) => (
-              <Collapsible 
-                key={group.category} 
-                open={openCategories[group.category] || false}
-                onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
-              >
-                <CollapsibleTrigger className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-muted/5 hover:bg-muted/40 transition-colors text-left">
-                  <div className="flex items-center gap-3">
-                    <CategoryIcon
-                      id={group.category}
-                      legacyCategory={group.category}
-                      className="h-4 w-4 text-muted-foreground"
-                    />
-                    <span className="font-medium text-sm">{group.categoryLabel}</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {group.warnings.length}
-                    </Badge>
-                  </div>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="min-w-0">
-                  <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
-                    {group.warnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
-                    ))}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
-          </div>
+          {effectiveDisplayVariant === 'cards' ? (
+            <div className="space-y-1">
+              {communityWarnings.map((warning) => (
+                <WarningDisclosure key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {groupWarningsByCategory(communityWarnings).map((group) => (
+                <Collapsible 
+                  key={group.category} 
+                  open={openCategories[group.category] || false}
+                  onOpenChange={(isOpen) => setOpenCategories(prev => ({ ...prev, [group.category]: isOpen }))}
+                >
+                  <CollapsibleTrigger className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-muted/5 hover:bg-muted/40 transition-colors text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+                    <div className="flex items-center gap-3">
+                      <CategoryIcon
+                        id={group.category}
+                        legacyCategory={group.category}
+                        className="h-4 w-4 text-muted-foreground"
+                      />
+                      <span className="font-medium text-sm">{group.categoryLabel}</span>
+                      <Badge variant="secondary" className="text-xs">
+                        {group.warnings.length}
+                      </Badge>
+                    </div>
+                    <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 data-[state=open]:rotate-180" />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="min-w-0">
+                    <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
+                      {group.warnings.map((warning) => (
+                        <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -927,6 +937,112 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       )}
       </div>
     </TooltipProvider>
+  )
+}
+
+/**
+ * Disclosure layout for displayVariant="cards" (sandbox). Approved design: one row per warning.
+ * Row = severity-colored left bar (red/orange/amber) + category icon + category name + chevron.
+ * Do not add "Content warning: … — Severity" or a horizontal dash line; keep icon + category only.
+ * Expand opens: description, Why?, thumbs. See docs/SANDBOX_BOOK_PAGE_CONTENT.md.
+ */
+function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = true }: { warning: ContentWarning; isAi?: boolean; showReasoningInWarnings?: boolean }) {
+  const [isRevealed, setIsRevealed] = useState(false)
+  const isSpoiler = warning.is_spoiler === true
+
+  let categoryLabel: string
+  let subcategoryLabel: string | null = null
+  try {
+    categoryLabel = (warning.category_id ? getCategoryById(warning.category_id)?.userLabel : null) || categoryLabels[warning.category] || warning.category || "Unknown"
+    if (warning.category_id && warning.subcategory_id) {
+      subcategoryLabel = getSubcategoryById(warning.category_id, warning.subcategory_id)?.userLabel ?? null
+    }
+  } catch {
+    categoryLabel = categoryLabels[warning.category] || warning.category || "Unknown"
+  }
+
+  const severity = (warning.severity ?? "mild").toString().toLowerCase() as "mild" | "moderate" | "severe"
+  const severityLabel = severity === "severe" ? "Severe" : severity === "moderate" ? "Moderate" : "Mild"
+  const descriptionText = (() => {
+    const phrase = getWarningPhrase(warning.category_id)
+    if (warning.description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) return warning.description
+    return `${phrase.replace("…", "")} ${warning.description.toLowerCase()}`
+  })()
+
+  const severityBorder =
+    severity === "severe"
+      ? "border-l-red-500"
+      : severity === "moderate"
+        ? "border-l-orange-500"
+        : "border-l-amber-500"
+  const severityBg =
+    severity === "severe"
+      ? "bg-red-500/5 dark:bg-red-500/10"
+      : severity === "moderate"
+        ? "bg-orange-500/5 dark:bg-orange-500/10"
+        : "bg-amber-500/5 dark:bg-amber-500/10"
+
+  return (
+    <Collapsible className="group">
+      <CollapsibleTrigger
+        className={cn(
+          "w-full flex items-center gap-3 rounded-tr-lg border border-border border-l-4 px-4 py-3.5 text-left transition-colors",
+          severityBorder,
+          "cursor-pointer list-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          "bg-muted/30 hover:bg-muted/50 dark:bg-muted/20 dark:hover:bg-muted/40",
+          severityBg
+        )}
+      >
+        {/* E-style: severity-colored bar + icon + category/subcategory (with definition tooltip) + chevron */}
+        <CategoryIcon id={warning.category_id} legacyCategory={warning.category} className="h-4 w-4 text-muted-foreground shrink-0" />
+        <span className="flex-1 text-sm font-medium text-foreground min-w-0">
+          {subcategoryLabel ? (
+            <>
+              <span className="text-muted-foreground">{categoryLabel}</span>
+              <span className="mx-1.5 text-muted-foreground/70" aria-hidden>—</span>
+              <TagWithTooltip label={subcategoryLabel} className="inline-flex" showIcon={true} />
+            </>
+          ) : (
+            <TagWithTooltip label={categoryLabel} className="inline-flex" showIcon={true} />
+          )}
+        </span>
+        <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180" aria-hidden />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className={cn("rounded-br-lg border-x border-b border-border border-l-4 px-4 py-4 space-y-3", severityBorder, "bg-muted/20 dark:bg-muted/10")}>
+          {isSpoiler && !isRevealed ? (
+            <div className="rounded-md bg-muted/50 border border-border p-3 text-center">
+              <p className="text-xs text-muted-foreground mb-2">This warning contains spoilers.</p>
+              <button type="button" onClick={() => setIsRevealed(true)} className="text-xs text-primary hover:underline font-medium">
+                Reveal
+              </button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground font-serif leading-relaxed">{descriptionText}</p>
+          )}
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {showReasoningInWarnings && warning.reasoning && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs text-muted-foreground hover:text-purple-600 dark:hover:text-purple-400 px-2">
+                    <Info className="h-3 w-3 mr-1" /> Why?
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="max-w-xs p-4 text-xs">
+                  <p>{warning.reasoning}</p>
+                </PopoverContent>
+              </Popover>
+            )}
+            <ThumbsButtons
+              warningId={warning.id}
+              helpfulCount={warning.helpful_count}
+              notHelpfulCount={warning.not_helpful_count}
+              userValidation={warning.user_validation}
+            />
+          </div>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 

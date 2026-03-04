@@ -44,7 +44,7 @@ export default async function HomePage() {
                 {v.homepage.ctaPrimary}
               </Button>
             </Link>
-            <Link href="/collection">
+            <Link href="/bookshelf">
               <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-border text-foreground hover:bg-accent hover:text-accent-foreground">
                 <Search className="mr-2 h-5 w-5" />
                 {v.homepage.ctaSecondary}

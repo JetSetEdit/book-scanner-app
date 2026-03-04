@@ -64,10 +64,7 @@ export function BooktokWarningsSummary({ warnings, onWarningClick }: BooktokWarn
     return { spiceLevel, triggers, tropes }
   }, [warnings])
 
-  // Don't render if empty (though rare for this app)
-  if (summary.spiceLevel === 0 && summary.triggers.length === 0 && summary.tropes.length === 0) {
-    return null
-  }
+  if (warnings.length === 0) return null
 
   const handleKeyDown = (e: React.KeyboardEvent, w: Warning) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -76,88 +73,132 @@ export function BooktokWarningsSummary({ warnings, onWarningClick }: BooktokWarn
     }
   }
 
+  const mildCount = warnings.filter(w => w.severity !== 'moderate' && w.severity !== 'severe').length
+  const moderateCount = warnings.filter(w => w.severity === 'moderate').length
+  const severeCount = warnings.filter(w => w.severity === 'severe').length
+
+  const subsectionLabel = "text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+
   return (
-    <div className="bg-muted/20 border border-border/50 rounded-3xl p-6 mb-8 space-y-6 backdrop-blur-sm shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold font-serif tracking-tight flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          Quick Glance
-        </h3>
-        
-        {/* Spice Meter */}
-        <div className="flex items-center gap-1.5 bg-background/50 px-3 py-1.5 rounded-full border border-border/50 shadow-sm">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mr-1">Spice</span>
-          {[1, 2, 3].map((level) => (
-            <Flame
-              key={level}
-              className={cn(
-                "h-4 w-4 transition-all",
-                level <= summary.spiceLevel 
-                  ? "fill-orange-500 text-orange-500" 
-                  : "text-muted-foreground/20"
-              )}
-            />
-          ))}
-        </div>
+    <div
+      className="max-w-2xl mx-auto mb-8 rounded-2xl border border-border/60 bg-muted/15 shadow-sm overflow-hidden"
+      role="region"
+      aria-label="Quick glance: content overview and key themes"
+    >
+      {/* Single header for the whole block */}
+      <div className="px-5 pt-4 pb-3 flex items-center gap-2 border-b border-border/50 bg-muted/10">
+        <BookOpen className="h-4 w-4 text-primary shrink-0" />
+        <h3 className="text-sm font-bold font-serif tracking-tight text-foreground">Quick Glance</h3>
       </div>
 
-      {/* Triggers Section */}
-      {summary.triggers.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-            <AlertTriangle className="h-3 w-3" />
-            <span>Key Triggers</span>
+      <div className="p-5 space-y-4">
+        {/* Row 1: Severity bar + legend and Spice on one line */}
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-0.5">
+            {warnings.map((w, i) => {
+              const severity = w.severity === 'severe' ? 'severe' : w.severity === 'moderate' ? 'moderate' : 'mild'
+              const bg = severity === 'severe' ? 'bg-red-500' : severity === 'moderate' ? 'bg-orange-500' : 'bg-amber-500'
+              const categoryLabel = (w.category_id || w.category || 'content').replace(/_/g, ' ')
+              return (
+                <span
+                  key={w.id || i}
+                  className={`inline-block h-4 min-w-[6px] flex-1 max-w-[18px] rounded-sm ${bg} border border-white/20 dark:border-black/20`}
+                  style={{ flexBasis: '8px' }}
+                  title={`${severity}: ${categoryLabel}`}
+                  aria-hidden
+                />
+              )
+            })}
           </div>
-          <div className="flex flex-wrap gap-2">
-            {summary.triggers.map((w, i) => (
-              <Badge 
-                key={i} 
-                variant={w.severity === 'severe' ? "destructive" : "secondary"}
-                className={cn(
-                  "px-3 py-1 text-xs font-medium border-transparent rounded-full shadow-sm",
-                  w.severity === 'severe' ? "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-300" : "",
-                  onWarningClick ? "cursor-pointer hover:opacity-80 transition-opacity hover:scale-105 active:scale-95" : ""
-                )}
-                onClick={() => onWarningClick?.(w)}
-                role={onWarningClick ? "button" : undefined}
-                tabIndex={onWarningClick ? 0 : undefined}
-                onKeyDown={(e) => handleKeyDown(e, w)}
-              >
-                {formatLabel(w)}
-              </Badge>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+            <div className="flex flex-wrap items-center gap-x-4 text-[10px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-sm bg-amber-500 border border-white/20" aria-hidden />
+                Mild {mildCount}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-sm bg-orange-500 border border-white/20" aria-hidden />
+                Moderate {moderateCount}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block w-2 h-2 rounded-sm bg-red-500 border border-white/20" aria-hidden />
+                Severe {severeCount}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="font-bold uppercase tracking-widest">Spice</span>
+              <span className="flex items-center gap-0.5">
+                {[1, 2, 3].map((level) => (
+                  <Flame
+                    key={level}
+                    className={cn(
+                      "h-3 w-3 transition-all",
+                      level <= summary.spiceLevel ? "fill-orange-500 text-orange-500" : "text-muted-foreground/20"
+                    )}
+                  />
+                ))}
+              </span>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Tropes Section */}
-      {summary.tropes.length > 0 && (
-        <div className="space-y-3">
-           <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-            <Heart className="h-3 w-3" />
-            <span>Tropes & Themes</span>
+        {/* Key Triggers — same subsection style */}
+        {summary.triggers.length > 0 && (
+          <div className="space-y-1.5">
+            <div className={cn("flex items-center gap-2", subsectionLabel)}>
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              <span>Key triggers</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {summary.triggers.map((w, i) => (
+                <Badge
+                  key={i}
+                  variant={w.severity === 'severe' ? "destructive" : "secondary"}
+                  className={cn(
+                    "px-2.5 py-0.5 text-xs font-medium rounded-full",
+                    w.severity === 'severe' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
+                    onWarningClick && "cursor-pointer hover:opacity-90"
+                  )}
+                  onClick={() => onWarningClick?.(w)}
+                  role={onWarningClick ? "button" : undefined}
+                  tabIndex={onWarningClick ? 0 : undefined}
+                  onKeyDown={(e) => handleKeyDown(e, w)}
+                >
+                  {formatLabel(w)}
+                </Badge>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {summary.tropes.map((w, i) => (
-              <Badge 
-                key={i} 
-                variant="outline"
-                className={cn(
-                  "px-3 py-1 text-xs font-medium bg-background/80 hover:bg-accent transition-all rounded-full border-border/60 shadow-sm",
-                  onWarningClick ? "cursor-pointer hover:scale-105 active:scale-95" : ""
-                )}
-                onClick={() => onWarningClick?.(w)}
-                role={onWarningClick ? "button" : undefined}
-                tabIndex={onWarningClick ? 0 : undefined}
-                onKeyDown={(e) => handleKeyDown(e, w)}
-              >
-                {formatLabel(w)}
-              </Badge>
-            ))}
+        )}
+
+        {/* Tropes & themes — same subsection style */}
+        {summary.tropes.length > 0 && (
+          <div className="space-y-1.5">
+            <div className={cn("flex items-center gap-2", subsectionLabel)}>
+              <Heart className="h-3 w-3 shrink-0" />
+              <span>Tropes & themes</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {summary.tropes.map((w, i) => (
+                <Badge
+                  key={i}
+                  variant="outline"
+                  className={cn(
+                    "px-2.5 py-0.5 text-xs font-medium rounded-full border-border/60 bg-background/60",
+                    onWarningClick && "cursor-pointer hover:bg-muted/50"
+                  )}
+                  onClick={() => onWarningClick?.(w)}
+                  role={onWarningClick ? "button" : undefined}
+                  tabIndex={onWarningClick ? 0 : undefined}
+                  onKeyDown={(e) => handleKeyDown(e, w)}
+                >
+                  {formatLabel(w)}
+                </Badge>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

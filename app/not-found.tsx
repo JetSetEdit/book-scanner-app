@@ -29,7 +29,7 @@ export default function NotFound() {
                   Scan a book
                 </Button>
               </Link>
-              <Link href="/collection">
+              <Link href="/bookshelf">
                 <Button variant="ghost" className="w-full sm:w-auto gap-2">
                   <Library className="h-4 w-4" />
                   Browse collection

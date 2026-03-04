@@ -9,6 +9,130 @@ export type ChangelogEntry = {
 // The version bump hook updates APP_VERSION, but does not auto-generate release notes.
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.03.76",
+    date: "2026-03-04",
+    title: "New features",
+    changes: [
+      "Detailed content warnings grouped by parent, live+sandbox cards, remove Quick Exit",
+      "Above-fold content summary + gentle collapsible animation",
+      "Author content warnings (URL + stored list, collapsed, author vs AI comparison)",
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Skip paywall for VIP invite users (entitlements API + scan page check)"
+    ],
+  },
+  {
+    version: "1.03.75",
+    date: "2026-03-04",
+    title: "New features",
+    changes: [
+      "Above-fold content summary + gentle collapsible animation",
+      "Author content warnings (URL + stored list, collapsed, author vs AI comparison)",
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Skip paywall for VIP invite users (entitlements API + scan page check)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.74",
+    date: "2026-03-04",
+    title: "New features",
+    changes: [
+      "Author content warnings (URL + stored list, collapsed, author vs AI comparison)",
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Skip paywall for VIP invite users (entitlements API + scan page check)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.73",
+    date: "2026-03-03",
+    title: "New features",
+    changes: [
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Skip paywall for VIP invite users (entitlements API + scan page check)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.72",
+    date: "2026-03-03",
+    title: "New features",
+    changes: [
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Skip paywall for VIP invite users (entitlements API + scan page check)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.71",
+    date: "2026-03-03",
+    title: "New features",
+    changes: [
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Skip paywall for VIP invite users (entitlements API + scan page check)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.70",
+    date: "2026-03-03",
+    title: "New features",
+    changes: [
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.69",
+    date: "2026-03-03",
+    title: "New features",
+    changes: [
+      "Unlimited scan credits for VIP (invite code)",
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.68",
+    date: "2026-03-03",
+    title: "New feature",
+    changes: [
+      "Master invite code reusable (wnw40f1hg3ccnyx4fdqw)",
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.67",
+    date: "2026-03-03",
+    title: "Improvements",
+    changes: [
+      "Add fetchBookByISBNWithRetry and fetchByTitleAuthor to book-api; add reset-invite script"
+    ],
+  },
+  {
+    version: "1.03.66",
+    date: "2026-03-03",
+    title: "Improvements",
+    changes: [
+      "Various improvements and bug fixes"
+    ],
+  },
+  {
+    version: "1.03.65",
+    date: "2026-03-03",
+    title: "New feature",
+    changes: [
+      "User-facing changes (uncommitted changes detected)"
+    ],
+  },
+  {
     version: "1.03.63",
     date: "2026-03-03",
     title: "New features",

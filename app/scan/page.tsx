@@ -786,21 +786,6 @@ function ScanTestPageContent() {
                       Show camera scanner by default
                     </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="enable-quick-exit"
-                      checked={preferences.enableQuickExit !== false}
-                      onCheckedChange={(checked) => {
-                        updatePreference('enableQuickExit', checked === true)
-                      }}
-                    />
-                    <Label
-                      htmlFor="enable-quick-exit"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Enable Quick Exit button for sensitive content
-                    </Label>
-                  </div>
                   <p className="text-xs text-muted-foreground ml-6">
                     If camera scanning is unreliable, you can keep manual ISBN entry as your default. If permission prompts get stuck, try refreshing or checking your browser’s camera permissions.
                   </p>
