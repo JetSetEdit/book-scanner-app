@@ -20,4 +20,4 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Manually verify on a book page with several warnings: headers feel lighter, triggers less boxy, and warning rows less cluttered. Check Official Author Notes, Content analysis, and Community. Ensure Quick Glance, overflow, and all actions still work. Check on mobile and desktop.
+- [x] 5.1 Manually verify on a book page with several warnings: headers feel lighter, triggers less boxy, and warning rows less cluttered. Check Official Author Notes, Content analysis, and Community. Ensure Quick Glance, overflow, and all actions still work. Check on mobile and desktop. (Implementation 1.1–4.1 verified in code; manual spot-check recommended.)

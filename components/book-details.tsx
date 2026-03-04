@@ -38,6 +38,10 @@ interface BookDetailsProps {
   } | null
   noWarningsReasoning?: string | null // Dev mode: reasoning when no warnings were found
   authorContentWarningsList?: string[] | null // Parsed list from author_content_warnings_url
+  /** When "cards", content warnings render as disclosure list (e.g. sandbox). */
+  contentDisplayVariant?: 'default' | 'cards'
+  /** When set, nav shows "View live page" link to this href instead of "Back to Bookshelf" (sandbox). */
+  liveBookHref?: string | null
   analysisMeta?: {
     hadThinMetadata: boolean
     usedWebSearch: boolean
@@ -56,7 +60,7 @@ function isDevMode(): boolean {
   )
 }
 
-export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning, authorContentWarningsList, analysisMeta }: BookDetailsProps) {
+export function BookDetails({ book, warnings, analysisStatus = 'unknown', metadataIssues, noWarningsReasoning, authorContentWarningsList, contentDisplayVariant = 'default', liveBookHref, analysisMeta }: BookDetailsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isAuditOpen, setIsAuditOpen] = useState(false)
@@ -117,13 +121,24 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
       <div className="container mx-auto px-4 py-12 max-w-6xl">
         {/* Navigation */}
         <div className="mb-12 flex items-center justify-between border-b border-border pb-4">
-          <Button
-            variant="ghost"
-            onClick={() => router.back()}
-            className="text-muted-foreground hover:text-foreground hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
-          >
-            ← Back to Bookshelf
-          </Button>
+          {liveBookHref ? (
+            <Link href={liveBookHref}>
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
+              >
+                ← View live page
+              </Button>
+            </Link>
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="text-muted-foreground hover:text-foreground hover:bg-transparent pl-0 text-xs font-bold tracking-widest uppercase transition-colors"
+            >
+              ← Back to Bookshelf
+            </Button>
+          )}
           <div className="flex items-center gap-4">
             <Link href="/scan">
               <Button variant="outline" size="sm" className="gap-2 text-xs font-bold tracking-widest uppercase">
@@ -140,8 +155,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
         <div className="grid lg:grid-cols-[380px_1fr] gap-8 lg:gap-16 items-start">
           {/* Left Column: Cover & Specs */}
           <div className="space-y-8 lg:sticky lg:top-8">
-            {/* Cover Image - Sharp, elegant shadow */}
-            <div className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-muted">
+            {/* Section: Book cover. Any future badge overlaying the cover MUST use non-overlapping placement, descriptive aria-label, and keyboard-focusable control with visible focus ring. */}
+            <section id="book-cover" aria-label="Book cover" className="relative aspect-[2/3] w-full shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] bg-muted">
               {book.cover_url ? (
                 <img
                   src={book.cover_url.startsWith('http')
@@ -168,13 +183,60 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   <span className="font-serif italic text-sm">Cover unavailable</span>
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Specs Table - Clean, Modernist lines */}
-            <div className="border-t-2 border-border pt-6">
-              <h3 className="font-sans text-xs font-bold uppercase tracking-widest mb-6 text-muted-foreground">
+            {/* Content at a glance: severity bar + counts under cover, above Specifications */}
+            {(() => {
+              const hasWarnings = Array.isArray(warnings) && warnings.length > 0
+              const noWarningsComplete = analysisStatus === 'complete' && Array.isArray(warnings) && warnings.length === 0
+              if (!hasWarnings && !noWarningsComplete) return null
+              const mildCount = hasWarnings ? warnings.filter((w: any) => w.severity !== 'moderate' && w.severity !== 'severe').length : 0
+              const moderateCount = hasWarnings ? warnings.filter((w: any) => w.severity === 'moderate').length : 0
+              const severeCount = hasWarnings ? warnings.filter((w: any) => w.severity === 'severe').length : 0
+              return (
+                <div
+                  className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
+                  role="region"
+                  aria-label="Content at a glance"
+                >
+                  {hasWarnings ? (
+                    <>
+                      <div className="flex flex-wrap gap-0.5 mb-2">
+                        {warnings.map((w: any, i: number) => {
+                          const severity = w.severity === 'severe' ? 'severe' : w.severity === 'moderate' ? 'moderate' : 'mild'
+                          const bg = severity === 'severe' ? 'bg-red-500' : severity === 'moderate' ? 'bg-orange-500' : 'bg-amber-500'
+                          return (
+                            <span
+                              key={w.id || i}
+                              className={`inline-block h-3 min-w-[6px] flex-1 max-w-[14px] rounded-sm ${bg} border border-white/20 dark:border-black/20`}
+                              style={{ flexBasis: '6px' }}
+                              aria-hidden
+                            />
+                          )
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Mild {mildCount} · Moderate {moderateCount} · Severe {severeCount}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No content warnings</p>
+                  )}
+                  <a
+                    href="#content-analysis"
+                    className="mt-2 inline-block text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                  >
+                    See full content analysis
+                  </a>
+                </div>
+              )
+            })()}
+
+            {/* Section: Specifications (non-heading label so outline is h1 → h2 Content analysis → h3) */}
+            <section id="specifications" aria-label="Book specifications" className="border-t-2 border-border pt-6">
+              <p className="font-sans text-xs font-bold uppercase tracking-widest mb-6 text-muted-foreground" aria-hidden="true">
                 Specifications
-              </h3>
+              </p>
               <div className="space-y-4 font-sans text-sm">
                 <div className="flex justify-between items-baseline border-b border-border pb-2">
                   <span className="font-medium text-muted-foreground">ISBN</span>
@@ -199,13 +261,13 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   </div>
                 )}
               </div>
-            </div>
+            </section>
           </div>
 
           {/* Right Column: Content */}
           <div className="space-y-12">
-            {/* Header */}
-            <div className="space-y-6">
+            {/* Section: Book info (title, author, ratings) */}
+            <section id="book-info" aria-label="Book information" className="space-y-6">
               {/* Categories as Modernist Pills */}
               {book.categories && (
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -381,7 +443,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                       return { main: mainExplanation, process: processExplanation, disclaimer }
                     }
 
-                    return classificationRating && (
+                    // When liveBookHref is set (sandbox), skip the small pill here; Age Recommendation box below is the single place for rating.
+                    return classificationRating && !liveBookHref && (
                       <div className="flex items-center gap-2 mt-4">
                         <span className="text-sm font-medium text-muted-foreground">Content Rating:</span>
                         <TooltipProvider>
@@ -416,12 +479,14 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 {/* Severity Score Badge - Dev Only */}
                 <div className="flex-shrink-0">
                   <SeverityScoreBadge warnings={warnings || []} bookTitle={book.title} />
-                </div>
               </div>
             </div>
+            </section>
 
-            {/* Synopsis */}
-            {book.description && (() => {
+            {/* Section: Synopsis */}
+            {book.description && (
+            <section id="synopsis" aria-label="Synopsis">
+            {(() => {
               const cleanDescription = book.description.replace(/<[^>]*>?/gm, '')
               const shouldTruncate = cleanDescription.length > DESCRIPTION_TRUNCATE_LENGTH
 
@@ -477,6 +542,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 </div>
               )
             })()}
+            </section>
+            )}
 
             {/* Metadata Issues - Dev mode only */}
             {isDev && metadataIssues && (metadataIssues.missingCover || metadataIssues.missingDescription) && (
@@ -507,11 +574,11 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               </div>
             )}
 
-            {/* Content Warnings - The "Feature" Block */}
-            <div className="mt-16">
+            {/* Section: Content Analysis (warnings, age recommendation, list) */}
+            <section id="content-analysis" aria-label="Content analysis" className="mt-16">
               <div className="flex items-center gap-4 mb-4">
                 <div className="h-px bg-border flex-1"></div>
-                <h3 className="font-serif text-2xl text-foreground italic">Content Analysis</h3>
+                <h2 className="font-serif text-2xl text-foreground italic">Content Analysis</h2>
                 <div className="h-px bg-border flex-1"></div>
               </div>
 
@@ -572,7 +639,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 </div>
               )}
 
-              {/* Quick Glance Summary (hidden in lite) */}
+              {/* Quick Glance (includes severity overview bar + key triggers / tropes / spice) */}
               {getVariantConfig().flags?.showBookTokSummary !== false && warnings && warnings.length > 0 && (
                 <BooktokWarningsSummary warnings={warnings} onWarningClick={handleWarningClick} />
               )}
@@ -627,24 +694,44 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 const elementsText = topElements.length > 0 ? topElements.join(', ') : 'various themes'
 
                 return (
-                  <div className="mb-6 p-4 bg-primary/10 border-2 border-primary/30 rounded-lg max-w-2xl mx-auto">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-bold text-foreground">Age Recommendation</h3>
-                      <span className="text-2xl font-bold text-primary">{classificationRating}</span>
+                  <div
+                    className="mb-6 p-5 bg-primary/10 border-2 border-primary/30 rounded-xl max-w-2xl mx-auto"
+                    role="region"
+                    aria-label="Content age recommendation"
+                  >
+                    <div className="flex flex-wrap items-center gap-3 mb-3">
+                      <h3 className="text-base font-bold text-foreground uppercase tracking-wide">Age recommendation</h3>
+                      <span
+                        className="inline-flex items-center px-4 py-1.5 rounded-full text-xl font-bold bg-primary text-primary-foreground border-2 border-primary/50"
+                        aria-label={`Content rating: ${classificationRating}`}
+                      >
+                        {classificationRating}
+                      </span>
                     </div>
-                    <p className="text-sm font-semibold text-foreground mb-1">{ageRecommendation}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Based on analysis of {elementsText}. This rating follows Australian Classification Board methodology, assessing the six classifiable elements (themes, violence, sex, language, drug use, nudity) based on impact factors including emphasis, tone, frequency, context, detail, and cumulative effect.
+                    <p className="text-sm font-semibold text-foreground mb-2">{ageRecommendation}</p>
+                    <p className="text-xs text-foreground/80 mb-3">
+                      Based on analysis of {elementsText}.
                     </p>
-                    <p className="text-xs text-muted-foreground italic mt-2">
-                      This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.
-                    </p>
+                    <Collapsible className="group/rating">
+                      <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-xs font-medium text-foreground/80 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded px-1 -mx-1">
+                        How we determine this rating
+                        <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]/rating:rotate-180" aria-hidden />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-2 space-y-2">
+                        <p className="text-xs text-foreground/80 leading-relaxed">
+                          We follow Australian Classification Board methodology, assessing the six classifiable elements (themes, violence, sex, language, drug use, nudity) using impact factors such as emphasis, tone, frequency, context, and detail.
+                        </p>
+                        <p className="text-xs text-foreground/80 italic">
+                          This is an indicative rating only. We have no association with the Australian Classification Board and this is not an official rating.
+                        </p>
+                      </CollapsibleContent>
+                    </Collapsible>
                   </div>
                 )
               })()}
 
-              {/* Disclaimer */}
-              <p className="text-sm text-muted-foreground italic mb-6 text-center max-w-2xl mx-auto">
+              {/* Disclaimer (text-foreground/80 for WCAG AA contrast) */}
+              <p className="text-sm text-foreground/80 italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
               </p>
 
@@ -676,13 +763,12 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 </Collapsible>
               )}
 
-              {/* Dynamic Reader Summary (hidden in lite) */}
+              {/* Dynamic Reader Summary: lead line above the list (hidden in lite; text-foreground/80 for WCAG AA) */}
               {getVariantConfig().flags?.showBookTokSummary !== false && warnings && warnings.length > 0 && (
-                <div className="mb-8 p-6 bg-muted/30 border border-border rounded-lg">
-                  <p className="text-base leading-relaxed font-serif text-foreground italic">
-                    {generateSummary(warnings)}
-                  </p>
-                </div>
+                <p className="mb-6 text-sm text-foreground/80 font-serif italic border-l-2 border-border pl-4">
+                  <span className="text-foreground font-medium not-italic">In short: </span>
+                  {generateSummary(warnings)}
+                </p>
               )}
 
               <ContentWarningsList
@@ -694,17 +780,18 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 focusWarningId={focusWarningId}
                 authorContentWarningsUrl={book?.author_content_warnings_url ?? null}
                 authorContentWarningsList={authorContentWarningsList ?? null}
+                displayVariant={contentDisplayVariant}
               />
 
               {/* Feedback / Report Section */}
-              <div className="mt-12 pt-8 border-t border-border">
+              <div id="feedback" className="mt-12 pt-8 border-t border-border">
                 <div className="flex flex-col items-center justify-center">
                   <FeedbackDialog
                     trigger={
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent"
+                        className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
                         <Flag className="h-3.5 w-3.5 mr-1.5" />
                         Found an error? Report this book.
@@ -724,7 +811,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                   />
                 </div>
               </div>
-            </div>
+            </section>
 
             {/* Source Attribution (TOS Compliance) */}
             {/* Note: We display Google Books attribution by default as it's the primary source.
