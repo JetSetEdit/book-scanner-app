@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { BookOpen } from "lucide-react"
 import { BookCardAdmin } from "@/components/book-card-admin"
+import { NoCoverPlaceholder } from "@/components/no-cover-placeholder"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
 
 const SPINE_WIDTH = 44
@@ -140,10 +140,7 @@ export function BookshelfSpineCard({ book }: BookshelfSpineCardProps) {
                   sizes="88px"
                 />
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground bg-muted/40">
-                  <BookOpen className="h-8 w-8 text-muted-foreground/50" />
-                  <span className="text-[10px]">No cover</span>
-                </div>
+                <NoCoverPlaceholder size="sm" className="gap-1" />
               )}
             </div>
             <div className="flex-1 min-w-0 p-2 flex flex-col justify-between">

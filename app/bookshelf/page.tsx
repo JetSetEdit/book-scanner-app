@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Library, Shield, ScanBarcode, HelpCircle, CheckCircle2 } from "lucide-react"
+import { BookOpen, Library, Shield, ScanBarcode, HelpCircle, CheckCircle2, PenLine, Sparkles, Users } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { RefreshBookButtonWrapper } from "@/components/refresh-book-button-wrapper"
@@ -9,6 +9,8 @@ import { CollectionSort } from "@/components/collection-sort"
 import { CollectionPagination } from "@/components/collection-pagination"
 import { compareBySeverity } from "@/lib/utils/severity-scoring"
 import { BookCardAdmin } from "@/components/book-card-admin"
+import { BookshelfLegendChipSources } from "@/components/bookshelf-legend-chip-sources"
+import { NoCoverPlaceholder } from "@/components/no-cover-placeholder"
 
 // Canonical path for bookshelf (nav, links, redirects)
 export const BOOKSHELF_PATH = "/bookshelf"
@@ -30,6 +32,14 @@ function getContentWarningSummary(contentWarnings?: any[]): { severe: number; mo
     else if (warning.severity === 'mild') acc.mild++
     return acc
   }, { severe: 0, moderate: 0, mild: 0 })
+}
+
+// Max severity for card accent (severe > moderate > mild)
+function getMaxSeverity(summary: { severe: number; moderate: number; mild: number }): 'severe' | 'moderate' | 'mild' | null {
+  if (summary.severe > 0) return 'severe'
+  if (summary.moderate > 0) return 'moderate'
+  if (summary.mild > 0) return 'mild'
+  return null
 }
 
 interface BookshelfPageProps {
@@ -55,7 +65,10 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
       content_warnings (
         id,
         description,
-        severity
+        severity,
+        source,
+        is_author_verified,
+        user_id
       ),
       ai_audit_logs!left (
         id,
@@ -154,11 +167,11 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 sm:py-10 overflow-x-hidden">
+      <div className="container mx-auto px-4 py-6 sm:py-8 overflow-x-hidden">
         <div className="max-w-6xl mx-auto w-full">
           {/* Header: calm hierarchy, warm tone */}
-          <header className="mb-8 sm:mb-10">
-            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-6">
+          <header className="mb-5 sm:mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
               <div className="min-w-0">
                 <h1 className="text-2xl sm:text-3xl font-serif font-semibold tracking-tight text-foreground flex items-center gap-3">
                   <span className="flex items-center justify-center w-11 h-11 rounded-2xl bg-card border border-border shadow-sm" aria-hidden>
@@ -192,24 +205,25 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
               </div>
             </div>
 
-            {/* Legend: matches card dots (each dot = one warning; color = severity) */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 py-3 text-muted-foreground border-b border-border/50">
+            {/* Legend: chip colors mirrored in text and dots so mapping is obvious */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 py-2 text-muted-foreground border-b border-border/50">
               <span className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/90">Severity</span>
               <div className="flex flex-wrap items-center gap-4 sm:gap-6 font-sans text-[11px]">
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-1.5 w-1.5 rounded-sm bg-amber-400/90" aria-hidden />
-                  <span className="font-medium text-muted-foreground">Mild</span>
+                  <span className="font-medium text-amber-400 dark:text-amber-400/90">Mild</span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-1.5 w-1.5 rounded-sm bg-amber-600/90" aria-hidden />
-                  <span className="font-medium text-muted-foreground">Moderate</span>
+                  <span className="font-medium text-amber-600 dark:text-amber-600/90">Moderate</span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <span className="inline-block h-1.5 w-1.5 rounded-sm bg-red-500/90" aria-hidden />
-                  <span className="font-medium text-muted-foreground">Severe</span>
+                  <span className="font-medium text-red-500 dark:text-red-500/90">Severe</span>
                 </span>
               </div>
               <span className="text-[10px] text-muted-foreground/80">Each dot = one content warning</span>
+              <BookshelfLegendChipSources />
             </div>
           </header>
 
@@ -252,7 +266,7 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
                 rows.push(sortedBooks.slice(i, i + BOOKS_PER_ROW))
               }
               return rows.map((rowBooks, rowIndex) => (
-                <div key={rowIndex} className="mb-8 last:mb-0">
+                <div key={rowIndex} className="mb-6 last:mb-0">
                   <div className="flex flex-wrap justify-center gap-6 sm:gap-8" style={{ gap: "clamp(1rem, 4vw, 2rem)" }}>
                     {rowBooks.map((book) => {
                       const warningSummary = getContentWarningSummary(book.content_warnings)
@@ -272,9 +286,50 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
                       const isAnalyzed = hasAuditLog || hasAiWarnings
                       const classificationRating = getClassificationFromCategories(book.categories || undefined)
 
+                      const maxSeverity = getMaxSeverity(warningSummary)
+                      const severityChipStyle = maxSeverity === 'severe'
+                        ? 'bg-red-500/95 text-white border-red-600/80'
+                        : maxSeverity === 'moderate'
+                          ? 'bg-amber-600/95 text-white border-amber-700/80'
+                          : maxSeverity === 'mild'
+                            ? 'bg-amber-400/95 text-foreground/90 border-amber-500/80'
+                            : isAnalyzed
+                              ? 'bg-muted text-muted-foreground border-border'
+                              : ''
+                      const severityLabel = maxSeverity === 'severe' ? 'Severe' : maxSeverity === 'moderate' ? 'Moderate' : maxSeverity === 'mild' ? 'Mild' : isAnalyzed ? 'None' : null
+                      const warningsForSource = (book.content_warnings as any[]) || []
+                      const hasAuthorFromWarnings = warningsForSource.some((w: any) => w.is_author_verified === true || w.is_author_approved === true || w.source === 'author_website' || w.source === 'author_approved')
+                      const hasAuthorFromBook = !!(book as any).author_content_warnings_list?.length || !!(book as any).author_content_warnings_url
+                      const hasAuthor = hasAuthorFromWarnings || hasAuthorFromBook
+                      const hasAI = warningsForSource.some((w: any) => w.source === 'ai_generated') || (isAnalyzed && warningsForSource.length > 0 && !warningsForSource.some((w: any) => w.source === 'user_submitted' || (w.user_id != null && w.user_id !== '')))
+                      const hasCommunity = warningsForSource.some((w: any) => w.source === 'user_submitted' || (w.user_id != null && w.user_id !== ''))
+                      const sourceParts: string[] = []
+                      if (hasAuthor) sourceParts.push('Author')
+                      if (hasAI) sourceParts.push('AI')
+                      if (hasCommunity) sourceParts.push('Community')
+                      const sourceLabel = sourceParts.length > 0 ? sourceParts.join(' + ') : (isAnalyzed ? 'AI' : null)
+
                       return (
                         <Link key={book.id} href={`/book/${book.isbn}`} className="block w-[140px] sm:w-[160px] h-[358px] sm:h-[384px] group flex-shrink-0">
-                          <div className="relative rounded-xl overflow-hidden border border-border/70 bg-card/80 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-200 flex flex-col h-full">
+                          <div className="relative rounded-xl overflow-hidden border border-border/70 bg-card/80 shadow-sm hover:shadow-md hover:scale-[1.02] transition-all duration-200 flex flex-col h-full ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                            {/* Severity chip: label + up to 3 source icons (Author, AI, Community) */}
+                            {severityLabel && (
+                              <span
+                                className={`absolute top-1.5 left-1.5 z-10 flex items-center gap-0.5 px-1.5 py-[2px] rounded-sm text-[9px] font-semibold uppercase tracking-wide border shrink-0 min-w-0 ${severityChipStyle}`}
+                                style={{ maxWidth: 'calc(100% - 0.5rem)' }}
+                                title={sourceLabel ? `Severity: ${severityLabel}. Sources: ${sourceLabel}.` : `Severity: ${severityLabel}.`}
+                                aria-label={sourceLabel ? `Severity: ${severityLabel}. Sources: ${sourceLabel}.` : undefined}
+                              >
+                                <span className="shrink-0" aria-hidden="true">{severityLabel}</span>
+                                {(hasAuthor || hasAI || hasCommunity) && (
+                                  <span className="inline-flex shrink-0 items-center gap-0.5 flex-nowrap" aria-hidden="true" style={{ minWidth: [hasAuthor, hasAI, hasCommunity].filter(Boolean).length * 11 + 4 }}>
+                                    {hasAuthor && <span className="inline-flex flex-shrink-0 w-[10px] justify-center"><PenLine className="h-2.5 w-2.5 opacity-90" title="Author" /></span>}
+                                    {hasAI && <span className="inline-flex flex-shrink-0 w-[10px] justify-center"><Sparkles className="h-2.5 w-2.5 opacity-90" title="AI" /></span>}
+                                    {hasCommunity && <span className="inline-flex flex-shrink-0 w-[10px] justify-center"><Users className="h-2.5 w-2.5 opacity-90" title="Community" /></span>}
+                                  </span>
+                                )}
+                              </span>
+                            )}
                             <BookCardAdmin isbn={book.isbn} title={displayTitle} />
                             {/* Fixed-height cover area (2:3) so all cards match */}
                             <div className="w-full flex-shrink-0 relative bg-muted/30 h-[210px] sm:h-[240px]">
@@ -287,10 +342,7 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
                                   sizes="(max-width: 640px) 140px, 160px"
                                 />
                               ) : (
-                                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground bg-muted/40">
-                                  <BookOpen className="h-10 w-10 text-muted-foreground/50" />
-                                  <span className="text-xs font-medium text-muted-foreground/80">No cover</span>
-                                </div>
+                                <NoCoverPlaceholder size="default" />
                               )}
                             </div>
                             {/* Bottom block: enough height so title, dots, rating, and "View book" never clip */}
@@ -314,9 +366,12 @@ export default async function BookshelfPage({ searchParams }: BookshelfPageProps
                                   <span className="text-[10px] text-muted-foreground italic">Not analyzed</span>
                                 )}
                               </div>
-                              <div className="mt-1.5 min-h-[20px] flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                                {classificationRating && <span className="bg-muted/80 px-1.5 py-0.5 rounded font-medium">{classificationRating}</span>}
-                                {displayDate && <span>{displayDate}</span>}
+                              <div className="mt-1.5 min-h-[18px] flex items-center gap-1 text-[10px] text-muted-foreground whitespace-nowrap">
+                                {classificationRating && displayDate && (
+                                  <span className="bg-muted/70 px-1.5 py-0.5 rounded font-medium">{classificationRating} · {displayDate}</span>
+                                )}
+                                {classificationRating && !displayDate && <span className="bg-muted/70 px-1.5 py-0.5 rounded font-medium">{classificationRating}</span>}
+                                {!classificationRating && displayDate && <span>{displayDate}</span>}
                               </div>
                               <p className="mt-auto pt-1.5 text-[11px] font-medium text-primary">View book →</p>
                             </div>
