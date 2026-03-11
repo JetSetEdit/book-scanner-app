@@ -99,8 +99,8 @@ export default function FAQPage() {
             </div>
           </section>
 
-          <section>
-            <h2 className="font-serif text-2xl text-foreground mb-4">Age and appropriateness</h2>
+          <section id="age-appropriateness" aria-labelledby="age-appropriateness-heading">
+            <h2 id="age-appropriateness-heading" className="font-serif text-2xl text-foreground mb-4">Age and appropriateness</h2>
             <div className="space-y-6">
               <div>
                 <h3 className="font-semibold text-foreground mb-2">Who decides what&apos;s &quot;age-appropriate&quot;?</h3>

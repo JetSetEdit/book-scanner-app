@@ -72,3 +72,16 @@ export function formatWarningDescription(
   
   return combined
 }
+
+/**
+ * Strip inline "source N (url)" citations from AI-generated description text.
+ * The AI sometimes embeds e.g. "source 1 (app.thestorygraph.com): " in the description;
+ * we show source via the Source link instead, so remove this for cleaner display.
+ */
+export function sanitizeDescriptionForDisplay(description: string): string {
+  if (!description || typeof description !== 'string') return description
+  return description
+    .replace(/\bsource\s+\d+\s*\([^)]+\)\s*:?\s*/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}

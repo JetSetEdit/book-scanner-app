@@ -17,12 +17,15 @@
 import { BookDetails } from "@/components/book-details"
 import { SponsoredCard } from "@/components/sponsored-card"
 import { supabaseAdmin } from "@/lib/supabase/admin"
+import { getWarningsForBookExcludingAppeals } from "@/lib/warnings-for-book"
 import { fetchBookByISBN } from "@/lib/book-api"
 import { validateISBNWithChecksum } from "@/lib/isbn-validation"
 import { BookStubPage } from "@/components/book-stub-page"
 import { monetizationConfig, defaultResultsFooterSponsor } from "@/lib/config/monetization"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
+import { calculateAgeRating, type ClassificationRating } from "@/lib/utils/age-rating"
+import type { EnhancedContentWarning } from "@/lib/config/taxonomy-context"
 
 interface BookPageProps {
   params: Promise<{
@@ -160,12 +163,8 @@ export default async function BookPage({ params }: BookPageProps) {
   }
 
 
-  // Fetch content warnings (include evidence for dev mode model source tracking)
-  const { data: warnings } = await supabase
-    .from("content_warnings")
-    .select("*")
-    .eq("book_id", book.id)
-    .order("helpful_count", { ascending: false })
+  // Fetch content warnings, excluding any under open appeal (suppressed until resolution)
+  const warnings = await getWarningsForBookExcludingAppeals(supabase, book.id)
 
   // Fetch audit logs to determine if analysis has been completed and get metadata issues
   // Also fetch ai_reasoning for dev mode display when no warnings were found
@@ -182,7 +181,7 @@ export default async function BookPage({ params }: BookPageProps) {
   // 1. There's an audit log with 'warnings_generated' or 'no_warnings', OR
   // 2. There are AI-generated warnings (even without audit log - indicates analysis was done)
   const hasAuditLog = auditLogs && auditLogs.length > 0
-  const hasAiWarnings = warnings && warnings.some((w: any) => w.source === 'ai_generated')
+  const hasAiWarnings = warnings.some((w: any) => w.source === 'ai_generated')
   const hasAnalysisCompleted = hasAuditLog || hasAiWarnings
   const analysisStatus: 'complete' | 'unknown' = hasAnalysisCompleted ? 'complete' : 'unknown'
   const metadataIssues = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any).metadata_issues : null
@@ -195,7 +194,7 @@ export default async function BookPage({ params }: BookPageProps) {
 
   // No user validation needed - all warnings are shown without user-specific data
   const warningsWithValidations = (() => {
-    const list: any[] = warnings || []
+    const list: any[] = warnings
     // Dedupe by (category_id, subcategory_id) for display stability.
     // This protects the UI even if multiple scans accidentally inserted duplicates.
     const severityRank = (sev: any) => {
@@ -229,12 +228,53 @@ export default async function BookPage({ params }: BookPageProps) {
   const rawList = (book as { author_content_warnings_list?: string[] | null }).author_content_warnings_list
   const authorContentWarningsList = Array.isArray(rawList) ? rawList : []
 
+  // Display-time safeguard: recompute age rating from current warnings and show the stricter of (stored, computed).
+  // Ensures we never show a lower rating than the content warrants (e.g. M when it should be R18+).
+  const RATING_STRICTNESS: Record<ClassificationRating, number> = {
+    G: 0,
+    PG: 1,
+    M: 2,
+    "MA15+": 3,
+    "R18+": 4,
+    RC: 5,
+  }
+  let displayCategories = (book.categories as string[] | null) || []
+  if (warningsWithValidations.length > 0) {
+    const enhancedWarnings: EnhancedContentWarning[] = warningsWithValidations.map((w: any) => ({
+      subcategory_id: w.subcategory_id || "",
+      severity: (w.severity || "mild") as "mild" | "moderate" | "severe",
+      modifiers: (w.context_modifiers || []) as EnhancedContentWarning["modifiers"],
+      evidence: (w.evidence || []) as EnhancedContentWarning["evidence"],
+      severity_signals: w.severity_signals ?? {
+        frequency: 0.5,
+        explicitness: 0.5,
+        proximity: 0.5,
+        centrality: 0.5,
+        intensity_markers: [],
+      },
+      taxonomy_version: w.taxonomy_version || "2.5.0",
+      is_spoiler: w.is_spoiler ?? false,
+      description: w.description,
+      reasoning: w.reasoning,
+    }))
+    const computed = calculateAgeRating(enhancedWarnings)
+    const storedTag = displayCategories.find((c: string) => c.startsWith("CLASSIFICATION:"))
+    const storedRating = storedTag ? (storedTag.replace("CLASSIFICATION:", "") as ClassificationRating) : null
+    const storedLevel = storedRating != null ? RATING_STRICTNESS[storedRating] ?? -1 : -1
+    const computedLevel = RATING_STRICTNESS[computed.rating]
+    const effectiveRating: ClassificationRating =
+      computedLevel > storedLevel ? computed.rating : (storedRating ?? computed.rating)
+    const categoriesWithoutRating = displayCategories.filter((c: string) => !c.startsWith("CLASSIFICATION:"))
+    displayCategories = [...categoriesWithoutRating, `CLASSIFICATION:${effectiveRating}`]
+  }
+  const bookForDisplay = { ...book, categories: displayCategories }
+
   return (
     <main className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           <BookDetails
-            book={book}
+            book={bookForDisplay}
             warnings={warningsWithValidations}
             analysisStatus={analysisStatus}
             metadataIssues={metadataIssues}

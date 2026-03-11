@@ -793,28 +793,28 @@ export async function processIsbnScan(
         onProgress?.(freshData ? `✅ Fetched data from ${freshData.source || 'external API'}` : '❌ No data returned from external APIs')
 
         if (freshData && freshData.description && freshData.description.length > 50) {
-          onProgress?.(`💾 Saving description (${freshData.description.length} chars) to database...`)
-          // Update the book in database with fresh description (accept descriptions > 50 chars)
-          const { error: updateError } = await supabaseAdmin
-            .from('books')
-            .update({
-              description: freshData.description,
-              last_synced_at: new Date().toISOString()
-            })
-            .eq('id', bookId)
+          const existingLen = (bookForAnalysis.description || '').length
+          const freshLen = freshData.description.length
+          // Only overwrite DB if fetched description is longer than existing (preserve Wiki or other longer source)
+          if (freshLen > existingLen) {
+            onProgress?.(`💾 Saving description (${freshLen} chars) to database...`)
+            const { error: updateError } = await supabaseAdmin
+              .from('books')
+              .update({
+                description: freshData.description,
+                last_synced_at: new Date().toISOString()
+              })
+              .eq('id', bookId)
 
-          if (!updateError) {
-            bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
-            if (freshData.description.length > 100) {
-              onProgress?.('✅ Fetched and saved fresh description from external APIs')
+            if (!updateError) {
+              bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
+              onProgress?.(freshLen > 100 ? '✅ Fetched and saved fresh description from external APIs' : '✅ Updated description from external APIs (shorter but valid)')
             } else {
-              onProgress?.('✅ Updated description from external APIs (shorter but valid)')
+              console.error('Failed to update book description:', updateError)
+              bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
             }
           } else {
-            console.error('Failed to update book description:', updateError)
-            onProgress?.(`❌ Error: Failed to save description: ${updateError.message}`)
-            // Continue anyway with the fresh data in memory
-            bookForAnalysis = { ...bookForAnalysis, description: freshData.description }
+            onProgress?.(`📌 Keeping existing description (${existingLen} chars, API had ${freshLen})`)
           }
         } else if (forceRefresh) {
           if (!freshData) {
@@ -832,6 +832,33 @@ export async function processIsbnScan(
         console.error('Error fetching fresh description:', fetchError)
         onProgress?.(`❌ Error fetching description: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`)
         // Continue with existing description if available
+      }
+    }
+
+    // If description is still thin (< 300 chars), try Wikipedia summary (avoids narrative excerpt / API short blurb)
+    const THIN_DESC_CHARS = 300
+    if (bookForAnalysis && bookForAnalysis.title && (bookForAnalysis.description || '').length < THIN_DESC_CHARS) {
+      try {
+        const { getWikipediaSummary } = await import('@/lib/wikipedia-summary')
+        onProgress?.('📖 Trying Wikipedia for a fuller description...')
+        const wikiSummary = await getWikipediaSummary(bookForAnalysis.title, bookForAnalysis.author)
+        if (wikiSummary && wikiSummary.length > (bookForAnalysis.description || '').length) {
+          onProgress?.(`✅ Using Wikipedia summary (${wikiSummary.length} chars)`)
+          const { error: updateError } = await supabaseAdmin
+            .from('books')
+            .update({
+              description: wikiSummary,
+              last_synced_at: new Date().toISOString()
+            })
+            .eq('id', bookId)
+          if (!updateError) {
+            bookForAnalysis = { ...bookForAnalysis, description: wikiSummary }
+          } else {
+            bookForAnalysis = { ...bookForAnalysis, description: wikiSummary }
+          }
+        }
+      } catch (wikiErr) {
+        console.warn('Wikipedia summary fetch failed:', wikiErr)
       }
     }
 
@@ -924,18 +951,18 @@ SAFE SOURCES TO USE:
 - Book review sites that allow citation (Goodreads public reviews, LibraryThing, etc.)
 - Wikipedia and other open encyclopedias
 - Academic databases with open access
-- Community tagging sites (Romance.io, The StoryGraph) - these are public community data
+- Reader community and tagging sites (e.g. Romance.io) - use only where terms permit; do not cite by name in user-facing output
 
 Please provide:
 1. A detailed plot summary or book description (2-4 sentences) from SAFE sources only - focus on plot details, character relationships, and story dynamics
-2. **CRITICAL: Content warnings, trigger warnings, or sensitive topics** - This is especially important for literary fiction, trauma narratives, and books known for graphic content. Check The StoryGraph, Goodreads reviews, and community discussions for trigger warnings. Include ALL major content warnings mentioned (self-harm, abuse, sexual violence, trauma, etc.)
+2. **CRITICAL: Content warnings, trigger warnings, or sensitive topics** - This is especially important for literary fiction, trauma narratives, and books known for graphic content. From sources that permit use (see SAFE SOURCES), include major content warnings mentioned (self-harm, abuse, sexual violence, trauma, etc.). Do not cite or name specific sites in the output.
 3. Romance tropes or themes explicitly mentioned (e.g., "enemies to lovers", "second chance", "fake dating", etc.) - quote the exact phrases used, but ONLY from safe sources like community sites, library catalogs, or publisher/author sites
 4. Character relationship dynamics described (e.g., "put aside their dislike", "adversarial", "conflict", etc.)
 5. Any themes, sensitive topics, or controversial content mentioned in reviews or discussions (from safe sources)
 6. Relationship dynamics or emotional content (conflict, tension, stress, etc.)
 
 CRITICAL: For romance books, specifically look for:
-- Enemies-to-lovers dynamics (look for phrases like "enemies to lovers", "enemies-to-lovers", "put aside their dislike", "mutual dislike", etc.) - check community sites like Romance.io or The StoryGraph
+- Enemies-to-lovers dynamics (look for phrases like "enemies to lovers", "enemies-to-lovers", "put aside their dislike", "mutual dislike", etc.) - from sources that permit use; do not cite site names in output
 - Second chance romance (past breakups, reconciliation stress)
 - Fake dating/pretending (deception, lying, secret-keeping)
 - Relationship conflict or emotional tension
@@ -944,7 +971,7 @@ CRITICAL: For romance books, specifically look for:
 IMPORTANT: 
 - If you find information that mentions "enemies to lovers" or similar phrases from SAFE sources (community sites, library catalogs, publisher sites), include it
 - If the only source is a retailer website, DO NOT quote it - instead, summarize the information in your own words based on what you know from safe sources, or state that information is not available from safe sources
-- Community tagging sites (Romance.io, The StoryGraph) are SAFE to use as they are public community data, not retailer content
+- Use only sources whose terms permit the use you are making; do not quote or cite retailer product copy; do not name specific community sites in user-facing output
 
 Be factual and specific. Only quote from sources that are safe to use. If you cannot find information from safe sources, say so explicitly.`
 
@@ -1401,7 +1428,7 @@ CRITICAL TOS COMPLIANCE:
 - ONLY use open, publicly available sources (community sites, review sites, library catalogs, etc.)
 
 CRITICAL: For Romance books, check:
-1. Community tagging sites like Romance.io or The StoryGraph for:
+1. Reader community or tagging sites (only where their terms permit use) for:
    - Heat/Spice level (explicit, moderate, mild, clean/sweet)
    - Common tropes flagged by readers (cheating, secret baby, loss/grief, emotional abuse, dubious consent, age gaps, stalking, toxic dynamics)
    - Emotional intensity levels
@@ -1414,7 +1441,7 @@ CRITICAL: For Romance books, check:
    - Disturbing or graphic content
    - Dark themes
 
-If you find any content warnings, heat levels, or tropes mentioned on Romance.io, The StoryGraph, or other community sites, list them specifically. If the book is known to be safe/cozy/light/clean romance, confirm that. Be factual and specific. If community reviews suggest content not mentioned in the blurb, state: "Community reviews suggest [X] may be present."
+If you find any content warnings, heat levels, or tropes from sources that permit use, list them specifically. If the book is known to be safe/cozy/light/clean romance, confirm that. Be factual and specific. If community reviews suggest content not mentioned in the blurb, state: "Community reviews suggest [X] may be present." Do not cite or name specific sites in the output.
 
 IMPORTANT: Only use information from safe, open sources. Do not quote retailer product descriptions.`
               : `Based on your knowledge and any available information, does the book "${bookForAnalysis.title}" by ${bookForAnalysis.author || 'Unknown Author'} have content warnings, trigger warnings, or sensitive content that readers should be aware of?
@@ -1624,7 +1651,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
             if (isMinimalDescription) {
               reasoning = 'Analysis could not identify warnings because the book description is missing or too short. The book may still contain sensitive content.'
             } else if (isRomanceBook && !usedWebSearch) {
-              reasoning += ' Analysis based on blurb only; community reviews on Romance.io or The StoryGraph may indicate different heat/spice levels or tropes not mentioned in the description.'
+              reasoning += ' Analysis based on blurb only; community reviews elsewhere may indicate different heat/spice levels or tropes not mentioned in the description.'
             } else if (usedWebSearch) {
               reasoning += ' Web search verification (using open sources only, TOS-compliant) confirmed the book appears safe for general reading.'
             } else if (!aiNoWarningsReasoning) {
