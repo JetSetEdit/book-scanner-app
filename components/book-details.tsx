@@ -20,6 +20,7 @@ import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { APP_VERSION } from "@/lib/config/version"
 import { generateSummary } from "@/lib/services/warning-renderer"
 import { FeedbackDialog } from "@/components/feedback-dialog"
+import { AppealDialog } from "@/components/appeal-dialog"
 import { CONTENT_WARNING_GENERATION_EXPLANATION, HOW_WE_GENERATE_LABEL } from "@/lib/content-warning-explanation"
 import { getVariantConfig } from "@/lib/config/variants"
 
@@ -73,6 +74,8 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
   const [fullHeight, setFullHeight] = useState<number | null>(null)
   const [focusWarningId, setFocusWarningId] = useState<string | null>(null)
   const [isHowWeGenerateOpen, setIsHowWeGenerateOpen] = useState(false)
+  const [appealDialogOpen, setAppealDialogOpen] = useState(false)
+  const [appealPreselectedWarningIds, setAppealPreselectedWarningIds] = useState<string[]>([])
 
   useEffect(() => {
     setIsDev(isDevMode())
@@ -244,20 +247,51 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                         Mild {mildCount} · Moderate {moderateCount} · Severe {severeCount}
                       </p>
                     </>
-                  ) : (
+                  ) : analysisStatus === 'complete' ? (
                     <p className="text-xs text-muted-foreground">No content warnings</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Content not yet analysed</p>
                   )}
-                  {classificationRating && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold border ${pillClass}`}
-                        aria-label={`Content rating: ${classificationRating}`}
-                      >
-                        {classificationRating}
-                      </span>
-                      {ageLine && <span className="text-xs text-muted-foreground">{ageLine}</span>}
-                    </div>
-                  )}
+                  {classificationRating && (() => {
+                    const ratingDescriptions: Record<string, string> = {
+                      'G': 'General — suitable for all ages.',
+                      'PG': 'Parental guidance — some material may not be suitable for young children.',
+                      'M': 'Mature — recommended for ages 13+. Not legally restricted.',
+                      'MA15+': 'Mature Accompanied — not suitable for under 15. May include stronger themes, violence, or sexual content.',
+                      'R18+': 'Restricted 18+ — legally restricted to adults. High-impact content.',
+                      'RC': 'Refused Classification — extreme content.',
+                    }
+                    const ratingDescription = ratingDescriptions[classificationRating] ?? `Content rating: ${classificationRating}.`
+                    return (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span
+                                className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-bold border cursor-help ${pillClass}`}
+                                aria-label={`Content rating: ${classificationRating}. ${ratingDescription}`}
+                              >
+                                {classificationRating}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-sm">
+                              <div className="text-sm space-y-2">
+                                <p>{ratingDescription}</p>
+                                {ageLine && <p className="text-xs text-muted-foreground">{ageLine}</p>}
+                                <p className="text-xs text-muted-foreground border-t border-border pt-2">
+                                  Indicative rating from our analysis; not an official Australian Classification Board rating.{' '}
+                                  <Link href="/faq#age-appropriateness" className="text-primary hover:underline underline-offset-2">
+                                    How we determine age ratings
+                                  </Link>
+                                </p>
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        {ageLine && <span className="text-xs text-muted-foreground">{ageLine}</span>}
+                      </div>
+                    )
+                  })()}
                   <a
                     href="#content-analysis"
                     className="mt-2 inline-block text-xs font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
@@ -660,11 +694,39 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 authorContentWarningsUrl={book?.author_content_warnings_url ?? null}
                 authorContentWarningsList={authorContentWarningsList ?? null}
                 displayVariant={displayVariant}
+                onReportWarning={(warningId) => {
+                  setAppealPreselectedWarningIds([warningId])
+                  setAppealDialogOpen(true)
+                }}
               />
 
-              {/* Feedback / Report Section */}
+              {/* Report a mistake (appeals) + general feedback */}
               <div id="feedback" className="mt-12 pt-8 border-t border-border">
-                <div className="flex flex-col items-center justify-center">
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    onClick={() => {
+                      setAppealPreselectedWarningIds([])
+                      setAppealDialogOpen(true)
+                    }}
+                  >
+                    <Flag className="h-3.5 w-3.5 mr-1.5" />
+                    Report a mistake
+                  </Button>
+                  <AppealDialog
+                    open={appealDialogOpen}
+                    onOpenChange={setAppealDialogOpen}
+                    bookId={book.id}
+                    isbn={book.isbn}
+                    bookTitle={book.title}
+                    warnings={warnings.map((w: any) => ({
+                      id: w.id,
+                      label: w.description || w.category || String(w.subcategory_id || w.category_id || "Warning"),
+                    }))}
+                    initialWarningIds={appealPreselectedWarningIds}
+                  />
                   <FeedbackDialog
                     trigger={
                       <Button
@@ -672,8 +734,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                         size="sm"
                         className="text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-transparent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                       >
-                        <Flag className="h-3.5 w-3.5 mr-1.5" />
-                        Found an error? Report this book.
+                        General feedback
                       </Button>
                     }
                     pageUrl={typeof window !== 'undefined' ? window.location.href : undefined}

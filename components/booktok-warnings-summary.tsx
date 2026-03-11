@@ -2,9 +2,10 @@
 
 import { useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
-import { Flame, AlertTriangle, BookOpen, Heart } from "lucide-react"
+import { Flame, AlertTriangle, BookOpen, Heart, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface Warning {
   category: string
@@ -89,6 +90,23 @@ export function BooktokWarningsSummary({ warnings, onWarningClick }: BooktokWarn
       <div className="px-5 pt-4 pb-3 flex items-center gap-2 border-b border-border/50 bg-muted/10">
         <BookOpen className="h-4 w-4 text-primary shrink-0" />
         <h3 className="text-sm font-bold font-serif tracking-tight text-foreground">Quick Glance</h3>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex p-0.5 rounded text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="What Key triggers and Tropes & themes mean"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs">
+              <p><strong>Key triggers</strong> are content that may be distressing (violence, abuse, mental health, loss, etc.)—things readers often want to avoid or prepare for.</p>
+              <p className="mt-1.5"><strong>Tropes & themes</strong> are story patterns and genre elements (e.g. enemies to lovers, found family)—what kind of story it is, not necessarily content to avoid.</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <div className="p-5 space-y-4">

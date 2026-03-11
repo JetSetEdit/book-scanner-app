@@ -40,7 +40,7 @@ import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/util
 import { getVariantConfig } from "@/lib/config/variants"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { getWarningPhrase } from "@/lib/services/warning-phraser"
+import { getWarningPhrase, sanitizeDescriptionForDisplay } from "@/lib/services/warning-phraser"
 import { SpoilerText } from "@/components/spoiler-text"
 
 interface ContentWarning {
@@ -77,6 +77,8 @@ interface ContentWarningsListProps {
   authorContentWarningsList?: string[] | null
   /** Alternate layout: "cards" = disclosure list (one row per warning, expand for details; sandbox). */
   displayVariant?: 'default' | 'cards'
+  /** When set, show a "Report" link per warning that opens the appeal dialog with this warning pre-selected. */
+  onReportWarning?: (warningId: string) => void
 }
 
 const categoryLabels: Record<string, string> = {
@@ -169,7 +171,7 @@ const CategoryIcon = ({ id, legacyCategory, className }: { id?: string | null, l
   }
 };
 
-export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId, authorContentWarningsUrl, authorContentWarningsList, displayVariant = 'default' }: ContentWarningsListProps) {
+export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus = 'unknown', isbn, noWarningsReasoning, focusWarningId, authorContentWarningsUrl, authorContentWarningsList, displayVariant = 'default', onReportWarning }: ContentWarningsListProps) {
   const pathname = usePathname()
   // Sandbox routes always use cards (disclosure rows with severity-colored bar)
   const effectiveDisplayVariant = pathname?.includes("/sandbox/") ? "cards" : displayVariant
@@ -767,7 +769,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
 
           <div className="space-y-0">
             {officialVerifiedWarnings.map((warning) => (
-              <WarningItem key={warning.id} warning={warning} isVerified={true} showReasoningInWarnings={showReasoning} />
+              <WarningItem key={warning.id} warning={warning} isVerified={true} showReasoningInWarnings={showReasoning} onReportWarning={onReportWarning} />
             ))}
           </div>
         </section>
@@ -827,7 +829,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                         <CollapsibleContent>
                           <div className="bg-muted/10 dark:bg-muted/5 pt-2 pb-3 px-3 space-y-2">
                             {group.warnings.map((warning) => (
-                              <WarningDisclosure key={warning.id} warning={warning} isAi showReasoningInWarnings={showReasoning} />
+                              <WarningDisclosure key={warning.id} warning={warning} isAi showReasoningInWarnings={showReasoning} onReportWarning={onReportWarning} />
                             ))}
                           </div>
                         </CollapsibleContent>
@@ -865,7 +867,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                     <CollapsibleContent className="min-w-0">
                       <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
                         {group.warnings.map((warning) => (
-                          <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} />
+                          <WarningItem key={warning.id} warning={warning} isAi={true} showReasoningInWarnings={showReasoning} onReportWarning={onReportWarning} />
                         ))}
                       </div>
                     </CollapsibleContent>
@@ -888,7 +890,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
           {effectiveDisplayVariant === 'cards' ? (
             <div className="space-y-1">
               {communityWarnings.map((warning) => (
-                <WarningDisclosure key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
+                <WarningDisclosure key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} onReportWarning={onReportWarning} />
               ))}
             </div>
           ) : (
@@ -916,7 +918,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
                   <CollapsibleContent className="min-w-0">
                     <div className="space-y-0 border-t border-border/80 mt-2 pt-3">
                       {group.warnings.map((warning) => (
-                        <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} />
+                        <WarningItem key={warning.id} warning={warning} showReasoningInWarnings={showReasoning} onReportWarning={onReportWarning} />
                       ))}
                     </div>
                   </CollapsibleContent>
@@ -946,7 +948,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
  * Do not add "Content warning: … — Severity" or a horizontal dash line; keep icon + category only.
  * Expand opens: description, Why?, thumbs. See docs/SANDBOX_BOOK_PAGE_CONTENT.md.
  */
-function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = true }: { warning: ContentWarning; isAi?: boolean; showReasoningInWarnings?: boolean }) {
+function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = true, onReportWarning }: { warning: ContentWarning; isAi?: boolean; showReasoningInWarnings?: boolean; onReportWarning?: (warningId: string) => void }) {
   const [isRevealed, setIsRevealed] = useState(false)
   const isSpoiler = warning.is_spoiler === true
 
@@ -964,9 +966,11 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
   const severity = (warning.severity ?? "mild").toString().toLowerCase() as "mild" | "moderate" | "severe"
   const severityLabel = severity === "severe" ? "Severe" : severity === "moderate" ? "Moderate" : "Mild"
   const descriptionText = (() => {
+    const raw = sanitizeDescriptionForDisplay(warning.description ?? '')
+    if (!raw) return ''
     const phrase = getWarningPhrase(warning.category_id)
-    if (warning.description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) return warning.description
-    return `${phrase.replace("…", "")} ${warning.description.toLowerCase()}`
+    if (raw.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) return raw
+    return `${phrase.replace("…", "")} ${raw.toLowerCase()}`
   })()
 
   const severityBorder =
@@ -1029,7 +1033,7 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="max-w-xs p-4 text-xs">
-                  <p>{warning.reasoning}</p>
+                  <p>{sanitizeDescriptionForDisplay(warning.reasoning ?? '')}</p>
                 </PopoverContent>
               </Popover>
             )}
@@ -1039,6 +1043,15 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
               notHelpfulCount={warning.not_helpful_count}
               userValidation={warning.user_validation}
             />
+            {onReportWarning && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onReportWarning(warning.id); }}
+                className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Report
+              </button>
+            )}
           </div>
         </div>
       </CollapsibleContent>
@@ -1046,7 +1059,7 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
   )
 }
 
-function WarningItem({ warning, isAi = false, isVerified = false, showReasoningInWarnings = true }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean, showReasoningInWarnings?: boolean }) {
+function WarningItem({ warning, isAi = false, isVerified = false, showReasoningInWarnings = true, onReportWarning }: { warning: ContentWarning, isAi?: boolean, isVerified?: boolean, showReasoningInWarnings?: boolean; onReportWarning?: (warningId: string) => void }) {
   const [isRevealed, setIsRevealed] = useState(false)
   const isSpoiler = warning.is_spoiler === true
 
@@ -1255,6 +1268,15 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
               notHelpfulCount={warning.not_helpful_count}
               userValidation={warning.user_validation}
             />
+            {onReportWarning && (
+              <button
+                type="button"
+                onClick={() => onReportWarning(warning.id)}
+                className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+              >
+                Report
+              </button>
+            )}
 
             {/* Reasoning / Sources (hidden in lite) */}
             {showReasoningInWarnings && (
@@ -1274,7 +1296,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
                       <p className="font-bold text-foreground mb-1 uppercase tracking-wider text-[10px]">
                         {isAi ? 'Reasoning' : 'Justification'}
                       </p>
-                      <p className="mb-3">{warning.reasoning}</p>
+                      <p className="mb-3">{sanitizeDescriptionForDisplay(warning.reasoning)}</p>
                     </>
                   )}
                   {warning.source_url && (

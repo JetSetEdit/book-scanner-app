@@ -224,6 +224,25 @@ async function diagnoseBook(isbn: string) {
   console.log(`   Max Impact: ${maxImpact.toFixed(3)}`)
   console.log(`   Reasoning: ${newRating.reasoning}`)
 
+  // --fix: persist recalculated rating to DB
+  const shouldFix = process.argv.includes('--fix')
+  if (shouldFix && newRating.rating !== currentRating) {
+    const currentCategories = (book.categories as string[]) || []
+    const categoriesWithoutRating = currentCategories.filter((c: string) => !c.startsWith('CLASSIFICATION:'))
+    const updatedCategories = [...categoriesWithoutRating, `CLASSIFICATION:${newRating.rating}`]
+    const { error: updateError } = await supabaseAdmin
+      .from('books')
+      .update({ categories: updatedCategories })
+      .eq('id', book.id)
+    if (updateError) {
+      console.error(`\n   ❌ Failed to update rating:`, updateError)
+    } else {
+      console.log(`\n   ✅ Updated stored rating: ${currentRating} → ${newRating.rating}`)
+    }
+  } else if (shouldFix && newRating.rating === currentRating) {
+    console.log(`\n   (No change: stored rating already ${currentRating})`)
+  }
+
   // Show top 5 impacts
   const top5 = warningImpacts
     .sort((a, b) => b.impact - a.impact)
@@ -296,14 +315,17 @@ async function main() {
   console.log('🔬 Age Rating Impact Diagnostic')
   console.log('='.repeat(80))
 
-  const testBooks = [
-    '9780571334650', // Normal People
-    '9781619634442', // A Court of Thorns and Roses (ACOTAR)
-    '9781649374042', // Fourth Wing
-    '9780439023481', // The Hunger Games
-    '9780593336823', // The Love Hypothesis
-    '9780062678416', // The Woman in the Window
-  ]
+  const isbnArg = process.argv[2]
+  const testBooks = isbnArg
+    ? [isbnArg]
+    : [
+        '9780571334650', // Normal People
+        '9781619634442', // A Court of Thorns and Roses (ACOTAR)
+        '9781649374042', // Fourth Wing
+        '9780439023481', // The Hunger Games
+        '9780593336823', // The Love Hypothesis
+        '9780062678416', // The Woman in the Window
+      ]
 
   const results = []
 

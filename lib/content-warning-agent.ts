@@ -67,10 +67,8 @@ function isValidSourceUrl(url: string | null | undefined): boolean {
   // Allow these patterns (actual content pages)
   const validPatterns = [
     /^https?:\/\/[^\/]+\/(books|library|content|warnings|notes|guidance)/i, // Author sites with content pages
-    /goodreads\.com/i, // Goodreads (reviews/content)
-    /storygraph\.com/i, // StoryGraph (reviews/content)
-    /amazon\.com.*\/dp\//i, // Amazon product pages (not images)
     /google\.com\/books/i, // Google Books volume pages (not cover images)
+    // Excluded: goodreads.com, storygraph.com – ToS restrict commercial use / scraping; do not use as source_url
   ];
   
   // Check if URL matches any valid pattern
@@ -80,16 +78,21 @@ function isValidSourceUrl(url: string | null | undefined): boolean {
     }
   }
   
-  // If it doesn't match cover patterns and doesn't match valid patterns, 
+  // Reject URLs from services whose ToS prohibit commercial use or scraping as source attribution
+  if (/storygraph\.com/i.test(url) || /goodreads\.com/i.test(url) || /amazon\./i.test(url)) {
+    return false;
+  }
+
+  // If it doesn't match cover patterns and doesn't match valid patterns,
   // check if it looks like a content page (has path beyond domain)
   const urlObj = new URL(url);
   const path = urlObj.pathname;
-  
+
   // If path is just "/" or very short, likely not a content page
   if (path.length < 3) {
     return false;
   }
-  
+
   // If it doesn't match cover patterns, allow it (but log for review)
   return true;
 }
@@ -1057,11 +1060,11 @@ ${!workflow.book_description || workflow.book_description.length === 0 ? '**MAND
 **CRITICAL: source_url Field Rules**
 - **DO NOT use cover image URLs** as source_url (e.g., mzstatic.com, covers.openlibrary.org, books.google.com cover images)
 - **DO NOT use artwork URLs** as source_url (e.g., artworkUrl100, image URLs ending in .jpg/.png/.gif)
-- **ONLY use actual content page URLs** as source_url:
+- **ONLY use actual content page URLs** as source_url when the source's terms permit:
   * ✅ Author's official website page (e.g., hdcarlton.com/library)
-  * ✅ Review sites (e.g., Goodreads, StoryGraph)
-  * ✅ Book description pages (e.g., Google Books volume page, not cover image)
+  * ✅ Google Books volume page (not cover image)
   * ✅ Publisher pages with content information
+  * ❌ Do NOT use Goodreads or The StoryGraph URLs as source_url (their terms restrict commercial use)
 - If you only have a cover image URL from web search, set source_url to null - do NOT use the cover URL
 - Cover images are NOT valid sources for content warnings - they provide no information about book content
 

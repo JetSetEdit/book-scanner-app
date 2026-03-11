@@ -28,6 +28,26 @@ This document outlines our data sourcing policy to ensure legal compliance and a
 
 **No Goodreads Integration**: We do not currently use Goodreads data, which is compliant with this policy.
 
+### 🔍 Sources to Evaluate (Fallbacks / Edge Cases)
+
+For edge cases where Google Books and Open Library lack or miss metadata (e.g. regional editions, academic titles, older imprints), the following are worth evaluating as additional safe metadata sources:
+
+1. **ISBNdb**
+   - **What it is**: Commercial ISBN/book metadata API ([isbndb.com](https://isbndb.com)).
+   - **Cost & access**: **Paid only** — no free API tier (free accounts were discontinued). You need a **subscription** and an **API key** (provided in dashboard after signup). Plans: Basic ~$15/mo (5k daily searches, 7-day trial), Premium, Pro, Enterprise. [Pricing](https://isbndb.com/isbn-database).
+   - **Terms**: [Terms and Conditions](https://isbndb.com/terms-and-conditions). API subscribers are authorized to use data for **personal and commercial purposes**; use on website/app to parse book information in real time is permitted. Data may be cached while subscription is current (must be deleted if subscription lapses). No copying, modification, or redistribution without permission.
+   - **Use case**: Fallback or supplement when Google Books and Open Library return thin or no results. [API docs](https://isbndb.com/apidocs/v2).
+   - **Status**: Not yet integrated; **evaluate** when prioritising metadata completeness.
+
+2. **WorldCat / OCLC**
+   - **What it is**: WorldCat Search API and WorldCat Metadata API ([OCLC Developer](https://www.oclc.org/developer/api/oclc-apis/worldcat-metadata-api.en.html)) provide bibliographic and holdings data from library catalogs.
+   - **Cost & access**: **API key (WSKey) required**. Request at [platform.worldcat.org/wskey](https://platform.worldcat.org/wskey). No per-call fee in the same way as ISBNdb, but access is gated: **Sandbox** keys are available for testing; **Production** and full API access often require an **OCLC subscription** (e.g. Cataloging and Metadata, FirstSearch/WorldCat Discovery) for libraries, or a **commercial partnership** (contact busdev@oclc.org) for commercial use. WorldCat Entities has some unauthenticated access with limited data; authenticated WSKey gives more.
+   - **Terms**: [WorldShare Platform Terms](https://oclc.org/developer/support/terms-and-conditions.en.html); [WorldCat Search API](https://oclc.org/developer/api/oclc-apis/worldcat-search-api.en.html). Default license is **non-commercial** (resource discovery, research, verification of bibliographic information). **Commercial use** (e.g. fee-based or ad-supported services) typically requires a **commercial partnership** with OCLC. WorldCat Entities data may be under CC BY-NC; check [WorldCat Entities Terms](https://policies.oclc.org/en/terms/worldcat-entities.html) for the specific service.
+   - **Use case**: Strong for library-held titles, academic works, and non-US editions where Google Books/Open Library are sparse.
+   - **Status**: Not yet integrated; **evaluate** and confirm commercial terms (partnership or permitted use) before use in a commercial product.
+
+**Action**: When prioritising metadata edge-case coverage, assess ISBNdb (subscription, commercial use allowed) and WorldCat (confirm commercial path with OCLC) and document chosen approach and terms in this policy.
+
 ### ⚠️ Sources to Avoid
 
 1. **Goodreads (Scraped Data)**
@@ -44,6 +64,12 @@ This document outlines our data sourcing policy to ensure legal compliance and a
    - May not align with current Goodreads ToS
    - **Risk Level**: ⚠️ Medium-High
    - **Action**: Avoid for production use
+
+3. **The StoryGraph (Commercial Use / Citation)**
+   - **ToS**: [Terms of Service](https://app.thestorygraph.com/terms-of-service) grant use only for "personal, non-commercial transitory viewing." Commercial use of materials, public display, modification/copying, and removal of proprietary notations are prohibited.
+   - **Risk**: Using StoryGraph content (e.g. via search snippets or AI summarising/citing their reviews or tags) in a commercial product may breach their ToS.
+   - **Risk Level**: ⚠️ Medium – breach risk if we direct the AI to "check StoryGraph" or display citations to app.thestorygraph.com as a source.
+   - **Action**: Do not instruct the AI to cite The StoryGraph by name in user-facing output. Use generic phrasing (e.g. "community review sites", "reader community sites") in prompts. Do not use StoryGraph as a named source in UI or reasoning. If web search returns StoryGraph results, avoid surfacing them as attributed sources; treat as background context only or omit.
 
 ## Dataset Licensing Guide
 
@@ -207,6 +233,11 @@ This policy is for guidance only. For production or commercial use:
 ## References
 
 - [Goodreads Terms of Service](https://www.goodreads.com/about/terms)
+- [The StoryGraph Terms of Service](https://app.thestorygraph.com/terms-of-service) – personal, non-commercial use only; commercial use prohibited
+- [ISBNdb Terms and Conditions](https://isbndb.com/terms-and-conditions) – API allows commercial use for subscribers
+- [ISBNdb API Documentation v2](https://isbndb.com/apidocs/v2)
+- [OCLC WorldShare Platform Terms and Conditions](https://oclc.org/developer/support/terms-and-conditions.en.html)
+- [WorldCat Metadata API](https://www.oclc.org/developer/api/oclc-apis/worldcat-metadata-api.en.html) | [WorldCat Search API](https://oclc.org/developer/api/oclc-apis/worldcat-search-api.en.html)
 - [goodbooks-10k (CC BY-SA 4.0)](https://www.kaggle.com/zygmunt/goodbooks-10k) ✅ **APPROVED FOR USE**
 - [CC BY-SA 4.0 License](https://creativecommons.org/licenses/by-sa/4.0/)
 - [Open Library Data](https://openlibrary.org/developers/api)
