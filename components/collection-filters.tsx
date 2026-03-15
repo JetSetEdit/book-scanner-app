@@ -21,15 +21,6 @@ const AGE_RATINGS = [
     { id: "R18+", label: "R18+", description: "Restricted" },
 ]
 
-// Subtext Suitability Scale (SSS) - emotional intensity
-const SSS_LEVELS = [
-    { id: "S0_NO_INPUT", label: "S0 – No rating", description: "Not yet assessed" },
-    { id: "S1_GENTLE", label: "S1 – Gentle", description: "Very low-intensity, brief difficulty" },
-    { id: "S2_MILD", label: "S2 – Mild", description: "Some upsetting moments, light tone" },
-    { id: "S3_MODERATE", label: "S3 – Moderate", description: "Recurring difficult content" },
-    { id: "S4_INTENSE", label: "S4 – Intense", description: "Sustained distressing content" },
-]
-
 // Severity levels
 const SEVERITY_LEVELS = [
     { id: "severe", label: "Has Severe Warnings" },
@@ -53,7 +44,6 @@ export interface FilterCounts {
     ratings: Record<string, number>
     severities: Record<string, number>
     categories: Record<string, number>
-    sss: Record<string, number>
 }
 
 interface CollectionFiltersProps {
@@ -69,12 +59,11 @@ export function CollectionFilters({ counts, className }: CollectionFiltersProps)
     const currentRatings = searchParams.get("rating")?.split(",").filter(Boolean) || []
     const currentSeverities = searchParams.get("severity")?.split(",").filter(Boolean) || []
     const currentCategories = searchParams.get("category")?.split(",").filter(Boolean) || []
-    const currentSss = searchParams.get("sss")?.split(",").filter(Boolean) || []
 
-    const hasActiveFilters = currentRatings.length > 0 || currentSeverities.length > 0 || currentCategories.length > 0 || currentSss.length > 0
+    const hasActiveFilters = currentRatings.length > 0 || currentSeverities.length > 0 || currentCategories.length > 0
 
     // Toggle a filter value
-    const toggleFilter = (type: "rating" | "severity" | "category" | "sss", value: string) => {
+    const toggleFilter = (type: "rating" | "severity" | "category", value: string) => {
         const params = new URLSearchParams(searchParams.toString())
         const currentValues = params.get(type)?.split(",").filter(Boolean) || []
 
@@ -103,7 +92,6 @@ export function CollectionFilters({ counts, className }: CollectionFiltersProps)
         params.delete("rating")
         params.delete("severity")
         params.delete("category")
-        params.delete("sss")
         params.delete("page")
         router.push(`/bookshelf?${params.toString()}`)
     }
@@ -128,22 +116,6 @@ export function CollectionFilters({ counts, className }: CollectionFiltersProps)
                     </Button>
                 )}
             </div>
-
-            {/* Subtext Suitability Scale (SSS) - Primary filter */}
-            <FilterSection title="Subtext Suitability" defaultOpen={true}>
-                <div className="space-y-2">
-                    {SSS_LEVELS.map((level) => (
-                        <FilterCheckbox
-                            key={level.id}
-                            id={`sss-${level.id}`}
-                            label={level.label}
-                            count={counts?.sss[level.id]}
-                            checked={currentSss.includes(level.id)}
-                            onCheckedChange={() => toggleFilter("sss", level.id)}
-                        />
-                    ))}
-                </div>
-            </FilterSection>
 
             {/* Severity Level */}
             <FilterSection title="Severity Level" defaultOpen={true}>
@@ -264,8 +236,7 @@ export function MobileFilterButton({ onClick }: { onClick: () => void }) {
     const hasFilters =
         searchParams.get("rating") ||
         searchParams.get("severity") ||
-        searchParams.get("category") ||
-        searchParams.get("sss")
+        searchParams.get("category")
 
     return (
         <Button

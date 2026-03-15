@@ -6,6 +6,8 @@
  *   npx tsx scripts/backfill-sss.ts [--dry-run] [--limit=N]
  *
  * Requires: OPENAI_API_KEY (for assignSSS), Supabase env vars in .env.local
+ *
+ * ARCHIVED 2025-03-03 — SSS removed. See docs/archive/SSS_REMOVAL.md.
  */
 
 import dotenv from 'dotenv'

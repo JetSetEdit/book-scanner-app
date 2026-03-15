@@ -4,6 +4,8 @@
  *        DOTENV_CONFIG_PATH=.env.local npx tsx scripts/test-sss-assignment.ts [ISBN]
  * Default ISBN: 9780593440872 (Book Lovers, Emily Henry)
  * Requires: .env.local with NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENAI_API_KEY (and GEMINI_API_KEY for full analysis).
+ *
+ * ARCHIVED 2025-03-03 — SSS removed. See docs/archive/SSS_REMOVAL.md.
  */
 
 import dotenv from 'dotenv'

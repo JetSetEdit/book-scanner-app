@@ -12,6 +12,9 @@ export type ScanStage = {
  * Returns null if the message indicates ambiguous results (should show selection UI instead)
  */
 export function mapProgressToStage(message: string): ScanStage | null {
+  if (message == null || typeof message !== 'string') {
+    return { stage: 2, displayText: 'Analyzing content for warnings...', icon: Sparkles }
+  }
   const lowerMessage = message.toLowerCase()
 
   // Special case: Ambiguous results - return null to hide loader

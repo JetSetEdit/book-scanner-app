@@ -30,8 +30,6 @@ export interface Database {
           audio_generated_at: string | null
           audio_voice_id: string | null
           last_synced_at: string | null
-          sss_level: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
-          sss_notes: string | null
           content_warnings_needs_review: boolean
           author_content_warnings_url: string | null
           author_content_warnings_list: string[] | null
@@ -56,8 +54,6 @@ export interface Database {
           audio_generated_at?: string | null
           audio_voice_id?: string | null
           last_synced_at?: string | null
-          sss_level?: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
-          sss_notes?: string | null
           content_warnings_needs_review?: boolean
           author_content_warnings_url?: string | null
           author_content_warnings_list?: string[] | null
@@ -82,8 +78,6 @@ export interface Database {
           audio_generated_at?: string | null
           audio_voice_id?: string | null
           last_synced_at?: string | null
-          sss_level?: 'S0_NO_INPUT' | 'S1_GENTLE' | 'S2_MILD' | 'S3_MODERATE' | 'S4_INTENSE' | null
-          sss_notes?: string | null
           content_warnings_needs_review?: boolean
           author_content_warnings_url?: string | null
           author_content_warnings_list?: string[] | null
@@ -337,12 +331,70 @@ export interface Database {
           }
         ]
       }
+      warning_appeals: {
+        Row: {
+          id: string
+          ticket_number: string
+          book_id: string
+          isbn: string
+          content_warning_ids: Json
+          status: 'pending' | 'acknowledged' | 'resolved_upheld' | 'resolved_removed'
+          message: string
+          reporter_email: string | null
+          acknowledged_at: string | null
+          resolved_at: string | null
+          resolution_notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          ticket_number: string
+          book_id: string
+          isbn: string
+          content_warning_ids?: Json
+          status?: 'pending' | 'acknowledged' | 'resolved_upheld' | 'resolved_removed'
+          message: string
+          reporter_email?: string | null
+          acknowledged_at?: string | null
+          resolved_at?: string | null
+          resolution_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          ticket_number?: string
+          book_id?: string
+          isbn?: string
+          content_warning_ids?: Json
+          status?: 'pending' | 'acknowledged' | 'resolved_upheld' | 'resolved_removed'
+          message?: string
+          reporter_email?: string | null
+          acknowledged_at?: string | null
+          resolved_at?: string | null
+          resolution_notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "warning_appeals_book_id_fkey"
+            columns: ["book_id"]
+            referencedRelation: "books"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      next_warning_appeal_ticket_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

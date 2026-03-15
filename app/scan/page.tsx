@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useRef, useCallback, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +29,12 @@ import { PaywallModal } from "@/components/paywall-modal"
 import { canRunScan } from "@/lib/entitlements"
 import { getDailyScanUsage, incrementDailyScanUsage } from "@/lib/utils/scan-usage"
 import { ScanningAnimation } from "@/components/scanning-animation"
+import {
+  SCAN_FIRST_MESSAGE,
+  getScanLastMessage,
+  getMiddleFlavourMessages,
+  FLAVOUR_MESSAGE_INTERVAL_MS,
+} from "@/lib/scan-loading-messages"
 
 // Helper function to format status messages for display
 function formatStatusMessage(message: string): string {
@@ -71,6 +77,8 @@ function formatStatusMessage(message: string): string {
     [/description too minimal/i, 'Limited information available, enriching...'],
     [/proceeding with analysis due to force refresh/i, 'Proceeding with analysis...'],
     [/scan process completed/i, 'Scan completed successfully'],
+    [/finding your book/i, 'Finding your book...'],
+    [/scan complete/i, 'Scan complete'],
   ]
 
   for (const [pattern, replacement] of replacements) {
@@ -171,6 +179,22 @@ function ScanTestPageContent() {
   const [reportAdditionalInfo, setReportAdditionalInfo] = useState("")
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
   const isDevUi = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+
+  // Flavour text progress: first + middle (timer) + last (on result)
+  const flavourIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const flavourMiddleRef = useRef<string[]>([])
+  const flavourNextIndexRef = useRef(0)
+
+  const clearFlavourInterval = useCallback(() => {
+    if (flavourIntervalRef.current) {
+      clearInterval(flavourIntervalRef.current)
+      flavourIntervalRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => { clearFlavourInterval() }
+  }, [clearFlavourInterval])
 
   // Rate limit tracking
   const [rateLimit, setRateLimit] = useState<{
@@ -279,21 +303,35 @@ function ScanTestPageContent() {
     setLoading(true)
     setError(null)
 
-    // Set initial status ATOMICALLY when clearing - prevents race condition
-    // where loading=true but statusUpdates is empty (spinner without text)
-    const initialStatus = "Validating ISBN and checking local database..."
+    // Flavour progress: first message + middle on timer, last on result
+    const initialStatus = SCAN_FIRST_MESSAGE
+    flavourMiddleRef.current = getMiddleFlavourMessages(effectiveMode)
+    flavourNextIndexRef.current = 0
+    clearFlavourInterval()
 
     if (!selectedCandidate) {
       setResult(null)
       setCandidates(null)
-      // Set initial status immediately, not after clearing
       setStatusUpdates([initialStatus])
       setDetailedStatusUpdates([{ action: initialStatus, timestamp: Date.now() }])
     } else {
-      // For candidate selection, add to existing updates
       setStatusUpdates(prev => [...prev, initialStatus])
       setDetailedStatusUpdates(prev => [...prev, { action: initialStatus, timestamp: Date.now() }])
     }
+
+    flavourIntervalRef.current = setInterval(() => {
+      const middle = flavourMiddleRef.current
+      const idx = flavourNextIndexRef.current
+      if (idx >= middle.length) {
+        clearFlavourInterval()
+        return
+      }
+      const next = middle[idx]
+      flavourNextIndexRef.current = idx + 1
+      setStatusUpdates(prev => [...prev, next])
+      setDetailedStatusUpdates(prev => [...prev, { action: next, timestamp: Date.now() }])
+      if (idx + 1 >= middle.length) clearFlavourInterval()
+    }, FLAVOUR_MESSAGE_INTERVAL_MS)
 
     // Reset selection state
     setSelectedCandidateId(null)
@@ -430,8 +468,7 @@ function ScanTestPageContent() {
                 const data = JSON.parse(line.slice(6))
 
                 if (data.status) {
-                  // Progress update
-                  setStatusUpdates(prev => [...prev, data.status])
+                  // Progress still driven by flavour timer; keep detailed for debug only
                   setDetailedStatusUpdates(prev => [...prev, {
                     action: data.status,
                     timestamp: Date.now()
@@ -471,6 +508,10 @@ function ScanTestPageContent() {
         throw new Error("No result received from scan - the scan may have completed but no result was returned")
       }
 
+      clearFlavourInterval()
+      const warningCount = result?.multiModelAnalysis?.combined_warnings?.length
+      setStatusUpdates(prev => [...prev, getScanLastMessage(warningCount)])
+
       console.log('[Scan] Result received:', {
         success: result.success,
         hasBook: !!result.book,
@@ -483,6 +524,7 @@ function ScanTestPageContent() {
 
       // Handle ambiguous results (multiple candidates)
       if (result.status === 'ambiguous' && result.candidates && result.candidates.length > 0) {
+        clearFlavourInterval()
         setCandidates(result.candidates)
         setResult(null) // Clear result to show candidate selection UI
         setLoading(false)
@@ -574,6 +616,7 @@ function ScanTestPageContent() {
       setLoading(false)
       return
     } catch (err) {
+      clearFlavourInterval()
       console.error('[Scan] Error caught in performScan:', err)
       console.error('[Scan] Error details:', {
         message: err instanceof Error ? err.message : String(err),
@@ -585,6 +628,7 @@ function ScanTestPageContent() {
       setSelectedCandidateId(null)
       setIsProcessingSelection(false)
     } finally {
+      clearFlavourInterval()
       setLoading(false)
     }
   }

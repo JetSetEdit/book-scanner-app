@@ -2,6 +2,8 @@
  * SSS (Subtext Suitability Scale) assignment service.
  * Assigns a reader-focused emotional intensity level (S1–S4) from content warnings and book metadata.
  * See OpenSpec: add-sss-assignment-agent, capability sss-assignment.
+ *
+ * ARCHIVED 2025-03-03 — SSS removed from product. See docs/archive/SSS_REMOVAL.md.
  */
 
 import OpenAI from 'openai'

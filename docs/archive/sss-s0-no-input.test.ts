@@ -1,5 +1,6 @@
 /**
  * Tests for S0_NO_INPUT SSS level: no-input branch and regression for assignSSS.
+ * ARCHIVED 2025-03-03 — SSS removed. See docs/archive/SSS_REMOVAL.md.
  */
 
 import { describe, it, expect } from 'vitest'
