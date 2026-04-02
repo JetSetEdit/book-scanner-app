@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, BookOpen, Shield, FileText, Megaphone, HelpCircle } from "lucide-react"
+import { ArrowLeft, BookOpen, Shield, FileText, Megaphone, HelpCircle, FileCheck } from "lucide-react"
 
 export const metadata = {
   title: 'Knowledge Base | Subtext',
@@ -8,6 +8,12 @@ export const metadata = {
 }
 
 const SECTIONS = [
+  {
+    title: 'Content warning SLA & update policy',
+    href: '/policy',
+    description: 'Appeals process, resolution SLA, and update/notification policy for institutions and committees. Stable URL for submissions.',
+    icon: FileCheck,
+  },
   {
     title: 'How we work',
     href: '/transparency',

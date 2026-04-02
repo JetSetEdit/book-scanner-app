@@ -8,6 +8,7 @@ import Link from "next/link"
 import { BookDetails } from "@/components/book-details"
 import { SponsoredCard } from "@/components/sponsored-card"
 import { supabaseAdmin } from "@/lib/supabase/admin"
+import { getWarningsForBookExcludingAppeals } from "@/lib/warnings-for-book"
 import { fetchBookByISBN } from "@/lib/book-api"
 import { validateISBNWithChecksum } from "@/lib/isbn-validation"
 import { BookStubPage } from "@/components/book-stub-page"
@@ -63,11 +64,7 @@ export default async function SandboxBookPage({ params }: SandboxBookPageProps) 
     )
   }
 
-  const { data: warnings } = await supabase
-    .from("content_warnings")
-    .select("*")
-    .eq("book_id", book.id)
-    .order("helpful_count", { ascending: false })
+  const warnings = await getWarningsForBookExcludingAppeals(supabase, book.id)
 
   const { data: auditLogs } = await supabase
     .from("ai_audit_logs")
@@ -78,7 +75,7 @@ export default async function SandboxBookPage({ params }: SandboxBookPageProps) 
     .limit(1)
 
   const hasAuditLog = auditLogs && auditLogs.length > 0
-  const hasAiWarnings = warnings && warnings.some((w: { source?: string }) => w.source === "ai_generated")
+  const hasAiWarnings = warnings.some((w: { source?: string }) => w.source === "ai_generated")
   const analysisStatus: "complete" | "unknown" = hasAuditLog || hasAiWarnings ? "complete" : "unknown"
   const metadataIssues = auditLogs?.length ? (auditLogs[0] as { metadata_issues?: unknown }).metadata_issues : null
   const latestAudit = auditLogs?.length ? auditLogs[0] : null
@@ -88,7 +85,7 @@ export default async function SandboxBookPage({ params }: SandboxBookPageProps) 
       : null
 
   const warningsWithValidations = (() => {
-    const list: unknown[] = warnings || []
+    const list: unknown[] = warnings
     const severityRank = (sev: unknown) => {
       switch (String(sev ?? "").toLowerCase()) {
         case "severe":

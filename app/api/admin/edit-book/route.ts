@@ -8,11 +8,8 @@ export async function PATCH(request: NextRequest) {
   const auth = requireAdmin(request);
   if (auth) return auth;
 
-  // Check if we're in dev mode
-  const isDev = process.env.NODE_ENV === 'development' || 
-                request.headers.get('host')?.includes('localhost')
-
-  if (!isDev) {
+  // Only allow in development — rely on NODE_ENV, not spoofable headers
+  if (process.env.NODE_ENV !== 'development') {
     return NextResponse.json({ error: 'Not available in production' }, { status: 403 })
   }
 

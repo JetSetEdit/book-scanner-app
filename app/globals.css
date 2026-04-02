@@ -480,3 +480,9 @@
     color: var(--foreground) !important;
   }
 }
+
+/* Scan redirect progress animation */
+@keyframes progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}

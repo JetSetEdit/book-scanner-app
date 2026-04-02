@@ -16,15 +16,26 @@ interface OpenLibraryBook {
 import { isPlaceholderTitle, filterPlaceholderCandidates } from './utils/placeholder-detection'
 import { normalizeISBN } from './isbn-validation'
 
+/** Build a Google Books API URL with the API key appended (if configured). */
+function googleBooksUrl(query: string, maxResults?: number): string {
+  const params = new URLSearchParams({ q: query })
+  if (maxResults) params.set('maxResults', String(maxResults))
+  if (process.env.GOOGLE_BOOKS_API_KEY) params.set('key', process.env.GOOGLE_BOOKS_API_KEY)
+  return `https://www.googleapis.com/books/v1/volumes?${params}`
+}
+
 /** Fetch with one retry on 429 (rate limit). Waits 2s then retries. */
-async function fetchWith429Retry(url: string, options: RequestInit = {}): Promise<Response> {
-  const res = await fetch(url, options)
-  if (res.status === 429) {
-    console.warn('[Book API] Google Books 429 rate limit, retrying after 2s...')
-    await new Promise((r) => setTimeout(r, 2000))
-    return fetch(url, options)
+async function fetchWith429Retry(url: string, options: RequestInit = {}, maxRetries = 3): Promise<Response> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const res = await fetch(url, options)
+    if (res.status !== 429 || attempt === maxRetries) {
+      return res
+    }
+    const delay = Math.min(2000 * Math.pow(2, attempt), 16000)
+    console.warn(`[Book API] Google Books 429 rate limit, retrying after ${delay / 1000}s (attempt ${attempt + 1}/${maxRetries})...`)
+    await new Promise((r) => setTimeout(r, delay))
   }
-  return res
+  return fetch(url, options) // unreachable, satisfies TS
 }
 
 interface BookData {
@@ -110,7 +121,7 @@ function isbnMatches(scannedIsbn: string, returnedISBNs: string[]): boolean {
 async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandidate[]> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
-    let url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}&maxResults=5`
+    let url = googleBooksUrl(`isbn:${cleanScannedIsbn}`, 5)
     let response = await fetchWith429Retry(url, {
       next: { revalidate: 86400 },
       headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
@@ -122,7 +133,7 @@ async function fetchCandidatesFromGoogleBooks(isbn: string): Promise<BookCandida
     }
     // Fallback when isbn: fails (429, empty, etc.): try plain number search so we still get a chance to find the book
     if (!response.ok || !data.items || data.items.length === 0) {
-      url = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(cleanScannedIsbn)}&maxResults=5`
+      url = googleBooksUrl(cleanScannedIsbn, 5)
       response = await fetchWith429Retry(url, {
         next: { revalidate: 86400 },
         headers: { 'User-Agent': 'Book-Scanner-App/1.0' },
@@ -384,10 +395,10 @@ async function fetchFromGoogleBooks(isbn: string): Promise<BookData | null> {
   try {
     const cleanScannedIsbn = normalizeISBN(isbn)
     const response = await fetchWith429Retry(
-      `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanScannedIsbn}`,
+      googleBooksUrl(`isbn:${cleanScannedIsbn}`),
       {
         next: { revalidate: 86400 },
-        headers: { 'User-Agent': 'Book-Scanner-App/1.0 (https://github.com/your-repo)' }
+        headers: { 'User-Agent': 'Book-Scanner-App/1.0' }
       }
     )
 
@@ -587,7 +598,7 @@ export async function fetchByTitleAuthor(
   if (!q) return null
   try {
     const response = await fetchWith429Retry(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}`,
+      googleBooksUrl(q),
       { next: { revalidate: 86400 }, headers: { 'User-Agent': 'Book-Scanner-App/1.0' } }
     )
     if (!response.ok) return null

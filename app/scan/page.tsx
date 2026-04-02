@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, CheckCircle, XCircle, ArrowRight, History, Trash2, Camera, Flag, Clock, ChevronDown } from "lucide-react"
+import { Loader2, CheckCircle, XCircle, ArrowRight, ArrowLeft, History, Trash2, Camera, Flag, Clock, ChevronDown, SlidersHorizontal } from "lucide-react"
 import Link from "next/link"
 import { useLocalStorage } from "@/hooks/use-browser-storage"
 import { useScanHistory } from "@/hooks/use-scan-history"
@@ -172,6 +172,8 @@ function ScanTestPageContent() {
   const [candidates, setCandidates] = useState<any[] | null>(null)
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null)
   const [isProcessingSelection, setIsProcessingSelection] = useState(false)
+  const [redirectingTo, setRedirectingTo] = useState<{ isbn: string; title: string } | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
   const [showReportForm, setShowReportForm] = useState(false)
   const [reportSubmitted, setReportSubmitted] = useState(false)
   const [reportTitle, setReportTitle] = useState("")
@@ -302,6 +304,7 @@ function ScanTestPageContent() {
 
     setLoading(true)
     setError(null)
+    setRedirectingTo(null)
 
     // Flavour progress: first message + middle on timer, last on result
     const initialStatus = SCAN_FIRST_MESSAGE
@@ -603,12 +606,13 @@ function ScanTestPageContent() {
         // Don't throw - timing is not critical
       }
 
-      // Auto-redirect to book page if book already exists
+      // Auto-redirect to book page if book already exists — show brief transition
       if (transformedResult.success && transformedResult.book && !transformedResult.isNewBook) {
-        console.log('[Scan] Book already exists, redirecting to book page:', isbnToScan)
-        // Redirect immediately - no need to wait
-        router.push(`/book/${isbnToScan}`)
         setLoading(false)
+        setRedirectingTo({ isbn: isbnToScan, title: transformedResult.book.title || 'this book' })
+        setTimeout(() => {
+          router.push(`/book/${isbnToScan}`)
+        }, 1200)
         return
       }
       // Note: incrementDailyScanUsage already called above for non-redirect success path
@@ -735,260 +739,119 @@ function ScanTestPageContent() {
         }}
       />
 
-      <div className="container mx-auto py-12 px-4 max-w-2xl">
-        <Card>
-          <CardHeader>
-            <CardTitle>Scan Book</CardTitle>
-            <CardDescription>
-              Scan a book barcode with your camera or enter an ISBN manually.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Scan Settings */}
-            <div className="mb-6 p-4 border rounded-lg bg-muted/30 space-y-4">
-              {/* Quick vs Deep scan toggle */}
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="quick-scan"
-                    checked={scanMode === 'quick'}
-                    onCheckedChange={(checked) => setScanMode(checked === true ? 'quick' : 'deep')}
-                  />
-                  <Label
-                    htmlFor="quick-scan"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    Quick scan (15–30s, recommended for browsing)
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground ml-6">
-                  Quick mode is optimized for speed and returns the most important warnings first. If the available metadata is sparse, Subtext may do an extra lookup to improve accuracy. Deep scan (90–120s) uses {DEEP_SCAN_COST} scan credits from the same daily pool (Quick uses 1).
-                </p>
-                <p className="text-xs text-muted-foreground ml-6 font-medium">
-                  Free triage. Pay for depth.
-                </p>
+      <div className="mx-auto max-w-2xl px-4 pt-4 pb-8 sm:pt-8">
+
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between mb-6">
+          <Link href="/" className="text-muted-foreground hover:text-foreground transition-colors p-1 -ml-1">
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-lg font-semibold">Scan Book</h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="p-1 -mr-1 text-muted-foreground hover:text-foreground"
+            onClick={() => setShowSettings(s => !s)}
+            aria-label="Scan settings"
+          >
+            <SlidersHorizontal className="h-5 w-5" />
+          </Button>
+        </div>
+
+        {/* ── Settings panel (hidden by default) ── */}
+        {showSettings && (
+          <div className="mb-6 p-4 border rounded-xl bg-muted/30 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="quick-scan"
+                  checked={scanMode === 'quick'}
+                  onCheckedChange={(checked) => setScanMode(checked === true ? 'quick' : 'deep')}
+                />
+                <Label htmlFor="quick-scan" className="text-sm font-medium cursor-pointer">
+                  Quick scan (15–30s, recommended)
+                </Label>
               </div>
-
-              {/* Force refresh toggle - Dev only */}
-              {isDevUi && (
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="force-refresh"
-                      checked={forceRefresh}
-                      onCheckedChange={(checked) => setForceRefresh(checked === true)}
-                    />
-                    <Label
-                      htmlFor="force-refresh"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Force refresh (re-scan and replace existing warnings)
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Recommended when testing changes. This deletes existing automated warnings for the book and regenerates them.
-                  </p>
-                </div>
-              )}
-
-              {/* Troubleshoot Camera (collapsed by default) */}
-              <Collapsible open={showTroubleshoot} onOpenChange={setShowTroubleshoot}>
-                <div className="pt-4 border-t border-border/50">
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="px-0 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <ChevronDown className={cn("h-4 w-4 mr-2 transition-transform", showTroubleshoot && "rotate-180")} />
-                      Troubleshoot camera
-                    </Button>
-                  </CollapsibleTrigger>
-                </div>
-                <CollapsibleContent className="pt-2 space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="show-camera-scanner"
-                      checked={preferences.showCameraScanner ?? false}
-                      onCheckedChange={(checked) => {
-                        const newValue = checked === true
-                        updatePreference('showCameraScanner', newValue)
-                        if (newValue) {
-                          try {
-                            window.localStorage.removeItem(AUTO_CAMERA_OPT_OUT_KEY)
-                          } catch {
-                            // ignore
-                          }
-                        }
-                      }}
-                    />
-                    <Label
-                      htmlFor="show-camera-scanner"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Show camera scanner by default
-                    </Label>
-                  </div>
-                  <p className="text-xs text-muted-foreground ml-6">
-                    If camera scanning is unreliable, you can keep manual ISBN entry as your default. If permission prompts get stuck, try refreshing or checking your browser’s camera permissions.
-                  </p>
-                  {cameraTrouble && (
-                    <p className="text-xs text-amber-700 dark:text-amber-400 ml-6">
-                      Camera trouble detected. Try using manual entry, or re-open the scanner to re-request permission.
-                    </p>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
+              <p className="text-xs text-muted-foreground ml-6">
+                Quick mode returns the most important warnings first. Deep scan (90–120s) uses {DEEP_SCAN_COST} credits.
+              </p>
             </div>
 
-            {/* Scan History - Only render after mount to prevent hydration mismatch */}
+            {isDevUi && (
+              <div className="flex items-center space-x-2">
+                <Checkbox id="force-refresh" checked={forceRefresh} onCheckedChange={(checked) => setForceRefresh(checked === true)} />
+                <Label htmlFor="force-refresh" className="text-sm font-medium cursor-pointer">Force refresh</Label>
+              </div>
+            )}
+
+            <div className="pt-3 border-t border-border/50 space-y-3">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show-camera-scanner"
+                  checked={preferences.showCameraScanner ?? false}
+                  onCheckedChange={(checked) => {
+                    const newValue = checked === true
+                    updatePreference('showCameraScanner', newValue)
+                    if (newValue) { try { window.localStorage.removeItem(AUTO_CAMERA_OPT_OUT_KEY) } catch {} }
+                  }}
+                />
+                <Label htmlFor="show-camera-scanner" className="text-sm font-medium cursor-pointer">Auto-open camera</Label>
+              </div>
+              {cameraTrouble && (
+                <p className="text-xs text-amber-700 dark:text-amber-400 ml-6">Camera trouble detected. Try manual entry or re-request permission.</p>
+              )}
+            </div>
+
             {isMounted && history.length > 0 && (
-              <div className="mb-6 p-4 border rounded-lg bg-muted/30">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    <span className="text-sm font-medium">Recent Scans</span>
-                    <span className="text-xs text-muted-foreground">({history.length})</span>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearHistory}
-                    className="h-7 text-xs"
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Clear
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {history.slice(0, 5).map((item) => (
-                    <Button
-                      key={item.isbn}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setIsbn(item.isbn)
-                        performScan(item.isbn)
-                      }}
-                      className="text-xs h-7"
-                    >
-                      {item.title.length > 20 ? `${item.title.substring(0, 20)}...` : item.title}
-                    </Button>
-                  ))}
-                </div>
+              <div className="pt-3 border-t border-border/50 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">{history.length} recent scans</span>
+                <Button variant="ghost" size="sm" onClick={clearHistory} className="h-7 text-xs text-muted-foreground">
+                  <Trash2 className="h-3 w-3 mr-1" /> Clear history
+                </Button>
               </div>
             )}
+          </div>
+        )}
 
-            {/* Bonus Scan Badge - Prominently displayed above rate limit */}
-            <div className="mb-4">
-              <BonusScanBadge variant="scan-page" />
-            </div>
+        {/* ── Camera Scanner ── */}
+        <div className="mb-6">
+          {showScanner ? (
+            <BarcodeScanner
+              onScanSuccess={handleBarcodeScan}
+              onError={handleScannerError}
+              onClose={closeScanner}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                try { window.localStorage.removeItem(AUTO_CAMERA_OPT_OUT_KEY) } catch {}
+                setShowScanner(true)
+              }}
+              className="w-full min-h-[160px] border-2 border-dashed border-border/60 rounded-xl flex flex-col items-center justify-center gap-3 text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors cursor-pointer"
+            >
+              <Camera className="h-8 w-8" />
+              <span className="text-sm font-medium">Tap to scan barcode</span>
+            </button>
+          )}
+        </div>
 
-            {/* Rate Limit Status */}
-            {rateLimit && (
-              <div className={cn(
-                "mb-6 p-4 border rounded-lg",
-                rateLimit.remaining === 0 && !rateLimit.unlimited
-                  ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500 text-yellow-700"
-                  : "bg-muted/30 border-border"
-              )}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-sm font-medium">
-                      {rateLimit.unlimited ? (
-                        <>Unlimited scan credits today</>
-                      ) : rateLimit.remaining === 0 ? (
-                        <>Daily scan credit limit reached</>
-                      ) : (
-                        <>
-                          {rateLimit.remaining} of {rateLimit.limit} scan credits remaining today
-                          {rateLimit.limit > DEFAULT_SCAN_CREDITS_PER_DAY && (
-                            <span className="ml-2 text-xs text-muted-foreground">
-                              ({DEFAULT_SCAN_CREDITS_PER_DAY} base + {rateLimit.limit - DEFAULT_SCAN_CREDITS_PER_DAY} bonus)
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  {rateLimit.remaining === 0 && !rateLimit.unlimited && (
-                    <span className="text-xs text-muted-foreground">
-                      Resets {new Date(rateLimit.resetAt).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
-                      })}
-                    </span>
-                  )}
-                </div>
-                {rateLimit.remaining > 0 && !rateLimit.unlimited && (
-                  <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
-                    <div
-                      className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                      style={{ width: `${(rateLimit.remaining / rateLimit.limit) * 100}%` }}
-                    />
-                  </div>
-                )}
-                {!rateLimit.unlimited && (
-                  <div className="mt-3 flex justify-end">
-                    <RateLimitFeedbackDialog rateLimitRemaining={rateLimit.remaining} />
-                  </div>
-                )}
-              </div>
-            )}
+        {/* ── "or" divider ── */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border/50"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-background px-3 text-muted-foreground">or enter ISBN</span>
+          </div>
+        </div>
 
-            {/* Unified Interface: Scanner + Manual Entry */}
-            <div className="space-y-6 mb-6">
-              {/* Barcode Scanner */}
-              {showScanner && (
-                <div>
-                  <BarcodeScanner
-                    onScanSuccess={handleBarcodeScan}
-                    onError={handleScannerError}
-                    onClose={closeScanner}
-                  />
-                </div>
-              )}
-
-              {/* Divider */}
-              {showScanner && (
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-200"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-white px-2 text-slate-500">Or</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual Entry */}
-              <div>
-                {!showScanner && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      try {
-                        window.localStorage.removeItem(AUTO_CAMERA_OPT_OUT_KEY)
-                      } catch {
-                        // ignore
-                      }
-                      setShowScanner(true)
-                    }}
-                    className="mb-4"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Use Camera Scanner
-                  </Button>
-                )}
-                <form onSubmit={handleScan} className="flex gap-4">
+        {/* ── ISBN Input ── */}
+        <div className="mb-4">
+              <form onSubmit={handleScan} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <Input
                     placeholder="Enter ISBN"
+                    aria-label="Enter ISBN number"
                     value={isbn}
                     onChange={(e) => setIsbn(e.target.value)}
                     className="flex-1"
@@ -1013,8 +876,68 @@ function ScanTestPageContent() {
                     )}
                   </Button>
                 </form>
-              </div>
+        </div>
+
+        {/* ── Compact info bar: mode + credits ── */}
+        <div className="mb-4 flex items-center gap-2 flex-wrap">
+          <Badge
+            variant="outline"
+            className="cursor-pointer text-xs select-none"
+            onClick={() => setScanMode(m => m === 'quick' ? 'deep' : 'quick')}
+          >
+            {scanMode === 'quick' ? 'Quick scan' : 'Deep scan'}
+          </Badge>
+          {rateLimit && !rateLimit.unlimited && (
+            <span className={cn(
+              "text-xs",
+              rateLimit.remaining === 0 ? "text-destructive font-medium" : "text-muted-foreground"
+            )}>
+              {rateLimit.remaining}/{rateLimit.limit} credits
+            </span>
+          )}
+          {rateLimit?.unlimited && (
+            <span className="text-xs text-muted-foreground">Unlimited</span>
+          )}
+          <div className="ml-auto">
+            <BonusScanBadge variant="scan-page" />
+          </div>
+        </div>
+
+        {/* ── History chips ── */}
+        {isMounted && history.length > 0 && (
+          <div className="mb-6 flex items-center gap-2 overflow-x-auto py-1 scrollbar-hide">
+            <History className="h-3 w-3 text-muted-foreground shrink-0" />
+            {history.slice(0, 5).map((item) => (
+              <Button
+                key={item.isbn}
+                variant="ghost"
+                size="sm"
+                onClick={() => { setIsbn(item.isbn); performScan(item.isbn) }}
+                className="text-xs h-6 px-2 text-muted-foreground hover:text-foreground shrink-0"
+              >
+                {item.title.length > 20 ? `${item.title.substring(0, 20)}…` : item.title}
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* ── Rate limit exhausted warning ── */}
+        {rateLimit && rateLimit.remaining === 0 && !rateLimit.unlimited && (
+          <div className="mb-6 p-3 border rounded-lg bg-yellow-50 dark:bg-yellow-950/20 border-yellow-500/50 text-yellow-700 dark:text-yellow-400">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">Daily scan limit reached</span>
+              <span className="text-xs text-muted-foreground">
+                Resets {new Date(rateLimit.resetAt).toLocaleTimeString('en-US', {
+                  hour: 'numeric', minute: '2-digit', hour12: true,
+                  timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+                })}
+              </span>
             </div>
+            <div className="mt-2 flex justify-end">
+              <RateLimitFeedbackDialog rateLimitRemaining={rateLimit.remaining} />
+            </div>
+          </div>
+        )}
 
             {error && (
               <Alert variant="destructive" className="mb-6">
@@ -1085,8 +1008,10 @@ function ScanTestPageContent() {
                       placeholder="Any other details that might help us find this book..."
                       value={reportAdditionalInfo}
                       onChange={(e) => setReportAdditionalInfo(e.target.value)}
+                      maxLength={500}
                       className="mt-1 flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                     />
+                    <p className="mt-1 text-xs text-muted-foreground text-right">{reportAdditionalInfo.length}/500</p>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -1146,10 +1071,13 @@ function ScanTestPageContent() {
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="font-medium text-foreground">{currentStage.displayText}</p>
-                        <div className="mt-2 w-full bg-secondary rounded-full h-1.5">
+                        <div className="flex items-center justify-between">
+                          <p className="font-medium text-foreground">{currentStage.displayText}</p>
+                          <span className="text-xs text-muted-foreground tabular-nums">{Math.round((currentStage.stage / 4) * 100)}%</span>
+                        </div>
+                        <div className="mt-2 w-full bg-secondary rounded-full h-2">
                           <div
-                            className="bg-primary h-1.5 rounded-full transition-all duration-500 ease-out"
+                            className="bg-primary h-2 rounded-full transition-all duration-500 ease-out"
                             style={{ width: `${(currentStage.stage / 4) * 100}%` }}
                           />
                         </div>
@@ -1202,6 +1130,31 @@ function ScanTestPageContent() {
               )
             })()}
 
+            {/* Redirect transition — existing book found */}
+            {redirectingTo && (
+              <div className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="border rounded-lg p-6 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-green-800 dark:text-green-200">
+                        Found it!
+                      </p>
+                      <p className="text-sm text-green-700/80 dark:text-green-300/70 truncate">
+                        Taking you to <span className="font-medium italic">{redirectingTo.title}</span>
+                      </p>
+                    </div>
+                    <Loader2 className="h-4 w-4 animate-spin text-green-600 dark:text-green-400 shrink-0" />
+                  </div>
+                  <div className="mt-3 w-full bg-green-200/50 dark:bg-green-800/30 rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-green-500 dark:bg-green-400 h-1.5 rounded-full animate-[progress_1.2s_ease-in-out_forwards]" />
+                  </div>
+                </div>
+              </div>
+            )}
+
             {candidates && (
               <div className="space-y-4 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <Alert className="border-yellow-500 text-yellow-700 bg-yellow-50 dark:bg-yellow-950/20">
@@ -1234,9 +1187,9 @@ function ScanTestPageContent() {
                         {candidate.cover_url && (
                           <img
                             src={candidate.cover_url}
-                            alt={candidate.title}
+                            alt={`${candidate.title}${candidate.author ? ` by ${candidate.author}` : ''}`}
                             className={cn(
-                              "w-16 h-24 object-cover rounded shadow-sm transition-all duration-300",
+                              "w-12 h-18 sm:w-16 sm:h-24 object-cover rounded shadow-sm transition-all duration-300",
                               isSelected && "ring-2 ring-primary"
                             )}
                           />
@@ -1300,32 +1253,18 @@ function ScanTestPageContent() {
             <PaywallModal open={showPaywall} onOpenChange={setShowPaywall} />
 
             {result && result.success && (
-              <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
-                <Alert className="border-green-500 text-green-700 bg-green-50 dark:bg-green-950/20">
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertTitle>Success</AlertTitle>
-                  <AlertDescription>
-                    Scan completed successfully.
-                    {result.analysisLevel === 'quick' && (
-                      <div className="mt-2">
-                        <Badge variant={result.enrichmentUsed ? "secondary" : "outline"}>
-                          {result.enrichmentUsed ? 'Quick (enriched)' : 'Quick'}
-                          {result.metadataQuality ? ` • ${result.metadataQuality} metadata` : ''}
-                        </Badge>
-                      </div>
-                    )}
-                    {result.analysisLevel === 'deep' && (
-                      <div className="mt-2">
-                        <Badge variant="outline">Deep</Badge>
-                      </div>
-                    )}
-                    {result.multiModelAnalysis && (
-                      <span className="block mt-1 text-xs">
-                        Cross-check analysis completed
-                      </span>
-                    )}
-                  </AlertDescription>
-                </Alert>
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-400">
+                {/* Success header — compact, no alert box */}
+                <div className="flex items-center gap-3 text-green-700 dark:text-green-400">
+                  <CheckCircle className="h-5 w-5 shrink-0" />
+                  <span className="font-medium">Scan complete</span>
+                  {result.analysisLevel && (
+                    <Badge variant="outline" className="ml-auto text-[10px]">
+                      {result.analysisLevel === 'quick' && result.enrichmentUsed ? 'Quick (enriched)' : result.analysisLevel === 'quick' ? 'Quick' : 'Deep'}
+                      {result.metadataQuality ? ` · ${result.metadataQuality} metadata` : ''}
+                    </Badge>
+                  )}
+                </div>
 
                 {/* Cross-check Analysis Display */}
                 {result.multiModelAnalysis && (
@@ -1398,29 +1337,38 @@ function ScanTestPageContent() {
                   </div>
                 )}
 
-                <div className="grid gap-4">
+                {/* Book result card */}
+                <div className="space-y-4">
                   {result.book && (
-                    <div className="p-4 border rounded bg-muted/50">
-                      <h3 className="font-bold text-lg">{result.book.title || "Unknown Title"}</h3>
-                      <p className="text-sm text-muted-foreground">{result.book.author}</p>
-
-                      {/* Timing Display (dev-only) */}
-                      {isDevUi && result.timing && (
-                        <div className="mt-3 p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">
-                          <div className="font-bold mb-1">⏱️ Scan Timing:</div>
-                          <div>Total: <strong>{result.timing.duration.toFixed(0)}ms</strong></div>
-                          {Object.entries(result.timing.stages).map(([stage, duration]) => (
-                            <div key={stage} className="ml-2 text-muted-foreground">
-                              {stage}: {Number(duration).toFixed(0)}ms
-                            </div>
-                          ))}
+                    <div className="border rounded-xl overflow-hidden bg-card shadow-sm">
+                      <div className="flex gap-4 p-4">
+                        {result.book.cover_url && (
+                          <img
+                            src={result.book.cover_url.startsWith("http") ? `/api/book-cover?url=${encodeURIComponent(result.book.cover_url)}` : result.book.cover_url}
+                            alt={`Cover of ${result.book.title}`}
+                            className="w-20 h-[120px] object-cover rounded-lg shadow-sm shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                          <div>
+                            <h3 className="font-serif font-bold text-lg leading-tight">{result.book.title || "Unknown Title"}</h3>
+                            {result.book.author && <p className="text-sm text-muted-foreground mt-0.5">{result.book.author}</p>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-muted-foreground">
+                            {result.isNewBook && <Badge variant="secondary" className="text-[10px]">New</Badge>}
+                            {result.contentWarningsGenerated && <Badge variant="outline" className="text-[10px]">Warnings generated</Badge>}
+                            {result.multiModelAnalysis && (
+                              <Badge variant="outline" className="text-[10px]">
+                                {result.multiModelAnalysis.combined_warnings.length} warnings (cross-checked)
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      )}
+                      </div>
 
-
-                      {/* Audio Player - If Available */}
+                      {/* Audio Player */}
                       {result.book.audio_url && result.book.content_briefing && (
-                        <div className="mt-4">
+                        <div className="px-4 pb-3">
                           <AccessibleAudioPlayer
                             audioUrl={result.book.audio_url}
                             duration={result.book.audio_duration || undefined}
@@ -1430,48 +1378,29 @@ function ScanTestPageContent() {
                         </div>
                       )}
 
-                      <div className="mt-4">
+                      {/* CTA */}
+                      <div className="border-t px-4 py-3">
                         <Link href={`/book/${result.book.isbn}`}>
-                          <Button
-                            variant="outline"
-                            className="w-full"
-                            onClick={() => {
-                              // Track timing to book page navigation
-                              if (result.timing) {
-                                const navStart = performance.now()
-                                const timeToNav = navStart - (result.timing.startTime + result.timing.duration)
-                                console.log(`📊 Time to navigate: ${timeToNav.toFixed(0)}ms`)
-                                console.log(`📊 Total time (scan + nav): ${(result.timing.duration + timeToNav).toFixed(0)}ms`)
-                              }
-                            }}
-                          >
-                            View Book Page <ArrowRight className="ml-2 h-4 w-4" />
+                          <Button className="w-full" size="sm">
+                            View Full Details <ArrowRight className="ml-2 h-4 w-4" />
                           </Button>
                         </Link>
                       </div>
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Is New Book?</span>
-                      <span className="font-mono">{result.isNewBook ? "Yes" : "No"}</span>
+                  {/* Timing Display (dev-only) */}
+                  {isDevUi && result.timing && (
+                    <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono">
+                      <div className="font-bold mb-1">Scan Timing:</div>
+                      <div>Total: <strong>{result.timing.duration.toFixed(0)}ms</strong></div>
+                      {Object.entries(result.timing.stages).map(([stage, duration]) => (
+                        <div key={stage} className="ml-2 text-muted-foreground">
+                          {stage}: {Number(duration).toFixed(0)}ms
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Warnings Generated?</span>
-                      <span className="font-mono">
-                        {result.multiModelAnalysis
-                          ? `${result.multiModelAnalysis.combined_warnings.length} (combined)`
-                          : result.contentWarningsGenerated ? "Yes" : "No"}
-                      </span>
-                    </div>
-                    {result.multiModelAnalysis && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Classification Rating</span>
-                        <span className="font-mono">{result.multiModelAnalysis.classification_rating || "N/A"}</span>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {/* Display Combined Warnings for Multi-Model */}
                   {result.multiModelAnalysis && result.multiModelAnalysis.combined_warnings.length > 0 && (
@@ -1516,8 +1445,6 @@ function ScanTestPageContent() {
                 </div>
               </div>
             )}
-          </CardContent>
-        </Card>
       </div>
     </>
   )
@@ -1526,14 +1453,11 @@ function ScanTestPageContent() {
 export default function ScanTestPage() {
   return (
     <Suspense fallback={
-      <div className="container mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mx-auto max-w-2xl px-4 pt-4 pb-8 sm:pt-8">
+        <div className="flex flex-col items-center justify-center py-24 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Loading scanner...</p>
+        </div>
       </div>
     }>
       <ScanTestPageContent />

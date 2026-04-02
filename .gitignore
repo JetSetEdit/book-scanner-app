@@ -21,6 +21,7 @@ yarn-error.log*
 
 # env files
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -56,3 +57,7 @@ backups/
 data/
 !data/training/.gitkeep
 !data/models/.gitkeepdatasets/
+
+# macOS
+.DS_Store
+**/.DS_Store

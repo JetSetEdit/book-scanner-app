@@ -176,13 +176,12 @@ export default async function BookPage({ params }: BookPageProps) {
     .order("created_at", { ascending: false })
     .limit(1)
 
-  // Determine analysis status
-  // Analysis is complete if:
-  // 1. There's an audit log with 'warnings_generated' or 'no_warnings', OR
-  // 2. There are AI-generated warnings (even without audit log - indicates analysis was done)
+  // Determine analysis status (see openspec: fix-book-analysis-status-display).
+  // Complete if: (1) audit log with warnings_generated/no_warnings, OR (2) any content warnings after appeal suppression.
+  // Intentional: we do not require source === 'ai_generated'; any stored warnings count so legacy/mixed-source books show as analyzed.
   const hasAuditLog = auditLogs && auditLogs.length > 0
-  const hasAiWarnings = warnings.some((w: any) => w.source === 'ai_generated')
-  const hasAnalysisCompleted = hasAuditLog || hasAiWarnings
+  const hasAnyWarnings = warnings && warnings.length > 0
+  const hasAnalysisCompleted = hasAuditLog || hasAnyWarnings
   const analysisStatus: 'complete' | 'unknown' = hasAnalysisCompleted ? 'complete' : 'unknown'
   const metadataIssues = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any).metadata_issues : null
   const latestAudit = auditLogs && auditLogs.length > 0 ? (auditLogs[0] as any) : null

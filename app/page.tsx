@@ -83,14 +83,14 @@ export default async function HomePage() {
 
             <div className="space-y-4 relative">
               <div className="absolute -top-2 -right-2">
-                <span className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground border border-border">
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary border border-primary/20">
                   Coming Soon
                 </span>
               </div>
               <div className="h-12 w-12 rounded-full bg-emerald-100/50 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-700 dark:text-emerald-400 opacity-60">
                 <Users className="h-6 w-6" />
               </div>
-              <h3 className="font-serif text-2xl font-bold text-foreground text-muted-foreground">{v.features.community.title}</h3>
+              <h3 className="font-serif text-2xl font-bold text-muted-foreground">{v.features.community.title}</h3>
               <p className="text-muted-foreground leading-relaxed">
                 {v.features.community.description}
               </p>
