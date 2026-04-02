@@ -10,5 +10,9 @@ export const HOW_WE_GENERATE_LABEL = 'How we generate these'
  * Short, non-technical explanation of how content warnings are produced.
  * 2–4 sentences: evidence-based, no genre/author inference, formula-driven severity, advisory-only.
  */
+/** One-line trust signal shown before expanding the full explanation. */
+export const CONTENT_WARNING_GENERATION_TEASER =
+  "We use this book’s description and other verified metadata—not genre, author reputation, or similar titles—to produce advisory warnings and severity."
+
 export const CONTENT_WARNING_GENERATION_EXPLANATION =
   "We use the book's description and other verified information about this specific book to identify themes and sensitive content. Warnings are based only on that evidence—not on genre, author, or similar books—and severity is calculated from factors like how central and how explicit the content is. All of this is advisory to help you decide what's right for you."

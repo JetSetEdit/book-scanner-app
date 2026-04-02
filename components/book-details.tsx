@@ -5,7 +5,7 @@ import { BooktokWarningsSummary } from "@/components/booktok-warnings-summary"
 import { AuditHistory } from "@/components/audit-history"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode, Flag, BookOpen } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Code, ScanBarcode, Flag, BookOpen, Flame, Info, Sparkles } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useState, useEffect, useRef } from "react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -15,16 +15,49 @@ import { GoogleBooksAttribution } from "@/components/google-books-attribution"
 import { ShareButton } from "@/components/ShareButton"
 import { BuyButton } from "@/components/BuyButton"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Info } from "lucide-react"
 import { getSubcategoryById } from "@/lib/config/taxonomy-v2"
 import { APP_VERSION } from "@/lib/config/version"
 import { generateSummary } from "@/lib/services/warning-renderer"
 import { FeedbackDialog } from "@/components/feedback-dialog"
 import { AppealDialog } from "@/components/appeal-dialog"
-import { CONTENT_WARNING_GENERATION_EXPLANATION, HOW_WE_GENERATE_LABEL } from "@/lib/content-warning-explanation"
+import {
+  CONTENT_WARNING_GENERATION_EXPLANATION,
+  CONTENT_WARNING_GENERATION_TEASER,
+  HOW_WE_GENERATE_LABEL,
+} from "@/lib/content-warning-explanation"
 import { getVariantConfig } from "@/lib/config/variants"
+import { cn } from "@/lib/utils"
+import { computeSpiceLevel } from "@/lib/utils/spice-level"
+import { formatPublicationDateDisplay } from "@/lib/utils/format-publication-date"
 
 const DESCRIPTION_TRUNCATE_LENGTH = 600
+
+function shouldSuggestDeepScan(opts: {
+  analysisStatus: 'complete' | 'unknown'
+  warnings: any[]
+  analysisMeta: {
+    hadThinMetadata: boolean
+    usedWebSearch: boolean
+    pipelinePath: string | null
+    analyzedAt: string | null
+  } | null
+  description: string
+}): boolean {
+  const { analysisStatus, warnings, analysisMeta, description } = opts
+  if (analysisStatus !== 'complete' || !Array.isArray(warnings) || warnings.length === 0) return false
+  const descriptionLength = (description || '').length
+  const crossChecked = warnings.some((w: any) => w?.evidence?.[0]?.model_source === 'both')
+  const votesPresent = warnings.some(
+    (w: any) => (w?.helpful_count || 0) + (w?.not_helpful_count || 0) > 0
+  )
+  const pipeline = analysisMeta?.pipelinePath?.includes('quick')
+    ? 'Quick'
+    : analysisMeta?.pipelinePath?.includes('deep')
+      ? 'Deep'
+      : null
+  const isThin = analysisMeta?.hadThinMetadata === true || descriptionLength < 200
+  return pipeline === 'Quick' || isThin || !crossChecked || !votesPresent
+}
 
 interface BookDetailsProps {
   book: any
@@ -190,7 +223,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               )}
             </section>
 
-            {/* Content at a glance: severity bar + counts + age classification (above Specifications) */}
+            {/* Left overview: severity + spice + age (Key themes card below adds only triggers/tropes). */}
             {(() => {
               const hasWarnings = Array.isArray(warnings) && warnings.length > 0
               const noWarningsComplete = analysisStatus === 'complete' && Array.isArray(warnings) && warnings.length === 0
@@ -202,6 +235,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               const mildCount = hasWarnings ? warnings.filter((w: any) => w.severity !== 'moderate' && w.severity !== 'severe').length : 0
               const moderateCount = hasWarnings ? warnings.filter((w: any) => w.severity === 'moderate').length : 0
               const severeCount = hasWarnings ? warnings.filter((w: any) => w.severity === 'severe').length : 0
+              const spiceLevel = hasWarnings ? computeSpiceLevel(warnings) : 0
               const ageRecommendations: Record<string, string> = {
                 'G': 'All ages',
                 'PG': 'Ages 8+',
@@ -225,8 +259,11 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <div
                   className="rounded-xl border border-border/60 bg-muted/10 px-4 py-3"
                   role="region"
-                  aria-label="Content at a glance"
+                  aria-label="Book overview: warning severity, spice level, and age classification"
                 >
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                    {'Severity & rating'}
+                  </p>
                   {hasWarnings ? (
                     <>
                       <div className="flex flex-wrap gap-0.5 mb-2">
@@ -246,6 +283,22 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                       <p className="text-xs text-muted-foreground">
                         Mild {mildCount} · Moderate {moderateCount} · Severe {severeCount}
                       </p>
+                      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mt-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Spice</span>
+                        <span className="flex items-center gap-0.5" aria-label={`Spice level ${spiceLevel} of 3`}>
+                          {[1, 2, 3].map((level) => (
+                            <Flame
+                              key={level}
+                              className={cn(
+                                'h-3 w-3 transition-all',
+                                level <= spiceLevel
+                                  ? 'fill-orange-500 text-orange-500'
+                                  : 'text-muted-foreground/20'
+                              )}
+                            />
+                          ))}
+                        </span>
+                      </div>
                     </>
                   ) : analysisStatus === 'complete' ? (
                     <p className="text-xs text-muted-foreground">No content warnings</p>
@@ -278,6 +331,9 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                               <div className="text-sm space-y-2">
                                 <p>{ratingDescription}</p>
                                 {ageLine && <p className="text-xs text-muted-foreground">{ageLine}</p>}
+                                <p className="text-xs text-muted-foreground">
+                                  The label reflects <strong>described content signals</strong> from this scan (severity and themes we could verify)—not genre, popularity, or reputation elsewhere online.
+                                </p>
                                 <p className="text-xs text-muted-foreground border-t border-border pt-2">
                                   Indicative rating from our analysis; not an official Australian Classification Board rating.{' '}
                                   <Link href="/faq#age-appropriateness" className="text-primary hover:underline underline-offset-2">
@@ -318,12 +374,27 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                     <span className="text-foreground text-right">{book.publisher}</span>
                   </div>
                 )}
-                {book.published_date && (
-                  <div className="flex justify-between items-baseline border-b border-border pb-2">
-                    <span className="font-medium text-muted-foreground">Released</span>
-                    <span className="text-foreground">{book.published_date}</span>
-                  </div>
-                )}
+                {book.published_date &&
+                  (() => {
+                    const { text, approximate } = formatPublicationDateDisplay(book.published_date)
+                    if (!text) return null
+                    return (
+                      <div className="flex justify-between items-baseline border-b border-border pb-2 gap-2">
+                        <span className="font-medium text-muted-foreground shrink-0">Released</span>
+                        <span className="text-foreground text-right">
+                          {text}
+                          {approximate ? (
+                            <span
+                              className="text-muted-foreground font-normal text-xs ml-1.5 whitespace-nowrap"
+                              title="Source data marked this date as uncertain"
+                            >
+                              (approx.)
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                    )
+                  })()}
                 {book.page_count && (
                   <div className="flex justify-between items-baseline border-b border-border pb-2">
                     <span className="font-medium text-muted-foreground">Length</span>
@@ -508,6 +579,28 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 <div className="h-px bg-border flex-1"></div>
               </div>
 
+              {!isDev &&
+                shouldSuggestDeepScan({
+                  analysisStatus,
+                  warnings: warnings || [],
+                  analysisMeta: analysisMeta ?? null,
+                  description: book?.description || '',
+                }) && (
+                  <div className="mb-6 max-w-2xl mx-auto rounded-lg border border-border/80 bg-muted/20 px-4 py-3 text-sm text-foreground/90">
+                    <p className="text-sm">
+                      This result is mainly from the available synopsis and metadata. A{' '}
+                      <strong>Deep scan</strong> is slower but can surface more detail when the blurb is short or thin.
+                    </p>
+                    <Link
+                      href={`/scan?isbn=${encodeURIComponent(book.isbn)}&scanMode=deep`}
+                      className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                    >
+                      <ScanBarcode className="h-4 w-4 shrink-0" aria-hidden />
+                      Run Deep scan for this book
+                    </Link>
+                  </div>
+                )}
+
               {/* Transparency line: what this analysis is based on (Dev mode only) */}
               {isDev && (
                 <div className="mb-6 max-w-2xl mx-auto text-xs text-muted-foreground">
@@ -532,19 +625,45 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                       return analysisMeta.usedWebSearch ? 'Yes' : 'No'
                     })()
                     const isThin = analysisMeta?.hadThinMetadata === true || descriptionLength < 200
-                    const shouldSuggestDeep = analysisStatus === 'complete' && (pipeline === 'Quick' || isThin || !crossChecked || !votesPresent)
-                    const parts = [
-                      `Description: ${descriptionLength} chars`,
-                      pipeline ? `Mode: ${pipeline}` : null,
-                      enrichment ? `Web enrichment: ${enrichment}` : null,
-                      `Verified: ${crossChecked ? 'Yes' : 'No'}`,
-                    ].filter(Boolean)
+                    const shouldSuggestDeep =
+                      analysisStatus === 'complete' &&
+                      (pipeline === 'Quick' || isThin || !crossChecked || !votesPresent)
                     return (
                       <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                        <div>
-                          <div className="font-medium text-foreground">Based on</div>
-                          <div>{parts.join(' • ')}</div>
+                        <Info className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                          <div className="font-medium text-foreground mb-2">Based on</div>
+                          <div className="flex flex-wrap gap-1.5 items-center">
+                            <Badge variant="outline" className="text-[10px] font-medium h-6 px-2 font-mono">
+                              {descriptionLength} chars
+                            </Badge>
+                            {pipeline ? (
+                              <Badge
+                                variant="secondary"
+                                className={cn(
+                                  'text-[10px] h-6 px-2 font-medium',
+                                  pipeline === 'Deep' && 'bg-violet-100 text-violet-900 dark:bg-violet-900/40 dark:text-violet-100'
+                                )}
+                              >
+                                {pipeline}
+                              </Badge>
+                            ) : null}
+                            {enrichment != null ? (
+                              <Badge variant="outline" className="text-[10px] h-6 px-2 font-medium">
+                                Web: {enrichment}
+                              </Badge>
+                            ) : null}
+                            <Badge
+                              className={cn(
+                                'text-[10px] h-6 px-2 font-medium border-0',
+                                crossChecked
+                                  ? 'bg-emerald-600 text-white hover:bg-emerald-600'
+                                  : 'bg-amber-100 text-amber-950 dark:bg-amber-900/50 dark:text-amber-50'
+                              )}
+                            >
+                              Verified: {crossChecked ? 'Yes' : 'No'}
+                            </Badge>
+                          </div>
                           {shouldSuggestDeep && (
                             <div className="mt-3">
                               <Link href={`/scan?isbn=${encodeURIComponent(book.isbn)}&scanMode=deep`}>
@@ -565,7 +684,62 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
                 </div>
               )}
 
-              {/* Quick Glance (includes severity overview bar + key triggers / tropes / spice) */}
+              {/* Trust: how warnings are produced (teaser always visible; details on expand) */}
+              {getVariantConfig().flags?.showHowWeGenerate !== false && (
+                <div className="mb-8 max-w-2xl mx-auto rounded-xl border border-primary/20 bg-primary/[0.04] dark:bg-primary/10 px-4 py-4 shadow-sm">
+                  <div className="flex gap-3">
+                    <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" aria-hidden />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-semibold text-foreground">{HOW_WE_GENERATE_LABEL}</h3>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex p-0.5 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                aria-label="More about how Subtext generates warnings"
+                              >
+                                <Info className="h-3.5 w-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="max-w-xs text-xs">
+                              Advisory only. Warnings tie to this book’s verified text and metadata; severity uses a
+                              fixed formula, not opinion or genre stereotypes.{' '}
+                              <Link href="/faq" className="text-primary underline underline-offset-2">
+                                FAQ
+                              </Link>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{CONTENT_WARNING_GENERATION_TEASER}</p>
+                      <Collapsible open={isHowWeGenerateOpen} onOpenChange={setIsHowWeGenerateOpen}>
+                        <CollapsibleTrigger
+                          id="how-we-generate-trigger"
+                          aria-expanded={isHowWeGenerateOpen}
+                          aria-controls="how-we-generate-cw-explanation"
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded"
+                        >
+                          Read full explanation
+                          {isHowWeGenerateOpen ? (
+                            <ChevronUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          ) : (
+                            <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                          )}
+                        </CollapsibleTrigger>
+                        <CollapsibleContent id="how-we-generate-cw-explanation" className="pt-2">
+                          <p className="text-sm text-muted-foreground leading-relaxed border-t border-border/60 pt-3">
+                            {CONTENT_WARNING_GENERATION_EXPLANATION}
+                          </p>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Key themes: moderate+ triggers and tropes (severity lives under cover) */}
               {getVariantConfig().flags?.showBookTokSummary !== false && warnings && warnings.length > 0 && (
                 <BooktokWarningsSummary warnings={warnings} onWarningClick={handleWarningClick} />
               )}
@@ -574,34 +748,6 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               <p className="text-sm text-foreground/80 italic mb-6 text-center max-w-2xl mx-auto">
                 Content warnings help readers make informed choices — they're not judgments about books or readers.
               </p>
-
-              {/* How we generate these — expandable (hidden in lite) */}
-              {getVariantConfig().flags?.showHowWeGenerate !== false && (
-                <Collapsible
-                  open={isHowWeGenerateOpen}
-                  onOpenChange={setIsHowWeGenerateOpen}
-                  className="mb-6 flex flex-col items-center"
-                >
-                  <CollapsibleTrigger
-                    id="how-we-generate-trigger"
-                    aria-expanded={isHowWeGenerateOpen}
-                    aria-controls="how-we-generate-cw-explanation"
-                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded px-1 -mx-1"
-                  >
-                    {HOW_WE_GENERATE_LABEL}
-                    {isHowWeGenerateOpen ? (
-                      <ChevronUp className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    ) : (
-                      <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    )}
-                  </CollapsibleTrigger>
-                  <CollapsibleContent id="how-we-generate-cw-explanation" className="w-full max-w-2xl">
-                    <p className="text-sm text-muted-foreground mt-2 text-center">
-                      {CONTENT_WARNING_GENERATION_EXPLANATION}
-                    </p>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
 
               {/* Dynamic Reader Summary: lead line above the list (hidden in lite; text-foreground/80 for WCAG AA) */}
               {getVariantConfig().flags?.showBookTokSummary !== false && warnings && warnings.length > 0 && (
