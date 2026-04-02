@@ -11,6 +11,8 @@ import { getCategoryIcon, getCategoryLabel } from "@/lib/utils/category-icons"
 const CAROUSEL_PX_PER_SEC = 28
 const CAROUSEL_TICK_MS = 80
 
+export type RecentScansVariant = "default" | "showcase"
+
 interface RecentScan {
   id: string
   isbn: string
@@ -137,7 +139,8 @@ function BackFace({
   )
 }
 
-export function RecentScans() {
+export function RecentScans({ variant = "default" }: { variant?: RecentScansVariant }) {
+  const isShowcase = variant === "showcase"
   const [scans, setScans] = useState<RecentScan[]>([])
   const [loading, setLoading] = useState(true)
   const [isPaused, setIsPaused] = useState(false)
@@ -242,7 +245,13 @@ export function RecentScans() {
 
   if (loading) {
     return (
-      <div className="border-t border-border/50 bg-card/60 py-12">
+      <div
+        className={
+          isShowcase
+            ? "border-t border-border/40 bg-gradient-to-b from-muted/40 via-card/80 to-background py-16 md:py-20"
+            : "border-t border-border/50 bg-card/60 py-12"
+        }
+      >
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-center gap-2 text-muted-foreground">
             <Clock className="h-4 w-4 animate-spin" />
@@ -266,24 +275,75 @@ export function RecentScans() {
   }
 
   return (
-    <div className="border-t border-border/50 bg-card/60 py-12">
+    <section
+      aria-labelledby="recent-scans-heading"
+      className={
+        isShowcase
+          ? "border-t border-border/40 bg-gradient-to-b from-muted/40 via-card/80 to-background py-16 md:py-24"
+          : "border-t border-border/50 bg-card/60 py-12"
+      }
+    >
       <div className="container mx-auto px-4">
         <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col items-center justify-center text-center mb-8 space-y-2">
-            <span className="text-sm text-muted-foreground uppercase tracking-wider font-medium">Here’s what Subtext looks like in action:</span>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-muted-foreground" />
-              <h2 className="font-serif text-2xl font-bold text-foreground">
-                Recently Scanned
+          <div
+            className={
+              isShowcase
+                ? "flex flex-col items-center justify-center text-center mb-10 md:mb-12 space-y-3"
+                : "flex flex-col items-center justify-center text-center mb-8 space-y-2"
+            }
+          >
+            <span
+              className={
+                isShowcase
+                  ? "text-xs md:text-sm text-muted-foreground uppercase tracking-[0.2em] font-medium"
+                  : "text-sm text-muted-foreground uppercase tracking-wider font-medium"
+              }
+            >
+              {isShowcase ? "Live from the scanner" : "Here’s what Subtext looks like in action:"}
+            </span>
+            <div className="flex items-center gap-2 md:gap-3">
+              <Clock
+                className={
+                  isShowcase
+                    ? "h-6 w-6 md:h-7 md:w-7 text-primary/70"
+                    : "h-5 w-5 text-muted-foreground"
+                }
+                aria-hidden
+              />
+              <h2
+                id="recent-scans-heading"
+                className={
+                  isShowcase
+                    ? "font-serif text-3xl md:text-4xl font-bold text-foreground tracking-tight"
+                    : "font-serif text-2xl font-bold text-foreground"
+                }
+              >
+                {isShowcase ? "Recently scanned" : "Recently Scanned"}
               </h2>
             </div>
+            {isShowcase && (
+              <p className="text-sm md:text-base text-muted-foreground max-w-xl leading-relaxed">
+                Real titles readers looked up—flip a cover for themes and warnings.
+              </p>
+            )}
           </div>
 
+          <div
+            className={
+              isShowcase
+                ? "rounded-2xl border border-border/50 bg-background/60 shadow-sm shadow-black/5 dark:shadow-black/20 px-2 py-4 md:px-4 md:py-6 backdrop-blur-[2px]"
+                : ""
+            }
+          >
           <div
             ref={scrollRef}
             onMouseEnter={() => setIsPaused(true)}
             onMouseLeave={() => setIsPaused(false)}
-            className="flex gap-4 overflow-x-auto overflow-y-visible pt-3 pb-6 -mx-4 px-4 scrollbar-hide"
+            className={
+              isShowcase
+                ? "flex gap-5 md:gap-6 overflow-x-auto overflow-y-visible pt-2 pb-2 -mx-2 px-2 md:-mx-0 md:px-0 scrollbar-hide"
+                : "flex gap-4 overflow-x-auto overflow-y-visible pt-3 pb-6 -mx-4 px-4 scrollbar-hide"
+            }
           >
             {scansWithBooks.slice(0, 8).map((scan) => {
               const timeAgo = formatDistanceToNow(new Date(scan.createdAt), {
@@ -295,7 +355,11 @@ export function RecentScans() {
               return (
                 <div
                   key={scan.isbn}
-                  className="flex-shrink-0 w-32 md:w-40 overflow-visible"
+                  className={
+                    isShowcase
+                      ? "flex-shrink-0 w-36 md:w-44 overflow-visible"
+                      : "flex-shrink-0 w-32 md:w-40 overflow-visible"
+                  }
                   style={{ perspective: "800px" }}
                 >
                   {prefersReducedMotion ? (
@@ -375,7 +439,7 @@ export function RecentScans() {
           </div>
 
           {scans.length > 8 && (
-            <div className="mt-6 text-center">
+            <div className={isShowcase ? "mt-8 text-center" : "mt-6 text-center"}>
               <Link
                 href="/bookshelf"
                 className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
@@ -384,9 +448,10 @@ export function RecentScans() {
               </Link>
             </div>
           )}
+          </div>
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 

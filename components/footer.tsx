@@ -1,11 +1,14 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { APP_VERSION_LABEL, APP_VERSION, APP_BUILD_DATE, APP_BUILD_ID } from "@/lib/config/version"
 import { getVariantConfig } from "@/lib/config/variants"
 import { FeedbackDialog } from "@/components/feedback-dialog"
 
 export function Footer() {
+  const pathname = usePathname()
+  const isHome = pathname === "/"
   const v = getVariantConfig()
 
   return (
@@ -33,9 +36,15 @@ export function Footer() {
             </p>
           )}
 
-          <p className="text-xs text-muted-foreground/60 text-center">
-            {APP_VERSION_LABEL} (v{APP_VERSION}) · Build {APP_BUILD_ID} · {APP_BUILD_DATE}
-          </p>
+          {isHome ? (
+            <p className="text-xs text-muted-foreground/50 text-center">
+              {APP_VERSION_LABEL} (v{APP_VERSION})
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground/60 text-center">
+              {APP_VERSION_LABEL} (v{APP_VERSION}) · Build {APP_BUILD_ID} · {APP_BUILD_DATE}
+            </p>
+          )}
         </div>
       </div>
     </footer>
