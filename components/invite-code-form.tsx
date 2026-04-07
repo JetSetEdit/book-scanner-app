@@ -45,18 +45,18 @@ export function InviteCodeForm() {
     <form action={handleSubmit} className="space-y-4 mt-6">
       <div className="space-y-2 text-left">
         <label htmlFor="invite-code" className="text-sm font-medium text-[#4A4A4A]">
-          Enter your invite code
+          Invite code
         </label>
         <Input
           id="invite-code"
           name="code"
           type="text"
-          placeholder="e.g. SUBTEXT-ABCD-1234"
+          placeholder="Enter your code"
           className="w-full bg-white border-[#E8E5DF]"
           autoComplete="off"
         />
         <p className="text-xs text-[#6B6B6B]">
-          Paste the code from your invite email to access the beta.
+          Got a code from a friend or post? Enter it here.
         </p>
       </div>
       {error && (
@@ -65,14 +65,6 @@ export function InviteCodeForm() {
         </p>
       )}
       <SubmitButton />
-      <p className="text-center">
-        <Link
-          href="/"
-          className="text-sm text-[#6B6B6B] hover:text-[#2C2416] underline"
-        >
-          Back to homepage
-        </Link>
-      </p>
     </form>
   )
 }
