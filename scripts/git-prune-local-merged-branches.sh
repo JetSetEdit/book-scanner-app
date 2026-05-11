@@ -41,14 +41,23 @@ if [[ "${CONFIRM:-}" != "1" ]]; then
   exit 0
 fi
 
+MAIN_TIP="$(git rev-parse "$MAIN")"
 while IFS= read -r b; do
   [[ -z "$b" ]] && continue
   if [[ "$b" == "$CURRENT" ]]; then
     echo "Skipping current branch: $b"
     continue
   fi
+  if ! git rev-parse --verify "$b" >/dev/null 2>&1; then
+    continue
+  fi
+  BR_TIP="$(git rev-parse "$b")"
+  if ! git merge-base --is-ancestor "$BR_TIP" "$MAIN_TIP" 2>/dev/null; then
+    echo "Skipping (tip not an ancestor of $MAIN): $b"
+    continue
+  fi
   echo "Deleting local branch: $b"
-  git branch -d "$b"
+  git branch -D "$b"
 done <<< "$merged_locals"
 
 echo "Done."
