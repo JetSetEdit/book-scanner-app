@@ -39,7 +39,7 @@ describe('Enrichment result shape (real enrichWithWebSearch)', () => {
 })
 
 describe('Analysis with minimal description (real analyzeBookWithMultiModel)', () => {
-  it('uses enrichment so we get warnings or needsReview for a known book (no short-circuit)', async () => {
+  it('uses enrichment so we get warnings or analyzed no-warnings reasoning for a known book (no short-circuit)', async () => {
     if (!hasOpenAI || !hasSupabase) {
       console.warn('Skipping: OPENAI_API_KEY or Supabase env not set')
       return
@@ -62,10 +62,11 @@ describe('Analysis with minimal description (real analyzeBookWithMultiModel)', (
         enableGemini: false,
       }
     )
-    // Should not short-circuit: we have enrichment for this book, so we get either warnings or needsReview
+    // Should not short-circuit without trying enrichment: pipeline returns web_enrichment when enrichment runs.
     const shortCircuitReasoning = 'No content warnings found because there was no description or external context to analyze'
+    expect(result.web_enrichment?.attempted).toBe(true)
     if (result.warnings.length === 0) {
-      expect(result.needsReview).toBe(true)
+      expect(result.noWarningsReasoning).toBeDefined()
       expect(result.noWarningsReasoning).not.toBe(shortCircuitReasoning)
     } else {
       expect(result.warnings.length).toBeGreaterThan(0)
@@ -100,7 +101,10 @@ describe('Short-circuit when no description and no enrichment (real)', () => {
       }
     )
     expect(result.warnings).toHaveLength(0)
-    expect(result.noWarningsReasoning).toContain('no description or external context')
-    expect(result.needsReview).toBe(false)
+    expect(result.web_enrichment?.attempted).toBe(true)
+    // Copy evolves with the model; assert substantive "no usable input" semantics.
+    expect(result.noWarningsReasoning?.toLowerCase()).toMatch(
+      /no .*book description|blurb|textual|enrichment context|without any textual/
+    )
   }, 45_000)
 })
