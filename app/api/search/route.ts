@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // For categories (array), we need a separate query
     
     // First: Search text fields
-    let textSearchQuery = supabase
+    const textSearchQuery = supabase
       .from("books")
       .select(`
         id,
@@ -181,7 +181,7 @@ export async function GET(request: NextRequest) {
      * Only when database returns < 3 results, query length >= 3, and not an ISBN query.
      * Gracefully degrades on 429, timeout, or other API errors.
      */
-    let externalResults: Array<{
+    const externalResults: Array<{
       isbn: string
       title: string
       author: string | null

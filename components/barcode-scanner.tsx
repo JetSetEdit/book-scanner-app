@@ -54,7 +54,7 @@ export function BarcodeScanner({ onScanSuccess, onError, onClose }: BarcodeScann
   }
 
   const startScanning = async () => {
-    let isMounted = true
+    const isMounted = true
 
     try {
       const scanner = new Html5Qrcode(viewfinderId)

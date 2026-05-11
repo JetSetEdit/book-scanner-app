@@ -244,13 +244,13 @@ export async function processIsbnScan(
   let usedWebSearch = false
   let isThinMetadata = false
   let pipelinePath = scanMode === 'quick' ? 'quick' : 'deep'
-  let authorContextInvestigated = false
+  const authorContextInvestigated = false
   let metadataQuality: MetadataQuality | undefined = undefined
   let enrichmentUsed: boolean | undefined = undefined
 
   // Clean ISBN (remove hyphens, spaces)
   const cleanIsbn = normalizeISBN(isbn)
-  let usedSelectedCandidate = !!selectedCandidate
+  const usedSelectedCandidate = !!selectedCandidate
 
   // Removed: cachedWebSearchResult - agents no longer used
 
