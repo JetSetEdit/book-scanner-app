@@ -907,6 +907,14 @@ Instructions:
 }
 
 /**
+ * Leading intensity words the post-processor recognizes. Single source of
+ * truth so the three detection patterns below cannot drift apart — a missing
+ * "Severe" here was the root cause of the "themes of severe themes of"
+ * doubling that survived the original Task 1 fix.
+ */
+const INTENSITY_WORDS = 'Strong|Moderate|Mild|Severe|Graphic|Explicit|Intense|Heavy|Light|Subtle'
+
+/**
  * Update reasoning text to match computed severity
  * Replaces AI's severity claim with the actual computed severity
  * Handles cases where AI confuses "detail level" (graphic/moderate/vague) with "severity" (mild/moderate/severe)
@@ -936,7 +944,7 @@ export function updateDescriptionForSeverity(
 
   // CRITICAL FIX: Handle the common AI error "Moderate of..." → "Moderate themes of..."
   // This must be checked FIRST before any other processing
-  const missingThemesPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i
+  const missingThemesPattern = new RegExp(`^(${INTENSITY_WORDS})\\s+of\\s+`, 'i')
   if (missingThemesPattern.test(updatedDescription)) {
     const match = updatedDescription.match(missingThemesPattern)
     if (match) {
@@ -947,7 +955,7 @@ export function updateDescriptionForSeverity(
   }
 
   // Pattern to match intensity word at the start
-  const intensityStartPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i
+  const intensityStartPattern = new RegExp(`^(${INTENSITY_WORDS})\\s+`, 'i')
 
   if (intensityStartPattern.test(updatedDescription)) {
     // Extract the current intensity word and everything after it
@@ -1002,13 +1010,19 @@ export function updateDescriptionForSeverity(
   if (updatedDescription.includes(' of ') && !updatedDescription.match(/themes?\s+of/i)) {
     // Replace "Intensity of" with "Intensity themes of"
     updatedDescription = updatedDescription.replace(
-      /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i,
+      new RegExp(`^(${INTENSITY_WORDS})\\s+of\\s+`, 'i'),
       `${targetIntensity} themes of `
     )
   }
 
-  // Belt-and-braces: collapse any accidental "themes of themes of" that slipped through.
-  updatedDescription = updatedDescription.replace(/\bthemes?\s+of\s+themes?\s+of\b/gi, 'themes of')
+  // Belt-and-braces: collapse "themes of themes of" doubling. The middle word is
+  // optional, so this also catches the "themes of {modifier} themes of" variant
+  // (e.g. "themes of severe themes of trauma") — preserving the modifier as an
+  // adjective on the topic rather than discarding it.
+  updatedDescription = updatedDescription.replace(
+    /\bthemes?\s+of\s+(?:(\w+)\s+)?themes?\s+of\b/gi,
+    (_match, modifier) => (modifier ? `themes of ${modifier}` : 'themes of'),
+  )
 
   return updatedDescription
 }

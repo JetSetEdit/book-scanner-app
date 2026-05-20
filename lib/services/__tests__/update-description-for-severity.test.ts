@@ -43,6 +43,26 @@ describe('updateDescriptionForSeverity', () => {
     ).toBe('Moderate themes of betrayal.')
   })
 
+  it('recognizes a leading "Severe" intensity word and normalizes it', () => {
+    // "Severe" was missing from the intensity whitelist — without it, this
+    // input fell through to the prepend branch and double-prepended.
+    expect(
+      updateDescriptionForSeverity('Severe themes of stalking.', 'severe')
+    ).toBe('Strong themes of stalking.')
+  })
+
+  it('collapses "themes of {modifier} themes of" while preserving the modifier', () => {
+    expect(
+      updateDescriptionForSeverity('themes of pervasive themes of coercive control.', 'moderate')
+    ).toBe('Moderate themes of pervasive coercive control.')
+  })
+
+  it('preserves an "implied" modifier in the doubling collapse', () => {
+    expect(
+      updateDescriptionForSeverity('themes of implied themes of character death.', 'moderate')
+    ).toBe('Moderate themes of implied character death.')
+  })
+
   it('strips leading articles and falls back to themes-of for plain prose', () => {
     expect(
       updateDescriptionForSeverity('The book contains violence.', 'moderate')
