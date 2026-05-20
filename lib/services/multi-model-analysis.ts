@@ -282,7 +282,10 @@ Instructions:
      * BAD: "The book centers around a troubled relationship..." (too narrative, not advisory)
      * BAD: "Passages from Amy's diary reveal..." (too quote-like, not descriptive enough)
      * BAD: "Alicia shoots her husband five times" (too specific, reveals plot)
+     * BAD: "Themes of betrayal and emotional manipulation." (missing leading intensity word — see rule below)
+     * BAD: "themes of grief and loss." (same problem, lowercase variant)
      Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
+     STRICT RULE: Never begin the description with "themes" or "themes of" — the description must lead with an intensity word (Strong, Moderate, or Mild). The "[Content type] themes" alt format (e.g. "Violence themes") remains valid only when no intensity word reasonably fits.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any):
@@ -668,7 +671,10 @@ Instructions:
      * BAD: "The book centers around a troubled relationship..." (too narrative, not advisory)
      * BAD: "Passages from Amy's diary reveal..." (too quote-like, not descriptive enough)
      * BAD: "Alicia shoots her husband five times" (too specific, reveals plot)
+     * BAD: "Themes of betrayal and emotional manipulation." (missing leading intensity word — see rule below)
+     * BAD: "themes of grief and loss." (same problem, lowercase variant)
      Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
+     STRICT RULE: Never begin the description with "themes" or "themes of" — the description must lead with an intensity word (Strong, Moderate, or Mild). The "[Content type] themes" alt format (e.g. "Violence themes") remains valid only when no intensity word reasonably fits.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any):
@@ -798,7 +804,7 @@ Instructions:
  * Replaces AI's severity claim with the actual computed severity
  * Handles cases where AI confuses "detail level" (graphic/moderate/vague) with "severity" (mild/moderate/severe)
  */
-function updateDescriptionForSeverity(
+export function updateDescriptionForSeverity(
   originalDescription: string | undefined,
   computedSeverity: 'mild' | 'moderate' | 'severe'
 ): string {
@@ -869,13 +875,20 @@ function updateDescriptionForSeverity(
       }
     }
   } else {
-    // Description doesn't start with intensity word - prepend it with "themes of"
-    // Remove leading articles if present
+    // Description doesn't start with an intensity word — prepend the intensity, and
+    // add "themes of" ONLY if the description doesn't already lead with "themes of".
+    // Without this guard, a model output like "themes of betrayal..." becomes
+    // "Moderate themes of themes of betrayal..." (the bug we're fixing here).
     const content = updatedDescription.replace(/^(The|A|An)\s+/i, '').trim()
-    // Ensure first letter is lowercase after prepending
-    const firstChar = content.charAt(0)
-    const rest = content.slice(1)
-    updatedDescription = `${targetIntensity} themes of ${firstChar.toLowerCase()}${rest}`
+
+    if (/^themes?\s+of\b/i.test(content)) {
+      // Model already wrote "themes of X" — just attach the intensity word.
+      updatedDescription = `${targetIntensity} ${content.charAt(0).toLowerCase()}${content.slice(1)}`
+    } else {
+      const firstChar = content.charAt(0)
+      const rest = content.slice(1)
+      updatedDescription = `${targetIntensity} themes of ${firstChar.toLowerCase()}${rest}`
+    }
   }
 
   // FINAL SAFETY CHECK: If description still has " of " but no "themes of", fix it
@@ -886,6 +899,9 @@ function updateDescriptionForSeverity(
       `${targetIntensity} themes of `
     )
   }
+
+  // Belt-and-braces: collapse any accidental "themes of themes of" that slipped through.
+  updatedDescription = updatedDescription.replace(/\bthemes?\s+of\s+themes?\s+of\b/gi, 'themes of')
 
   return updatedDescription
 }
