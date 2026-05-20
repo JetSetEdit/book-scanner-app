@@ -23,7 +23,7 @@ export const PLACEHOLDER_WARNINGS = [
     category: "mental_health",
     category_id: "mental_health",
     subcategory_id: "academic_pressure",
-    description: "Contains references to moderate themes of academic pressure and study-related stress.",
+    description: "Moderate themes of academic pressure and study-related stress.",
     severity: "moderate" as const,
     helpful_count: 0,
     not_helpful_count: 0,

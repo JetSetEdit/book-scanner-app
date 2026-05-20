@@ -40,7 +40,7 @@ import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/util
 import { getVariantConfig } from "@/lib/config/variants"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { getWarningPhrase, sanitizeDescriptionForDisplay, lowercasePreservingAcronyms } from "@/lib/services/warning-phraser"
+import { sanitizeDescriptionForDisplay } from "@/lib/services/warning-phraser"
 import { SpoilerText } from "@/components/spoiler-text"
 
 interface ContentWarning {
@@ -965,13 +965,7 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
 
   const severity = (warning.severity ?? "mild").toString().toLowerCase() as "mild" | "moderate" | "severe"
   const severityLabel = severity === "severe" ? "Severe" : severity === "moderate" ? "Moderate" : "Mild"
-  const descriptionText = (() => {
-    const raw = sanitizeDescriptionForDisplay(warning.description ?? '')
-    if (!raw) return ''
-    const phrase = getWarningPhrase(warning.category_id)
-    if (raw.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) return raw
-    return `${phrase.replace("…", "")} ${lowercasePreservingAcronyms(raw)}`
-  })()
+  const descriptionText = sanitizeDescriptionForDisplay(warning.description ?? '')
 
   const severityBorder =
     severity === "severe"
@@ -1185,16 +1179,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
               </div>
             ) : (
               <p className="text-muted-foreground text-base leading-relaxed font-serif">
-                {(() => {
-                  const phrase = getWarningPhrase(warning.category_id)
-                  // If description already starts with a phrase-like pattern, use it as-is
-                  if (warning.description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) {
-                    return warning.description
-                  }
-                  // Otherwise, prepend the rotated phrase
-                  const cleanPhrase = phrase.replace('…', '')
-                  return `${cleanPhrase} ${lowercasePreservingAcronyms(warning.description)}`
-                })()}
+                {sanitizeDescriptionForDisplay(warning.description ?? '')}
               </p>
             )}
           </div>
