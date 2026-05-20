@@ -40,7 +40,7 @@ import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/util
 import { getVariantConfig } from "@/lib/config/variants"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { getWarningPhrase, sanitizeDescriptionForDisplay } from "@/lib/services/warning-phraser"
+import { getWarningPhrase, sanitizeDescriptionForDisplay, lowercasePreservingAcronyms } from "@/lib/services/warning-phraser"
 import { SpoilerText } from "@/components/spoiler-text"
 
 interface ContentWarning {
@@ -970,7 +970,7 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
     if (!raw) return ''
     const phrase = getWarningPhrase(warning.category_id)
     if (raw.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) return raw
-    return `${phrase.replace("…", "")} ${raw.toLowerCase()}`
+    return `${phrase.replace("…", "")} ${lowercasePreservingAcronyms(raw)}`
   })()
 
   const severityBorder =
@@ -1193,7 +1193,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
                   }
                   // Otherwise, prepend the rotated phrase
                   const cleanPhrase = phrase.replace('…', '')
-                  return `${cleanPhrase} ${warning.description.toLowerCase()}`
+                  return `${cleanPhrase} ${lowercasePreservingAcronyms(warning.description)}`
                 })()}
               </p>
             )}

@@ -33,6 +33,21 @@ export function getWarningPhrase(categoryId: string | null | undefined): string 
 }
 
 /**
+ * Lowercase a description while preserving all-caps acronyms (PTSD, OCD,
+ * LGBTQIA, PG-13, etc.). A token is treated as an acronym if its letters,
+ * stripped of punctuation/digits, are all uppercase and at least 2 chars.
+ */
+export function lowercasePreservingAcronyms(text: string): string {
+  return text.replace(/\S+/g, (token) => {
+    const letters = token.replace(/[^A-Za-z]/g, '')
+    if (letters.length >= 2 && letters === letters.toUpperCase()) {
+      return token
+    }
+    return token.toLowerCase()
+  })
+}
+
+/**
  * Format a warning description with the rotated phrase
  * Removes redundant phrases to avoid "Explores themes involving moderate themes..."
  */
@@ -41,15 +56,17 @@ export function formatWarningDescription(
   description: string
 ): string {
   const phrase = getWarningPhrase(categoryId)
-  
+
   // If description already starts with a phrase-like pattern, use it as-is
   if (description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) {
     return description
   }
-  
-  // Remove the ellipsis and combine
+
+  // Remove the ellipsis and combine. Lowercase the description so it reads
+  // naturally after the wrapper phrase, but preserve acronyms — without this
+  // guard "PTSD" rendered as "ptsd" (the bug fixed in Task 3).
   const cleanPhrase = phrase.replace('…', '')
-  let combined = `${cleanPhrase} ${description.toLowerCase()}`
+  let combined = `${cleanPhrase} ${lowercasePreservingAcronyms(description)}`
   
   // Fix redundant phrases like "Explores themes involving moderate themes..."
   // Pattern: "Explores themes involving" + "moderate themes of..." → "Explores moderate themes of..."
