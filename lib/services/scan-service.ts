@@ -1066,6 +1066,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
         // Determine which models were actually used for audit logging
         // Check if models were enabled and ran successfully (even if they found 0 warnings)
         const modelResults = (analysisResult as any).model_results
+        const auditDiagnostics = (analysisResult as any).audit_diagnostics
         const openaiEnabled = effectiveAnalysisOptions.enableOpenAI
         const geminiEnabled = effectiveAnalysisOptions.enableGemini
         // Model results arrays exist if the model ran (even if empty)
@@ -1383,6 +1384,7 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
               descriptionLength: descriptionForAnalysis.length,
               hadThinMetadata: isMinimalDescription,
               usedWebSearch: usedWebSearch,
+              rawAiResponse: auditDiagnostics || null,
               modelVersion: MODEL_VERSION,
               taxonomyVersion: TAXONOMY_VERSION,
               pipelinePath: pipelinePath,
@@ -1599,6 +1601,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
                           descriptionLength: enhancedDescription.length,
                           hadThinMetadata: isMinimalDescription,
                           usedWebSearch: true,
+                          rawAiResponse: (reanalysisResult as any)?.audit_diagnostics || auditDiagnostics || null,
                           modelVersion: MODEL_VERSION,
                           taxonomyVersion: TAXONOMY_VERSION,
                           pipelinePath: `${pipelinePath} -> web_search_verification`,
@@ -1670,6 +1673,7 @@ IMPORTANT: Only use information from safe, open sources. Do not quote retailer p
               descriptionLength: descriptionForAnalysis.length,
               hadThinMetadata: isMinimalDescription,
               usedWebSearch: usedWebSearch,
+              rawAiResponse: auditDiagnostics || null,
               modelVersion: MODEL_VERSION,
               taxonomyVersion: TAXONOMY_VERSION,
               pipelinePath: usedWebSearch ? `${pipelinePath} -> web_search_verification` : pipelinePath,

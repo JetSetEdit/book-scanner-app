@@ -57,6 +57,79 @@ type WebEnrichmentInfo = {
   added_warnings: number
 }
 
+/**
+ * Per-model slot inside AuditDiagnostics.raw_responses.
+ * 'ok'    → model returned a parsed response (warnings are PRE post-processor).
+ * 'error' → model threw or returned malformed content; details captured for replay.
+ * null    → model was disabled by options; check options.enable{OpenAI,Gemini}.
+ */
+export type RawModelResponseSlot =
+  | { status: 'ok'; warnings: any[]; no_warnings_reasoning?: string }
+  | { status: 'error'; error_message: string; error_code?: string | number; error_type?: string }
+  | null
+
+/**
+ * One blob per ai_audit_logs row. Captures everything needed to replay a scan:
+ * the exact prompts sent, the pipeline configuration, both models' raw responses
+ * (BEFORE updateDescriptionForSeverity mangles descriptions), and the outcomes
+ * of the adversarial + verification stages.
+ *
+ * Written to ai_audit_logs.raw_ai_response (jsonb) via logAuditDecision.
+ */
+export type AuditDiagnostics = {
+  prompts: {
+    openai: string | null
+    gemini: string | null
+  }
+  options: {
+    enableOpenAI: boolean
+    enableGemini: boolean
+    enableAdversarial: boolean
+    enableVerification: boolean
+    enableWebEnrichment: boolean
+    model: string | null
+    maxWarnings: number | null
+    includeReasoning: boolean
+    maxDescriptionChars: number | null
+  }
+  raw_responses: {
+    openai: RawModelResponseSlot
+    gemini: RawModelResponseSlot
+  }
+  adversarial: {
+    fired: boolean
+    openai_critiques_gemini: any[]
+    gemini_critiques_openai: any[]
+    before_count: number
+    after_count: number
+  } | null
+  verification: {
+    fired: boolean
+    status: 'passed' | 'failed' | 'timeout' | 'skipped'
+    duration_ms: number
+    kept: number
+    dropped: number
+    adjusted: number
+  } | null
+  timings: {
+    openai_ms: number | null
+    gemini_ms: number | null
+    adversarial_ms: number | null
+    verification_ms: number | null
+    total_ms: number
+  }
+  taxonomy_version: string
+  scan_started_at: string
+}
+
+type ModelInvocationEnvelope = {
+  warnings: EnhancedContentWarning[]
+  noWarningsReasoning?: string
+  rawResponse: Extract<RawModelResponseSlot, { status: 'ok' }>
+  prompt: string
+  timing_ms: number
+}
+
 function applyDescriptionTruncation(metadata: BookMetadata, maxChars?: number): BookMetadata {
   if (!maxChars || maxChars <= 0) return metadata
   const desc = metadata.description || ''
@@ -209,7 +282,8 @@ async function analyzeWithOpenAI(
   model?: string,
   options?: AnalysisOptions,
   isCanonical: boolean = false
-): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
+): Promise<ModelInvocationEnvelope> {
+  const startTime = performance.now()
   // Generate dynamic category list based on book content
   const relevantCategories = selectRelevantCategories(metadata)
   const categoryLabels = relevantCategories
@@ -582,9 +656,23 @@ DESCRIPTION FORMAT (Australian Classification Board style):
     }
 
     const analysis = JSON.parse(content)
-    const warnings = processWarnings(analysis.warnings || [], 'openai')
+    const rawWarnings = Array.isArray(analysis.warnings) ? analysis.warnings : []
+    // Snapshot raw model output BEFORE processWarnings (which calls
+    // updateDescriptionForSeverity and mutates descriptions in place).
+    const rawSnapshot = JSON.parse(JSON.stringify(rawWarnings))
+    const warnings = processWarnings(rawWarnings, 'openai')
     const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
-    return { warnings, noWarningsReasoning }
+    return {
+      warnings,
+      noWarningsReasoning,
+      rawResponse: {
+        status: 'ok',
+        warnings: rawSnapshot,
+        no_warnings_reasoning: noWarningsReasoning,
+      },
+      prompt,
+      timing_ms: Math.round(performance.now() - startTime),
+    }
   } catch (error) {
     console.error('OpenAI analysis error:', error)
 
@@ -618,7 +706,8 @@ async function analyzeWithGemini(
   onProgress?: ProgressCallback,
   options?: AnalysisOptions,
   isCanonical: boolean = false
-): Promise<EnhancedContentWarning[]> {
+): Promise<ModelInvocationEnvelope> {
+  const startTime = performance.now()
   onProgress?.('Analyzing with Gemini...')
 
   const taxonomyContext = buildTaxonomyContext()
@@ -779,7 +868,22 @@ Instructions:
     }
 
     const analysis = JSON.parse(jsonText)
-    return processWarnings(analysis.warnings || [], 'gemini')
+    const rawWarnings = Array.isArray(analysis.warnings) ? analysis.warnings : []
+    // Snapshot raw model output BEFORE processWarnings mutates descriptions.
+    const rawSnapshot = JSON.parse(JSON.stringify(rawWarnings))
+    const warnings = processWarnings(rawWarnings, 'gemini')
+    const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
+    return {
+      warnings,
+      noWarningsReasoning,
+      rawResponse: {
+        status: 'ok',
+        warnings: rawSnapshot,
+        no_warnings_reasoning: noWarningsReasoning,
+      },
+      prompt,
+      timing_ms: Math.round(performance.now() - startTime),
+    }
   } catch (error) {
     console.error('Gemini analysis error:', error)
     if (error instanceof Error) {
@@ -795,7 +899,10 @@ Instructions:
     } else {
       onProgress?.('⚠️ Gemini analysis failed, continuing with OpenAI only...')
     }
-    return []
+    // Re-throw so analyzeBookWithMultiModel can construct an error slot for
+    // audit_diagnostics.raw_responses.gemini. The caller's existing .catch()
+    // demotes this back to a non-fatal "[]" outcome when OpenAI is enabled.
+    throw error
   }
 }
 
@@ -1655,7 +1762,11 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
   web_enrichment?: WebEnrichmentInfo
+  audit_diagnostics: AuditDiagnostics
 }> {
+  const scanStartedAt = new Date().toISOString()
+  const totalStartTime = performance.now()
+
   const options: AnalysisOptions =
     typeof modelOrOptions === 'string'
       ? { model: modelOrOptions }
@@ -1682,6 +1793,29 @@ export async function analyzeBookWithMultiModel(
   const effectiveMetadata = applyDescriptionTruncation(metadata, effectiveOptions.maxDescriptionChars)
   const isCanonical = isCanonicalBook(metadata.title, metadata.author)
 
+  // Audit-diagnostics scratch state — populated by side-effect inside the
+  // promise handlers below, then assembled into the final blob at return.
+  // Typed as a tuple to keep `let` inference from collapsing to `never` after the
+  // initial `null` assignment.
+  type ErrorInfo = { message: string; code?: string | number; type?: string }
+  const scratch: {
+    openaiEnvelope: ModelInvocationEnvelope | null
+    geminiEnvelope: ModelInvocationEnvelope | null
+    openaiError: ErrorInfo | null
+    geminiError: ErrorInfo | null
+  } = {
+    openaiEnvelope: null,
+    geminiEnvelope: null,
+    openaiError: null,
+    geminiError: null,
+  }
+
+  const captureError = (err: unknown) => ({
+    message: err instanceof Error ? err.message : String(err),
+    code: (err as any)?.status ?? (err as any)?.code ?? undefined,
+    type: err instanceof Error ? err.name : typeof err,
+  })
+
   // Run both OpenAI and Gemini in parallel for cross-validation
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
@@ -1690,33 +1824,35 @@ export async function analyzeBookWithMultiModel(
   // Run enabled models in parallel (when both enabled)
   const openaiPromise = effectiveOptions.enableOpenAI
     ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
-    : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
+        .then(env => { scratch.openaiEnvelope = env; return env })
+    : Promise.resolve(null)
 
   const geminiPromise = effectiveOptions.enableGemini
-    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical).catch(err => {
-      if (!effectiveOptions.enableOpenAI) {
-        // If OpenAI is disabled, Gemini is the only model. Failure here is fatal.
-        console.error('[Multi-Model] Gemini analysis failed and it is the only model enabled. Throwing error:', err)
-        throw err
-      }
-      // Gemini failures are non-fatal - log and continue with OpenAI only
-      console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
-      return []
-    })
-    : Promise.resolve([])
+    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical)
+        .then(env => { scratch.geminiEnvelope = env; return env })
+        .catch(err => {
+          scratch.geminiError = captureError(err)
+          if (!effectiveOptions.enableOpenAI) {
+            // If OpenAI is disabled, Gemini is the only model. Failure here is fatal.
+            console.error('[Multi-Model] Gemini analysis failed and it is the only model enabled. Throwing error:', err)
+            throw err
+          }
+          // Gemini failures are non-fatal - log and continue with OpenAI only
+          console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
+          return null
+        })
+    : Promise.resolve(null)
 
   const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
 
-  const openaiWarnings = openaiResult.status === 'fulfilled'
-    ? openaiResult.value.warnings
-    : []
-  const openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
-    ? openaiResult.value.noWarningsReasoning
-    : undefined
+  if (openaiResult.status === 'rejected') {
+    scratch.openaiError = captureError(openaiResult.reason)
+  }
 
-  const geminiWarnings = geminiResult.status === 'fulfilled'
-    ? geminiResult.value
-    : []
+  const openaiWarnings = scratch.openaiEnvelope?.warnings ?? []
+  const openaiNoWarningsReasoning = scratch.openaiEnvelope?.noWarningsReasoning
+  const geminiWarnings = scratch.geminiEnvelope?.warnings ?? []
+  void geminiResult // settled result already mirrored via envelope/error scratch
 
   // Log cross-validation status
   if (geminiWarnings.length > 0) {
@@ -1734,7 +1870,11 @@ export async function analyzeBookWithMultiModel(
   // Adversarial Validation: Models critique each other's warnings
   // This creates a "debate" where each model reviews the other for being too restrictive or too lenient
   let refinedWarnings = combined
+  // Adversarial-stage diagnostics: null when the stage did not fire.
+  let adversarialDiagnostics: AuditDiagnostics['adversarial'] = null
+  let adversarialTimingMs: number | null = null
   if (effectiveOptions.enableAdversarial && openaiWarnings.length > 0 && geminiWarnings.length > 0) {
+    const adversarialStart = performance.now()
     try {
       const { runAdversarialValidation } = await import('./adversarial-validation')
       const adversarialResult = await runAdversarialValidation(
@@ -1754,9 +1894,25 @@ export async function analyzeBookWithMultiModel(
           gemini_critiques: adversarialResult.gemini_critiques_openai.length
         })
       }
+      adversarialDiagnostics = {
+        fired: true,
+        openai_critiques_gemini: adversarialResult.openai_critiques_gemini,
+        gemini_critiques_openai: adversarialResult.gemini_critiques_openai,
+        before_count: combined.length,
+        after_count: refinedWarnings.length,
+      }
     } catch (error) {
       console.warn('[Adversarial Validation] Failed, using original combined warnings:', error)
       // Continue with original combined warnings if adversarial validation fails
+      adversarialDiagnostics = {
+        fired: true,
+        openai_critiques_gemini: [],
+        gemini_critiques_openai: [],
+        before_count: combined.length,
+        after_count: combined.length,
+      }
+    } finally {
+      adversarialTimingMs = Math.round(performance.now() - adversarialStart)
     }
   }
 
@@ -1764,9 +1920,12 @@ export async function analyzeBookWithMultiModel(
   const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
   let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
+  let verificationDiagnostics: AuditDiagnostics['verification'] = null
+  let verificationTimingMs: number | null = null
   let webEnrichment: WebEnrichmentInfo | undefined = undefined
 
   if (effectiveOptions.enableVerification && allUniqueWarnings.length > 0) {
+    const verificationStart = performance.now()
     // Use the opposite model for verification when both ran (cross-validation).
     // When OpenAI failed (e.g. 429 quota) we only have Gemini results — use Gemini for verification
     // so the scan can complete instead of calling OpenAI again and failing.
@@ -1803,6 +1962,18 @@ export async function analyzeBookWithMultiModel(
       latency_ms: metrics.latency_ms,
       failed: metrics.failed
     })
+
+    verificationDiagnostics = {
+      fired: true,
+      status: metrics.failed
+        ? (metrics.latency_ms >= 10000 ? 'timeout' : 'failed')
+        : 'passed',
+      duration_ms: metrics.latency_ms,
+      kept: metrics.kept,
+      dropped: metrics.dropped,
+      adjusted: metrics.adjusted,
+    }
+    verificationTimingMs = Math.round(performance.now() - verificationStart)
   }
 
   // Final message will be shown by scan-service
@@ -2053,6 +2224,57 @@ export async function analyzeBookWithMultiModel(
     finalWarnings = finalWarnings.map(w => ({ ...w, reasoning: undefined }))
   }
 
+  const buildModelSlot = (
+    envelope: ModelInvocationEnvelope | null,
+    error: { message: string; code?: string | number; type?: string } | null,
+    enabled: boolean,
+  ): RawModelResponseSlot => {
+    if (!enabled) return null
+    if (envelope) return envelope.rawResponse
+    if (error) {
+      return {
+        status: 'error',
+        error_message: error.message,
+        error_code: error.code,
+        error_type: error.type,
+      }
+    }
+    return null
+  }
+
+  const auditDiagnostics: AuditDiagnostics = {
+    prompts: {
+      openai: scratch.openaiEnvelope?.prompt ?? null,
+      gemini: scratch.geminiEnvelope?.prompt ?? null,
+    },
+    options: {
+      enableOpenAI: effectiveOptions.enableOpenAI,
+      enableGemini: effectiveOptions.enableGemini,
+      enableAdversarial: effectiveOptions.enableAdversarial,
+      enableVerification: effectiveOptions.enableVerification,
+      enableWebEnrichment: effectiveOptions.enableWebEnrichment,
+      model: effectiveOptions.model ?? null,
+      maxWarnings: effectiveOptions.maxWarnings ?? null,
+      includeReasoning: effectiveOptions.includeReasoning,
+      maxDescriptionChars: effectiveOptions.maxDescriptionChars ?? null,
+    },
+    raw_responses: {
+      openai: buildModelSlot(scratch.openaiEnvelope, scratch.openaiError, effectiveOptions.enableOpenAI),
+      gemini: buildModelSlot(scratch.geminiEnvelope, scratch.geminiError, effectiveOptions.enableGemini),
+    },
+    adversarial: adversarialDiagnostics,
+    verification: verificationDiagnostics,
+    timings: {
+      openai_ms: scratch.openaiEnvelope?.timing_ms ?? null,
+      gemini_ms: scratch.geminiEnvelope?.timing_ms ?? null,
+      adversarial_ms: adversarialTimingMs,
+      verification_ms: verificationTimingMs,
+      total_ms: Math.round(performance.now() - totalStartTime),
+    },
+    taxonomy_version: TAXONOMY_VERSION,
+    scan_started_at: scanStartedAt,
+  }
+
   return {
     warnings: finalWarnings,
     noWarningsReasoning: finalWarnings.length === 0 ? openaiNoWarningsReasoning : undefined,
@@ -2064,7 +2286,8 @@ export async function analyzeBookWithMultiModel(
       openai: openaiWarnings,
       gemini: geminiWarnings
     },
-    web_enrichment: webEnrichment
+    web_enrichment: webEnrichment,
+    audit_diagnostics: auditDiagnostics,
   }
 }
 

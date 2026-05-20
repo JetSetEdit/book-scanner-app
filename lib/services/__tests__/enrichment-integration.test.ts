@@ -72,6 +72,27 @@ describe('Analysis with minimal description (real analyzeBookWithMultiModel)', (
       expect(result.warnings.length).toBeGreaterThan(0)
       expect(result.noWarningsReasoning).toBeUndefined()
     }
+
+    // Audit-diagnostics blob (what gets persisted to ai_audit_logs.raw_ai_response).
+    expect(result.audit_diagnostics).toBeDefined()
+    const diag = result.audit_diagnostics
+    expect(Object.keys(diag).sort()).toEqual(
+      ['adversarial', 'options', 'prompts', 'raw_responses', 'scan_started_at', 'taxonomy_version', 'timings', 'verification'].sort()
+    )
+    // OpenAI enabled, Gemini disabled in this test config.
+    expect(diag.options.enableOpenAI).toBe(true)
+    expect(diag.options.enableGemini).toBe(false)
+    expect(typeof diag.prompts.openai).toBe('string')
+    expect(diag.prompts.openai!.length).toBeGreaterThan(100)
+    expect(diag.prompts.gemini).toBeNull()
+    expect(diag.raw_responses.openai).not.toBeNull()
+    if (diag.raw_responses.openai && diag.raw_responses.openai.status === 'ok') {
+      expect(Array.isArray(diag.raw_responses.openai.warnings)).toBe(true)
+    }
+    expect(diag.raw_responses.gemini).toBeNull()
+    expect(typeof diag.timings.total_ms).toBe('number')
+    expect(diag.taxonomy_version).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(typeof diag.scan_started_at).toBe('string')
   }, 60_000)
 })
 
