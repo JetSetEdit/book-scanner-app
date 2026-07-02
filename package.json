@@ -5,7 +5,7 @@
   "scripts": {
     "build": "next build",
     "dev": "NODE_OPTIONS='--max-old-space-size=4096' next dev -H 0.0.0.0",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest",
     "start": "next start",
     "taxonomy:sync": "npx tsx scripts/generate-taxonomy-csv.ts",
@@ -80,6 +80,8 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^17.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
     "pg": "^8.16.3",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",

@@ -26,6 +26,71 @@ export interface EnrichmentResult {
 }
 
 /**
+ * Fetches and extracts the visible text of a trusted content-warning page.
+ *
+ * Google snippets are ~150 chars — far too thin for the second-pass model to recover a book's
+ * real warnings (e.g. the domestic-violence thread in "It Ends With Us"). Pulling the actual
+ * page text gives the model the full community CW list to work from. Defensive by design:
+ * short timeout, browser-like UA, tag stripping, and a CW-focused text window.
+ */
+async function fetchPageText(url: string, maxChars: number = 3000): Promise<string | null> {
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 6000)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    }).finally(() => clearTimeout(timer))
+
+    if (!res.ok) return null
+    const html = await res.text()
+
+    // Strip non-content markup, then collapse to readable text.
+    const text = html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&#\d+;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (text.length <= maxChars) return text
+
+    // The specific warnings can appear anywhere in a long review, so a single positional
+    // window misses them. Instead, pull out every segment that actually mentions a content
+    // warning or a concrete harm and concatenate those — this reliably captures the CW list
+    // wherever it lives on the page.
+    const CW_TERMS = [
+      'trigger warning', 'content warning', 'tw:', 'cw:', 'self-harm', 'self harm', 'self injury',
+      'suicid', 'sexual abuse', 'sexual assault', 'sexual violence', 'rape', 'non-consensual',
+      'child abuse', 'csa', 'incest', 'pedophil', 'grooming', 'torture', 'domestic violence',
+      'domestic abuse', 'eating disorder', 'abuse', 'graphic', 'molest', 'cutting', 'overdose',
+      'infanticide', 'trafficking', 'gore', 'mutilation',
+    ]
+    const segments = text.split(/(?<=[.!?;:\n])\s+/)
+    const picked: string[] = []
+    let total = 0
+    for (const seg of segments) {
+      const low = seg.toLowerCase()
+      if (CW_TERMS.some(t => low.includes(t))) {
+        picked.push(seg.trim())
+        total += seg.length
+        if (total >= maxChars) break
+      }
+    }
+    if (picked.length > 0) return picked.join(' ').slice(0, maxChars)
+    return text.slice(0, maxChars)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Enriches book metadata with content warning information from community sources
  * 
  * This function should be called when:
@@ -111,25 +176,52 @@ Return a compact bullet list.`
       return { enrichedContext: null, source: null, foundContentWarnings: false, combinedText: '', hadResults: false }
     }
 
-    // Filter out retailer websites and low-quality user-generated content
-    const blockedDomains = [
-      // Retailers
-      'amazon.com', 'qbd.com.au', 'booktopia.com.au', 'barnesandnoble.com',
-      'waterstones.com', 'indigo.ca', 'books.google.com',
-      // Noisy UGC / Social Media (high hallucination risk)
-      'reddit.com', 'pinterest.com', 'tumblr.com', 'twitter.com', 'x.com',
-      'facebook.com', 'instagram.com', 'tiktok.com', 'youtube.com',
-      'pastemagazine.com', 'buzzfeed.com', 'screenrant.com'
+    // RELEVANCE GATE (two-part) — this is what prevents stray, unrelated snippets from
+    // becoming warnings (e.g. a govt manual or random blog that merely mentions a title
+    // getting a children's book tagged "severe domestic violence").
+    //
+    // Part 1: SOURCE ALLOWLIST. Only trust dedicated book content-warning databases and
+    // community catalogues. A blocklist is not enough: anything not explicitly blocked was
+    // trusted, so arbitrary pages (cyfd.nm.gov, personal blogs) slipped through.
+    const trustedCwDomains = [
+      'thestorygraph.com', 'booktriggerwarnings.com', 'triggerwarningdatabase.com',
+      'commonsensemedia.org', 'doesthedogdie.com', 'romance.io', 'librarything.com',
+      'goodreads.com', 'theliterarylifestyle.com', 'bookriot.com', 'bitsandbitesblog.com',
+      'thestorygraphapp.com', 'readinggroupguides.com',
     ]
+    const isTrustedCwSource = (link: string) =>
+      trustedCwDomains.some(domain => link.toLowerCase().includes(domain))
+
+    // Part 2: BOOK-REFERENCE CHECK. The result must actually be about THIS book — its title
+    // (or a distinctive title token) or the author's surname must appear in the title/snippet.
+    const stopwords = new Set([
+      'the', 'a', 'an', 'of', 'and', 'or', 'to', 'in', 'on', 'with', 'for', 'is', 'it',
+      'us', 'we', 'you', 'my', 'his', 'her', 'their', 'this', 'that', 'book', 'novel',
+    ])
+    const normalize = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+    const bookTitleCore = normalize(metadata.title.split(':')[0]) // drop subtitle
+    const titleTokens = bookTitleCore.split(' ').filter(t => t.length >= 4 && !stopwords.has(t))
+    const authorSurname = normalize(metadata.author || '').split(' ').filter(Boolean).pop() || ''
+
+    const referencesBook = (result: SearchResult): boolean => {
+      const hay = normalize(`${result.title} ${result.snippet}`)
+      if (bookTitleCore.length >= 6 && hay.includes(bookTitleCore)) return true
+      const tokenHits = titleTokens.filter(t => hay.includes(t)).length
+      const authorHit = authorSurname.length >= 4 && hay.includes(authorSurname)
+      // Require the author plus at least one title token, or (for multi-word titles) two title tokens.
+      if (authorHit && tokenHits >= 1) return true
+      if (titleTokens.length >= 2 && tokenHits >= 2) return true
+      return false
+    }
 
     const safeResults = searchResults.filter(result => {
-      const link = result.link.toLowerCase()
-      return !blockedDomains.some(indicator => link.includes(indicator))
+      const link = (result.link || '').toLowerCase()
+      return isTrustedCwSource(link) && referencesBook(result)
     })
 
     if (safeResults.length === 0) {
-      console.warn('[Web Search Enrichment] All results were from retailer sites (rejected for TOS compliance)')
-      onProgress?.('⚠️ Web search found only retailer content (rejected for TOS compliance)')
+      console.warn('[Web Search Enrichment] No results from trusted CW sources that actually reference this book — skipping enrichment (avoids false positives)')
+      onProgress?.('ℹ️ No relevant community content-warning sources found')
       return {
         enrichedContext: null,
         source: null,
@@ -139,20 +231,28 @@ Return a compact bullet list.`
       }
     }
 
-    // Combine search snippets into enrichment text
+    // Fetch full page text for the top trusted results (concurrently, best-effort). This is
+    // what actually lets the second pass recover a book's real warnings instead of guessing
+    // from a one-line snippet. Falls back to the snippet whenever a fetch fails.
+    const resultsToFetch = safeResults.slice(0, 3)
+    const pageTexts = await Promise.all(resultsToFetch.map(r => fetchPageText(r.link)))
+
+    // Combine into enrichment text (prefer fetched page body, fall back to snippet).
     const enrichmentText = safeResults
       .map((result, index) => {
-        // Extract domain from URL for attribution
         let domain = 'Unknown source'
         try {
           const url = new URL(result.link)
           domain = url.hostname.replace('www.', '')
         } catch (e) {
-          // Invalid URL, use title as fallback
           domain = result.title
         }
 
-        return `Source ${index + 1} (${domain}):\nTitle: ${result.title}\nSnippet: "${result.snippet}"`
+        const body = pageTexts[index]
+        const content = body && body.length > (result.snippet?.length || 0)
+          ? `Page content: "${body}"`
+          : `Snippet: "${result.snippet}"`
+        return `Source ${index + 1} (${domain}):\nTitle: ${result.title}\n${content}`
       })
       .join('\n\n')
 

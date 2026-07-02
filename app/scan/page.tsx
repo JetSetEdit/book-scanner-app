@@ -152,7 +152,7 @@ function ScanTestPageContent() {
     }
 
     setDidInitCamera(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isMounted, didInitCamera, isMobile, preferences.showCameraScanner])
 
   // If the user turns on the preference, open the scanner immediately.

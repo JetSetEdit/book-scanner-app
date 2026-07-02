@@ -72,7 +72,7 @@ export function ThumbsButtons({ warningId, helpfulCount, notHelpfulCount, userVa
     } else {
       setLocalUserValidation(null)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [warningId])
   
   // If server counts change on refresh, keep local counts in sync

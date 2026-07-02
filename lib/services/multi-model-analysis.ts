@@ -57,6 +57,79 @@ type WebEnrichmentInfo = {
   added_warnings: number
 }
 
+/**
+ * Per-model slot inside AuditDiagnostics.raw_responses.
+ * 'ok'    → model returned a parsed response (warnings are PRE post-processor).
+ * 'error' → model threw or returned malformed content; details captured for replay.
+ * null    → model was disabled by options; check options.enable{OpenAI,Gemini}.
+ */
+export type RawModelResponseSlot =
+  | { status: 'ok'; warnings: any[]; no_warnings_reasoning?: string }
+  | { status: 'error'; error_message: string; error_code?: string | number; error_type?: string }
+  | null
+
+/**
+ * One blob per ai_audit_logs row. Captures everything needed to replay a scan:
+ * the exact prompts sent, the pipeline configuration, both models' raw responses
+ * (BEFORE updateDescriptionForSeverity mangles descriptions), and the outcomes
+ * of the adversarial + verification stages.
+ *
+ * Written to ai_audit_logs.raw_ai_response (jsonb) via logAuditDecision.
+ */
+export type AuditDiagnostics = {
+  prompts: {
+    openai: string | null
+    gemini: string | null
+  }
+  options: {
+    enableOpenAI: boolean
+    enableGemini: boolean
+    enableAdversarial: boolean
+    enableVerification: boolean
+    enableWebEnrichment: boolean
+    model: string | null
+    maxWarnings: number | null
+    includeReasoning: boolean
+    maxDescriptionChars: number | null
+  }
+  raw_responses: {
+    openai: RawModelResponseSlot
+    gemini: RawModelResponseSlot
+  }
+  adversarial: {
+    fired: boolean
+    openai_critiques_gemini: any[]
+    gemini_critiques_openai: any[]
+    before_count: number
+    after_count: number
+  } | null
+  verification: {
+    fired: boolean
+    status: 'passed' | 'failed' | 'timeout' | 'skipped'
+    duration_ms: number
+    kept: number
+    dropped: number
+    adjusted: number
+  } | null
+  timings: {
+    openai_ms: number | null
+    gemini_ms: number | null
+    adversarial_ms: number | null
+    verification_ms: number | null
+    total_ms: number
+  }
+  taxonomy_version: string
+  scan_started_at: string
+}
+
+type ModelInvocationEnvelope = {
+  warnings: EnhancedContentWarning[]
+  noWarningsReasoning?: string
+  rawResponse: Extract<RawModelResponseSlot, { status: 'ok' }>
+  prompt: string
+  timing_ms: number
+}
+
 function applyDescriptionTruncation(metadata: BookMetadata, maxChars?: number): BookMetadata {
   if (!maxChars || maxChars <= 0) return metadata
   const desc = metadata.description || ''
@@ -209,7 +282,8 @@ async function analyzeWithOpenAI(
   model?: string,
   options?: AnalysisOptions,
   isCanonical: boolean = false
-): Promise<{ warnings: EnhancedContentWarning[], noWarningsReasoning?: string }> {
+): Promise<ModelInvocationEnvelope> {
+  const startTime = performance.now()
   // Generate dynamic category list based on book content
   const relevantCategories = selectRelevantCategories(metadata)
   const categoryLabels = relevantCategories
@@ -282,7 +356,10 @@ Instructions:
      * BAD: "The book centers around a troubled relationship..." (too narrative, not advisory)
      * BAD: "Passages from Amy's diary reveal..." (too quote-like, not descriptive enough)
      * BAD: "Alicia shoots her husband five times" (too specific, reveals plot)
+     * BAD: "Themes of betrayal and emotional manipulation." (missing leading intensity word — see rule below)
+     * BAD: "themes of grief and loss." (same problem, lowercase variant)
      Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
+     STRICT RULE: Never begin the description with "themes" or "themes of" — the description must lead with an intensity word (Strong, Moderate, or Mild). The "[Content type] themes" alt format (e.g. "Violence themes") remains valid only when no intensity word reasonably fits.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any):
@@ -299,6 +376,10 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with at least one evidence span containing: source: "text", excerpt: short quote, confidence: 0-1)
+     * EVIDENCE DISTINCTNESS (critical, prevents fabrication): each warning's excerpt must be a DISTINCT quote that DIRECTLY and SPECIFICALLY names or depicts that exact content type. Do NOT reuse the same excerpt across multiple warnings.
+     * A single vague phrase (e.g. "an unspeakable childhood trauma", "a heart-wrenching story", "a dark past") is NOT evidence for specific severe categories (infanticide, grooming, torture, sexual violence, self-harm, suicide). If the text is only vague/atmospheric, emit at most ONE general warning (e.g. mental_health or trauma) — never a fan-out of specific severe warnings all citing that one phrase.
+     * If you cannot point to a distinct, specific excerpt for a severe category, do not emit it.
+     * EXCEPTION — EXPLICIT COMMUNITY LISTS: when the "Additional context from community sources" EXPLICITLY LISTS a content/trigger warning (e.g. "Trigger warnings: self-harm, suicide, child sexual abuse, domestic violence"), that listed item IS valid, specific evidence. You MUST emit a warning for each such listed item (use evidence source "text", excerpt = the listed warning phrase). This exception exists so documented warnings absent from a sanitized blurb are still surfaced.
    - reasoning: A clear explanation of why this warning was assigned, using Australian Classification Board style language. Explain what evidence supports the warning and why the severity level (Strong/Moderate/Mild) is appropriate. When assessing impact, explicitly consider: Emphasis (how prominently featured), Tone (manner of presentation), Frequency (how often it appears), Context (setting and justification), Detail (amount of detail), and Cumulative effect (how it combines with other elements). CRITICAL: If context modifiers are applied (e.g., educational_or_analytical, historical_context, condemned_by_narrative), explicitly explain how the context reduces the impact and justifies a lower severity level. Conversely, if content is endorsed_by_narrative or exploitative, explain how this increases impact. DO NOT mention specific character names, plot events, or story details. Keep it generic and focused on content types.
      * GOOD: "Strong themes of emotional abuse are present as a central element of the narrative (emphasis: central, frequency: repeated theme). The content explores psychological manipulation and control within relationships with moderate detail (detail: moderate), presented in a serious tone (tone: serious), which justifies a high severity classification."
      * GOOD: "Moderate violence is depicted, including physical abuse within relationships. The content includes scenes of domestic violence (frequency: repeated scenes, detail: moderate, context: relationship setting), supporting a moderate severity rating."
@@ -579,9 +660,23 @@ DESCRIPTION FORMAT (Australian Classification Board style):
     }
 
     const analysis = JSON.parse(content)
-    const warnings = processWarnings(analysis.warnings || [], 'openai')
+    const rawWarnings = Array.isArray(analysis.warnings) ? analysis.warnings : []
+    // Snapshot raw model output BEFORE processWarnings (which calls
+    // updateDescriptionForSeverity and mutates descriptions in place).
+    const rawSnapshot = JSON.parse(JSON.stringify(rawWarnings))
+    const warnings = processWarnings(rawWarnings, 'openai')
     const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
-    return { warnings, noWarningsReasoning }
+    return {
+      warnings,
+      noWarningsReasoning,
+      rawResponse: {
+        status: 'ok',
+        warnings: rawSnapshot,
+        no_warnings_reasoning: noWarningsReasoning,
+      },
+      prompt,
+      timing_ms: Math.round(performance.now() - startTime),
+    }
   } catch (error) {
     console.error('OpenAI analysis error:', error)
 
@@ -615,7 +710,8 @@ async function analyzeWithGemini(
   onProgress?: ProgressCallback,
   options?: AnalysisOptions,
   isCanonical: boolean = false
-): Promise<EnhancedContentWarning[]> {
+): Promise<ModelInvocationEnvelope> {
+  const startTime = performance.now()
   onProgress?.('Analyzing with Gemini...')
 
   const taxonomyContext = buildTaxonomyContext()
@@ -668,7 +764,10 @@ Instructions:
      * BAD: "The book centers around a troubled relationship..." (too narrative, not advisory)
      * BAD: "Passages from Amy's diary reveal..." (too quote-like, not descriptive enough)
      * BAD: "Alicia shoots her husband five times" (too specific, reveals plot)
+     * BAD: "Themes of betrayal and emotional manipulation." (missing leading intensity word — see rule below)
+     * BAD: "themes of grief and loss." (same problem, lowercase variant)
      Use the format: "[Intensity] [content type]" or "[Content type] themes" - be concise, clear, and direct about what content is present.
+     STRICT RULE: Never begin the description with "themes" or "themes of" — the description must lead with an intensity word (Strong, Moderate, or Mild). The "[Content type] themes" alt format (e.g. "Violence themes") remains valid only when no intensity word reasonably fits.
    - presence (on_page, off_page, flashback, referenced, implied)
    - detail_level (graphic, moderate, vague, clinical)
    - context_modifiers (array of applicable modifiers, if any):
@@ -685,6 +784,10 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with evidence spans)
+     * EVIDENCE DISTINCTNESS (critical, prevents fabrication): each warning's excerpt must be a DISTINCT quote that DIRECTLY and SPECIFICALLY names or depicts that exact content type. Do NOT reuse the same excerpt across multiple warnings.
+     * A single vague phrase (e.g. "an unspeakable childhood trauma", "a heart-wrenching story", "a dark past") is NOT evidence for specific severe categories (infanticide, grooming, torture, sexual violence, self-harm, suicide). If the text is only vague/atmospheric, emit at most ONE general warning — never a fan-out of specific severe warnings all citing that one phrase.
+     * If you cannot point to a distinct, specific excerpt for a severe category, do not emit it.
+     * EXCEPTION — EXPLICIT COMMUNITY LISTS: when the "Additional context from community sources" EXPLICITLY LISTS a content/trigger warning (e.g. "Trigger warnings: self-harm, suicide, child sexual abuse, domestic violence"), that listed item IS valid, specific evidence. You MUST emit a warning for each such listed item (use evidence source "text", excerpt = the listed warning phrase). This exception exists so documented warnings absent from a sanitized blurb are still surfaced.
    - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
 
 2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
@@ -773,7 +876,22 @@ Instructions:
     }
 
     const analysis = JSON.parse(jsonText)
-    return processWarnings(analysis.warnings || [], 'gemini')
+    const rawWarnings = Array.isArray(analysis.warnings) ? analysis.warnings : []
+    // Snapshot raw model output BEFORE processWarnings mutates descriptions.
+    const rawSnapshot = JSON.parse(JSON.stringify(rawWarnings))
+    const warnings = processWarnings(rawWarnings, 'gemini')
+    const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
+    return {
+      warnings,
+      noWarningsReasoning,
+      rawResponse: {
+        status: 'ok',
+        warnings: rawSnapshot,
+        no_warnings_reasoning: noWarningsReasoning,
+      },
+      prompt,
+      timing_ms: Math.round(performance.now() - startTime),
+    }
   } catch (error) {
     console.error('Gemini analysis error:', error)
     if (error instanceof Error) {
@@ -789,16 +907,27 @@ Instructions:
     } else {
       onProgress?.('⚠️ Gemini analysis failed, continuing with OpenAI only...')
     }
-    return []
+    // Re-throw so analyzeBookWithMultiModel can construct an error slot for
+    // audit_diagnostics.raw_responses.gemini. The caller's existing .catch()
+    // demotes this back to a non-fatal "[]" outcome when OpenAI is enabled.
+    throw error
   }
 }
+
+/**
+ * Leading intensity words the post-processor recognizes. Single source of
+ * truth so the three detection patterns below cannot drift apart — a missing
+ * "Severe" here was the root cause of the "themes of severe themes of"
+ * doubling that survived the original Task 1 fix.
+ */
+const INTENSITY_WORDS = 'Strong|Moderate|Mild|Severe|Graphic|Explicit|Intense|Heavy|Light|Subtle'
 
 /**
  * Update reasoning text to match computed severity
  * Replaces AI's severity claim with the actual computed severity
  * Handles cases where AI confuses "detail level" (graphic/moderate/vague) with "severity" (mild/moderate/severe)
  */
-function updateDescriptionForSeverity(
+export function updateDescriptionForSeverity(
   originalDescription: string | undefined,
   computedSeverity: 'mild' | 'moderate' | 'severe'
 ): string {
@@ -823,7 +952,7 @@ function updateDescriptionForSeverity(
 
   // CRITICAL FIX: Handle the common AI error "Moderate of..." → "Moderate themes of..."
   // This must be checked FIRST before any other processing
-  const missingThemesPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i
+  const missingThemesPattern = new RegExp(`^(${INTENSITY_WORDS})\\s+of\\s+`, 'i')
   if (missingThemesPattern.test(updatedDescription)) {
     const match = updatedDescription.match(missingThemesPattern)
     if (match) {
@@ -834,7 +963,7 @@ function updateDescriptionForSeverity(
   }
 
   // Pattern to match intensity word at the start
-  const intensityStartPattern = /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+/i
+  const intensityStartPattern = new RegExp(`^(${INTENSITY_WORDS})\\s+`, 'i')
 
   if (intensityStartPattern.test(updatedDescription)) {
     // Extract the current intensity word and everything after it
@@ -869,23 +998,39 @@ function updateDescriptionForSeverity(
       }
     }
   } else {
-    // Description doesn't start with intensity word - prepend it with "themes of"
-    // Remove leading articles if present
+    // Description doesn't start with an intensity word — prepend the intensity, and
+    // add "themes of" ONLY if the description doesn't already lead with "themes of".
+    // Without this guard, a model output like "themes of betrayal..." becomes
+    // "Moderate themes of themes of betrayal..." (the bug we're fixing here).
     const content = updatedDescription.replace(/^(The|A|An)\s+/i, '').trim()
-    // Ensure first letter is lowercase after prepending
-    const firstChar = content.charAt(0)
-    const rest = content.slice(1)
-    updatedDescription = `${targetIntensity} themes of ${firstChar.toLowerCase()}${rest}`
+
+    if (/^themes?\s+of\b/i.test(content)) {
+      // Model already wrote "themes of X" — just attach the intensity word.
+      updatedDescription = `${targetIntensity} ${content.charAt(0).toLowerCase()}${content.slice(1)}`
+    } else {
+      const firstChar = content.charAt(0)
+      const rest = content.slice(1)
+      updatedDescription = `${targetIntensity} themes of ${firstChar.toLowerCase()}${rest}`
+    }
   }
 
   // FINAL SAFETY CHECK: If description still has " of " but no "themes of", fix it
   if (updatedDescription.includes(' of ') && !updatedDescription.match(/themes?\s+of/i)) {
     // Replace "Intensity of" with "Intensity themes of"
     updatedDescription = updatedDescription.replace(
-      /^(Strong|Moderate|Mild|Graphic|Explicit|Intense|Heavy|Light|Subtle)\s+of\s+/i,
+      new RegExp(`^(${INTENSITY_WORDS})\\s+of\\s+`, 'i'),
       `${targetIntensity} themes of `
     )
   }
+
+  // Belt-and-braces: collapse "themes of themes of" doubling. The middle word is
+  // optional, so this also catches the "themes of {modifier} themes of" variant
+  // (e.g. "themes of severe themes of trauma") — preserving the modifier as an
+  // adjective on the topic rather than discarding it.
+  updatedDescription = updatedDescription.replace(
+    /\bthemes?\s+of\s+(?:(\w+)\s+)?themes?\s+of\b/gi,
+    (_match, modifier) => (modifier ? `themes of ${modifier}` : 'themes of'),
+  )
 
   return updatedDescription
 }
@@ -1142,6 +1287,122 @@ function processWarnings(
   }, [])
 }
 
+/**
+ * Final-stage safety net that (a) removes fabricated warnings and (b) keeps each warning's
+ * severity and description in sync. Runs over the fully-assembled warning list (post combine /
+ * adversarial / verification / enrichment) so it catches drift introduced by any stage.
+ *
+ * Two problems it defends against, both observed in real scans of blurb-only books:
+ *   1. FABRICATED EVIDENCE — one vague phrase ("a man scarred by an unspeakable childhood
+ *      trauma") used as the sole "textual" proof for a dozen SPECIFIC-SEVERE categories
+ *      (infanticide, grooming, torture, sexual violence). We drop specific-severe claims that
+ *      rest only on vague excerpts, and de-duplicate a single excerpt spread across many
+ *      specific-severe categories.
+ *   2. SEVERITY⇄DESCRIPTION CONTRADICTION — the adversarial pass bumps `severity` but not the
+ *      description's leading intensity word ("severe" warning still reads "Mild themes of…").
+ *      We re-run updateDescriptionForSeverity so the wording always matches the final severity.
+ */
+function sanitizeWarnings(
+  warnings: EnhancedContentWarning[],
+  onProgress?: ProgressCallback
+): EnhancedContentWarning[] {
+  // Subcategories whose *specific* claim demands specific evidence. Matched on the second
+  // path segment so it is robust to whatever parent category the taxonomy nests them under.
+  const SPECIFIC_SEVERE = [
+    'infanticide', 'intentional_child_harm', 'child_harm', 'child_abuse', 'child_death',
+    'child', 'against_children', 'torture', 'cannibal', 'grooming', 'sexual_violence',
+    'sexual_assault', 'rape', 'self_harm', 'suicid', 'molestation', 'incest',
+    'trafficking', 'mutilation',
+  ]
+  // Canon (model "general knowledge") inference is only defensible for a narrow set of themes
+  // with broad literary consensus. Everything else must be grounded in text/community evidence.
+  const ALLOWED_CANON = ['suicid', 'self_harm', 'racism', 'discrimination', 'police', 'institutional_abuse']
+
+  const isSpecificSevere = (id: string) => {
+    const sub = (id.split('.')[1] || id)
+    return SPECIFIC_SEVERE.some(k => sub.includes(k))
+  }
+  const isAllowedCanon = (id: string) => {
+    const sub = (id.split('.')[1] || id)
+    return ALLOWED_CANON.some(k => sub.includes(k))
+  }
+
+  const normalizeExcerpt = (w: EnhancedContentWarning): string =>
+    (w.evidence?.[0]?.excerpt || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+
+  // A "vague" excerpt gestures at darkness/trauma without naming a specific harm.
+  const GENERIC_TONE = ['trauma', 'heart wrenching', 'heartwrenching', 'dark past', 'difficult childhood',
+    'unspeakable', 'troubled past', 'scarred', 'suffering', 'haunted', 'tragic', 'ultimate price', 'harrowing']
+  const SPECIFIC_HARM = ['rape', 'assault', 'suicide', 'self harm', 'self-harm', 'abuse', 'torture', 'murder',
+    'kill', 'molest', 'incest', 'overdose', 'cutting', 'starv', 'groom', 'traffick', 'infanticide', 'stab',
+    'shot', 'strangl', 'beaten', 'drown']
+  const isVagueExcerpt = (ex: string): boolean => {
+    if (!ex) return true
+    const hasSpecific = SPECIFIC_HARM.some(t => ex.includes(t))
+    // Naming a concrete harm makes the excerpt specific — even a short one like "self-harm"
+    // (which is exactly how trusted community CW lists phrase it). Do NOT treat as vague.
+    if (hasSpecific) return false
+    if (ex.length < 60) return true
+    const hasTone = GENERIC_TONE.some(t => ex.includes(t))
+    return hasTone
+  }
+  const allEvidenceVague = (w: EnhancedContentWarning): boolean => {
+    const spans = w.evidence || []
+    if (spans.length === 0) return true
+    return spans.every(s => isVagueExcerpt((s.excerpt || '').toLowerCase()))
+  }
+
+  const dropped: string[] = []
+  let kept = warnings.filter(w => {
+    if (!isSpecificSevere(w.subcategory_id)) return true
+
+    // Community/enrichment evidence is corroborated externally — trust it.
+    const src = (w.evidence?.[0] as any)?.source
+    if (src === 'community' || src === 'canon' && isAllowedCanon(w.subcategory_id)) return true
+    if (w.evidence_source === 'canon') {
+      if (isAllowedCanon(w.subcategory_id)) return true
+      dropped.push(`${w.subcategory_id} (canon-inferred, not a consensus-safe theme)`) ; return false
+    }
+    // Claims textual proof but the excerpt is vague → fabricated specific-severe warning.
+    if (allEvidenceVague(w)) {
+      dropped.push(`${w.subcategory_id} (specific-severe claim from vague evidence)`) ; return false
+    }
+    return true
+  })
+
+  // De-dup: one excerpt used as the sole anchor for many specific-severe categories.
+  const excerptGroups = new Map<string, EnhancedContentWarning[]>()
+  for (const w of kept) {
+    if (!isSpecificSevere(w.subcategory_id)) continue
+    const ex = normalizeExcerpt(w)
+    if (!ex) continue
+    const arr = excerptGroups.get(ex) || []
+    arr.push(w)
+    excerptGroups.set(ex, arr)
+  }
+  const toRemove = new Set<EnhancedContentWarning>()
+  for (const [, group] of excerptGroups) {
+    if (group.length < 3) continue // 1-2 shared is plausible; 3+ specific-severe from one quote is fabrication
+    const best = group.slice().sort((a, b) =>
+      (b.evidence?.[0]?.confidence || 0) - (a.evidence?.[0]?.confidence || 0))[0]
+    for (const w of group) {
+      if (w !== best) { toRemove.add(w); dropped.push(`${w.subcategory_id} (shares one excerpt with ${group.length - 1} other severe warnings)`) }
+    }
+  }
+  if (toRemove.size > 0) kept = kept.filter(w => !toRemove.has(w))
+
+  if (dropped.length > 0) {
+    console.log(`[sanitizeWarnings] Dropped ${dropped.length} fabricated/unsupported warning(s):`, dropped)
+    onProgress?.(`✓ Removed ${dropped.length} unsupported warning${dropped.length === 1 ? '' : 's'}`)
+  }
+
+  // Keep severity and description wording consistent (fixes "severe" warnings that read "Mild…").
+  return kept.map(w => ({
+    ...w,
+    description: updateDescriptionForSeverity(w.description, w.severity),
+  }))
+}
+
 interface VerificationResult {
   subcategory_id: string
   action: 'keep' | 'drop' | 'adjust'
@@ -1328,9 +1589,12 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       }
     })()
 
-    // Add timeout (10 seconds)
+    // Add timeout. 10s was far too short for a reasoning-model verification call
+    // (GPT-5.x / Gemini structured JSON over a full taxonomy routinely takes 12-25s),
+    // so verification failed on EVERY deep scan and silently discarded refinements.
+    const VERIFICATION_TIMEOUT_MS = 30000
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Verification timeout after 10s')), 10000)
+      setTimeout(() => reject(new Error('Verification timeout after 30s')), VERIFICATION_TIMEOUT_MS)
     })
 
     try {
@@ -1639,7 +1903,11 @@ export async function analyzeBookWithMultiModel(
     gemini: EnhancedContentWarning[]
   }
   web_enrichment?: WebEnrichmentInfo
+  audit_diagnostics: AuditDiagnostics
 }> {
+  const scanStartedAt = new Date().toISOString()
+  const totalStartTime = performance.now()
+
   const options: AnalysisOptions =
     typeof modelOrOptions === 'string'
       ? { model: modelOrOptions }
@@ -1666,6 +1934,29 @@ export async function analyzeBookWithMultiModel(
   const effectiveMetadata = applyDescriptionTruncation(metadata, effectiveOptions.maxDescriptionChars)
   const isCanonical = isCanonicalBook(metadata.title, metadata.author)
 
+  // Audit-diagnostics scratch state — populated by side-effect inside the
+  // promise handlers below, then assembled into the final blob at return.
+  // Typed as a tuple to keep `let` inference from collapsing to `never` after the
+  // initial `null` assignment.
+  type ErrorInfo = { message: string; code?: string | number; type?: string }
+  const scratch: {
+    openaiEnvelope: ModelInvocationEnvelope | null
+    geminiEnvelope: ModelInvocationEnvelope | null
+    openaiError: ErrorInfo | null
+    geminiError: ErrorInfo | null
+  } = {
+    openaiEnvelope: null,
+    geminiEnvelope: null,
+    openaiError: null,
+    geminiError: null,
+  }
+
+  const captureError = (err: unknown) => ({
+    message: err instanceof Error ? err.message : String(err),
+    code: (err as any)?.status ?? (err as any)?.code ?? undefined,
+    type: err instanceof Error ? err.name : typeof err,
+  })
+
   // Run both OpenAI and Gemini in parallel for cross-validation
   // IMPORTANT: Don't catch errors here - let them propagate to scan-service
   // If we catch and return empty array, it will be treated as "no warnings" which is wrong
@@ -1674,33 +1965,35 @@ export async function analyzeBookWithMultiModel(
   // Run enabled models in parallel (when both enabled)
   const openaiPromise = effectiveOptions.enableOpenAI
     ? analyzeWithOpenAI(effectiveMetadata, onProgress, effectiveOptions.model, effectiveOptions, isCanonical)
-    : Promise.resolve({ warnings: [], noWarningsReasoning: undefined })
+        .then(env => { scratch.openaiEnvelope = env; return env })
+    : Promise.resolve(null)
 
   const geminiPromise = effectiveOptions.enableGemini
-    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical).catch(err => {
-      if (!effectiveOptions.enableOpenAI) {
-        // If OpenAI is disabled, Gemini is the only model. Failure here is fatal.
-        console.error('[Multi-Model] Gemini analysis failed and it is the only model enabled. Throwing error:', err)
-        throw err
-      }
-      // Gemini failures are non-fatal - log and continue with OpenAI only
-      console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
-      return []
-    })
-    : Promise.resolve([])
+    ? analyzeWithGemini(effectiveMetadata, onProgress, effectiveOptions, isCanonical)
+        .then(env => { scratch.geminiEnvelope = env; return env })
+        .catch(err => {
+          scratch.geminiError = captureError(err)
+          if (!effectiveOptions.enableOpenAI) {
+            // If OpenAI is disabled, Gemini is the only model. Failure here is fatal.
+            console.error('[Multi-Model] Gemini analysis failed and it is the only model enabled. Throwing error:', err)
+            throw err
+          }
+          // Gemini failures are non-fatal - log and continue with OpenAI only
+          console.warn('[Multi-Model] Gemini analysis failed, continuing with OpenAI only:', err)
+          return null
+        })
+    : Promise.resolve(null)
 
   const [openaiResult, geminiResult] = await Promise.allSettled([openaiPromise, geminiPromise])
 
-  const openaiWarnings = openaiResult.status === 'fulfilled'
-    ? openaiResult.value.warnings
-    : []
-  const openaiNoWarningsReasoning = openaiResult.status === 'fulfilled'
-    ? openaiResult.value.noWarningsReasoning
-    : undefined
+  if (openaiResult.status === 'rejected') {
+    scratch.openaiError = captureError(openaiResult.reason)
+  }
 
-  const geminiWarnings = geminiResult.status === 'fulfilled'
-    ? geminiResult.value
-    : []
+  const openaiWarnings = scratch.openaiEnvelope?.warnings ?? []
+  const openaiNoWarningsReasoning = scratch.openaiEnvelope?.noWarningsReasoning
+  const geminiWarnings = scratch.geminiEnvelope?.warnings ?? []
+  void geminiResult // settled result already mirrored via envelope/error scratch
 
   // Log cross-validation status
   if (geminiWarnings.length > 0) {
@@ -1718,7 +2011,11 @@ export async function analyzeBookWithMultiModel(
   // Adversarial Validation: Models critique each other's warnings
   // This creates a "debate" where each model reviews the other for being too restrictive or too lenient
   let refinedWarnings = combined
+  // Adversarial-stage diagnostics: null when the stage did not fire.
+  let adversarialDiagnostics: AuditDiagnostics['adversarial'] = null
+  let adversarialTimingMs: number | null = null
   if (effectiveOptions.enableAdversarial && openaiWarnings.length > 0 && geminiWarnings.length > 0) {
+    const adversarialStart = performance.now()
     try {
       const { runAdversarialValidation } = await import('./adversarial-validation')
       const adversarialResult = await runAdversarialValidation(
@@ -1738,19 +2035,44 @@ export async function analyzeBookWithMultiModel(
           gemini_critiques: adversarialResult.gemini_critiques_openai.length
         })
       }
+      adversarialDiagnostics = {
+        fired: true,
+        openai_critiques_gemini: adversarialResult.openai_critiques_gemini,
+        gemini_critiques_openai: adversarialResult.gemini_critiques_openai,
+        before_count: combined.length,
+        after_count: refinedWarnings.length,
+      }
     } catch (error) {
       console.warn('[Adversarial Validation] Failed, using original combined warnings:', error)
       // Continue with original combined warnings if adversarial validation fails
+      adversarialDiagnostics = {
+        fired: true,
+        openai_critiques_gemini: [],
+        gemini_critiques_openai: [],
+        before_count: combined.length,
+        after_count: combined.length,
+      }
+    } finally {
+      adversarialTimingMs = Math.round(performance.now() - adversarialStart)
     }
   }
 
-  // POC: Verify unique warnings only
+  // Verify unique warnings only — but ONLY those that survived the adversarial pass.
+  // Previously we verified the raw unique set from combineResults; when verification then
+  // timed out and fell back to "original unique warnings", any warning the adversarial pass
+  // had removed (e.g. a bogus "grief" inferred from tone) got re-injected. Filtering to the
+  // refined set here means removed warnings stay removed regardless of verification outcome.
+  const refinedSubcategoryIds = new Set(refinedWarnings.map(w => w.subcategory_id))
   const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
+    .filter(w => refinedSubcategoryIds.has(w.subcategory_id))
   let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
+  let verificationDiagnostics: AuditDiagnostics['verification'] = null
+  let verificationTimingMs: number | null = null
   let webEnrichment: WebEnrichmentInfo | undefined = undefined
 
   if (effectiveOptions.enableVerification && allUniqueWarnings.length > 0) {
+    const verificationStart = performance.now()
     // Use the opposite model for verification when both ran (cross-validation).
     // When OpenAI failed (e.g. 429 quota) we only have Gemini results — use Gemini for verification
     // so the scan can complete instead of calling OpenAI again and failing.
@@ -1771,8 +2093,11 @@ export async function analyzeBookWithMultiModel(
 
     // Replace unique warnings in combined list with verified ones
     // Remove original unique warnings
+    // Start from the ADVERSARIALLY-REFINED set (not raw `combined`), then swap the unique
+    // warnings for their verified versions. Using `combined` here was the second half of the
+    // re-injection bug — it resurrected warnings the adversarial pass had already dropped.
     const uniqueSubcategoryIds = new Set(allUniqueWarnings.map(w => w.subcategory_id))
-    finalWarnings = combined.filter(w => !uniqueSubcategoryIds.has(w.subcategory_id))
+    finalWarnings = refinedWarnings.filter(w => !uniqueSubcategoryIds.has(w.subcategory_id))
 
     // Add verified warnings
     finalWarnings.push(...verified)
@@ -1787,6 +2112,18 @@ export async function analyzeBookWithMultiModel(
       latency_ms: metrics.latency_ms,
       failed: metrics.failed
     })
+
+    verificationDiagnostics = {
+      fired: true,
+      status: metrics.failed
+        ? (metrics.latency_ms >= 30000 ? 'timeout' : 'failed')
+        : 'passed',
+      duration_ms: metrics.latency_ms,
+      kept: metrics.kept,
+      dropped: metrics.dropped,
+      adjusted: metrics.adjusted,
+    }
+    verificationTimingMs = Math.round(performance.now() - verificationStart)
   }
 
   // Final message will be shown by scan-service
@@ -1835,7 +2172,20 @@ export async function analyzeBookWithMultiModel(
   // Enrichment can help recover the specific violence type from community sources.
   const hasOtherViolence = finalWarnings.some(w => w.subcategory_id === 'violence.other_violence')
 
-  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster || looksLikeViolenceWithoutSex || hasOtherViolence)) {
+  // BLURB-ONLY DEFENCE (the master defect fix). The first analysis only ever sees the
+  // marketing description, which routinely omits the very warnings readers need (e.g. the
+  // domestic-violence / attempted-rape threads in "It Ends With Us" are absent from its long
+  // but sanitized blurb). We therefore ALWAYS consult community CW sources unless the book
+  // already has many warnings — the relevance-gated, trusted-source-only enrichment above
+  // makes this safe (unrelated pages can no longer inject warnings). enrichWithWebSearch
+  // itself short-circuits when >7 warnings already exist, so this stays bounded.
+  const alreadyHasCommunityEvidence = finalWarnings.some(w => (w.evidence?.[0] as any)?.source === 'community')
+
+  if (
+    effectiveOptions.enableWebEnrichment &&
+    !alreadyHasCommunityEvidence &&
+    finalWarnings.length <= 7
+  ) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
     const hasOnlyGenericWarnings = finalWarnings.length > 0 &&
       finalWarnings.every(w =>
@@ -1843,22 +2193,11 @@ export async function analyzeBookWithMultiModel(
         w.subcategory_id === 'substance_use_or_alcohol.alcohol'
       )
 
-    // Trigger enrichment if:
-    // 1. We have 0 warnings (definitely need enrichment)
-    // 2. We only have generic warnings (likely sanitized)
-    // 3. We have 1-2 warnings but they're all relationship/alcohol (might be missing mental health)
-    // 4. We have "other_violence" (likely masking specific severe content like infanticide)
-    const shouldEnrich = finalWarnings.length === 0 ||
-      looksLikeGenericCluster ||
-      looksLikeViolenceWithoutSex ||
-      hasOtherViolence ||
-      hasOnlyGenericWarnings ||
-      (finalWarnings.length <= 2 &&
-        !finalWarnings.some(w =>
-          w.subcategory_id?.includes('mental_health') ||
-          w.subcategory_id?.includes('grief') ||
-          w.subcategory_id?.includes('death')
-        ))
+    // Entry was already gated on (<=7 warnings && no community evidence yet), so always enrich.
+    // The specific-cluster heuristics below are retained only as documentation of the patterns
+    // that most benefit; they no longer gate the decision.
+    const shouldEnrich = true
+    void looksLikeGenericCluster; void looksLikeViolenceWithoutSex; void hasOtherViolence; void hasOnlyGenericWarnings
 
     if (shouldEnrich) {
       onProgress?.('⏳ Initial scan found few warnings - searching community sources for additional information...')
@@ -2024,6 +2363,11 @@ export async function analyzeBookWithMultiModel(
     }
   }
 
+  // Final safety net: strip fabricated / unsupported specific-severe warnings and re-sync
+  // each description's intensity word with its final severity. Runs last so it also cleans
+  // up anything the enrichment second-pass introduced.
+  finalWarnings = sanitizeWarnings(finalWarnings, onProgress)
+
   // Apply post-processing caps/stripping for benchmarking / quick modes
   const maxWarningsForReturn =
     webEnrichment?.used === true
@@ -2037,6 +2381,57 @@ export async function analyzeBookWithMultiModel(
     finalWarnings = finalWarnings.map(w => ({ ...w, reasoning: undefined }))
   }
 
+  const buildModelSlot = (
+    envelope: ModelInvocationEnvelope | null,
+    error: { message: string; code?: string | number; type?: string } | null,
+    enabled: boolean,
+  ): RawModelResponseSlot => {
+    if (!enabled) return null
+    if (envelope) return envelope.rawResponse
+    if (error) {
+      return {
+        status: 'error',
+        error_message: error.message,
+        error_code: error.code,
+        error_type: error.type,
+      }
+    }
+    return null
+  }
+
+  const auditDiagnostics: AuditDiagnostics = {
+    prompts: {
+      openai: scratch.openaiEnvelope?.prompt ?? null,
+      gemini: scratch.geminiEnvelope?.prompt ?? null,
+    },
+    options: {
+      enableOpenAI: effectiveOptions.enableOpenAI,
+      enableGemini: effectiveOptions.enableGemini,
+      enableAdversarial: effectiveOptions.enableAdversarial,
+      enableVerification: effectiveOptions.enableVerification,
+      enableWebEnrichment: effectiveOptions.enableWebEnrichment,
+      model: effectiveOptions.model ?? null,
+      maxWarnings: effectiveOptions.maxWarnings ?? null,
+      includeReasoning: effectiveOptions.includeReasoning,
+      maxDescriptionChars: effectiveOptions.maxDescriptionChars ?? null,
+    },
+    raw_responses: {
+      openai: buildModelSlot(scratch.openaiEnvelope, scratch.openaiError, effectiveOptions.enableOpenAI),
+      gemini: buildModelSlot(scratch.geminiEnvelope, scratch.geminiError, effectiveOptions.enableGemini),
+    },
+    adversarial: adversarialDiagnostics,
+    verification: verificationDiagnostics,
+    timings: {
+      openai_ms: scratch.openaiEnvelope?.timing_ms ?? null,
+      gemini_ms: scratch.geminiEnvelope?.timing_ms ?? null,
+      adversarial_ms: adversarialTimingMs,
+      verification_ms: verificationTimingMs,
+      total_ms: Math.round(performance.now() - totalStartTime),
+    },
+    taxonomy_version: TAXONOMY_VERSION,
+    scan_started_at: scanStartedAt,
+  }
+
   return {
     warnings: finalWarnings,
     noWarningsReasoning: finalWarnings.length === 0 ? openaiNoWarningsReasoning : undefined,
@@ -2048,7 +2443,8 @@ export async function analyzeBookWithMultiModel(
       openai: openaiWarnings,
       gemini: geminiWarnings
     },
-    web_enrichment: webEnrichment
+    web_enrichment: webEnrichment,
+    audit_diagnostics: auditDiagnostics,
   }
 }
 

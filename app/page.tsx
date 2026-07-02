@@ -5,18 +5,12 @@ import { Button } from "@/components/ui/button"
 import { BookSpineLogo } from "@/components/book-spine-logo"
 import { RecentScans } from "@/components/recent-scans"
 import { getVariantConfig } from "@/lib/config/variants"
-import { HomepageGate } from "@/components/homepage-gate"
 import { isIpAllowlisted } from '@/lib/utils/rate-limiter'
 import { FeedbackDialog } from '@/components/feedback-dialog'
+import { ScanPreviewCard } from "@/components/scan-preview-card"
 
 export default async function HomePage() {
   const cookieStore = await cookies()
-  const hasAccess = cookieStore.has('subtext_vip') || cookieStore.has('subtext_access_granted')
-
-  if (!hasAccess) {
-    return <HomepageGate />
-  }
-
   const headerList = await headers()
   const forwarded = headerList.get('x-forwarded-for')
   const ip = forwarded ? forwarded.split(',')[0].trim() : 'unknown'
@@ -27,80 +21,88 @@ export default async function HomePage() {
   const v = getVariantConfig()
   return (
     <main className="min-h-screen bg-background flex flex-col">
-      {/* Hero: distinct marketing band */}
+      {/* Hero */}
       <section className="relative overflow-hidden border-b border-border/30">
         <div
           className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.07] via-background to-background"
           aria-hidden
         />
-        <div className="relative flex flex-col items-center px-4 pt-20 pb-16 md:pt-28 md:pb-20 text-center">
-          <div className="max-w-4xl mx-auto space-y-8">
-            <div className="flex flex-col items-center justify-center">
-              <div className="mb-6">
-                <BookSpineLogo className="h-40 w-40 md:h-52 md:w-52 text-foreground" />
+        <div className="relative container mx-auto px-6 py-16 md:py-24">
+          <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+
+            {/* Left: brand + headline + CTAs */}
+            <div className="flex flex-col items-center md:items-start text-center md:text-left space-y-6">
+              <div className="flex flex-col items-center md:items-start">
+                <BookSpineLogo className="h-16 w-16 md:h-20 md:w-20 text-foreground mb-4" />
+                <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-medium mb-1">
+                  Content awareness for books
+                </p>
+                <span className="text-3xl md:text-4xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>{v.name}</span>
               </div>
-              <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground font-medium mb-3">
-                Content awareness for books
+
+              <h1 className="font-serif text-3xl md:text-5xl font-bold tracking-tight text-foreground leading-[1.1]">
+                {v.homepage.headline}{' '}
+                <span className="text-muted-foreground italic">{v.homepage.headlineItalic}</span>
+              </h1>
+
+              <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-lg">
+                {v.homepage.subhead}
               </p>
-              <span className="text-4xl md:text-6xl font-serif font-normal tracking-tight text-foreground" style={{ fontFamily: 'var(--font-serif)' }}>{v.name}</span>
+
+              <div className="flex flex-col sm:flex-row items-center md:items-start gap-3 pt-1">
+                <Link href="/scan">
+                  <Button size="lg" className="h-12 px-7 text-base rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
+                    <ScanBarcode className="mr-2 h-5 w-5" />
+                    {v.homepage.ctaPrimary}
+                  </Button>
+                </Link>
+                <Link href="/bookshelf">
+                  <Button size="lg" variant="outline" className="h-12 px-7 text-base rounded-full border-border text-foreground hover:bg-accent hover:text-accent-foreground">
+                    <Search className="mr-2 h-5 w-5" />
+                    {v.homepage.ctaSecondary}
+                  </Button>
+                </Link>
+              </div>
             </div>
 
-            <h1 className="font-serif text-4xl md:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
-              {v.homepage.headline} <br className="hidden md:block" />
-              <span className="text-muted-foreground italic">{v.homepage.headlineItalic}</span>
-            </h1>
-
-            <p className="mx-auto max-w-2xl text-lg md:text-xl text-muted-foreground leading-relaxed">
-              {v.homepage.subhead}
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
-              <Link href="/scan">
-                <Button size="lg" className="h-14 px-8 text-lg rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all hover:scale-[1.02]">
-                  <ScanBarcode className="mr-2 h-5 w-5" />
-                  {v.homepage.ctaPrimary}
-                </Button>
-              </Link>
-              <Link href="/bookshelf">
-                <Button size="lg" variant="outline" className="h-14 px-8 text-lg rounded-full border-border text-foreground hover:bg-accent hover:text-accent-foreground">
-                  <Search className="mr-2 h-5 w-5" />
-                  {v.homepage.ctaSecondary}
-                </Button>
-              </Link>
+            {/* Right: live preview card */}
+            <div className="flex justify-center md:justify-end">
+              <ScanPreviewCard />
             </div>
 
-            {/* Trust: how to read Subtext (near top, low jargon) */}
-            <div className="pt-10 md:pt-14 max-w-3xl mx-auto">
-              <ul className="grid sm:grid-cols-3 gap-6 text-left rounded-2xl border border-border/50 bg-card/40 dark:bg-card/20 px-5 py-6 md:px-8 md:py-8 shadow-sm">
-                <li className="space-y-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Sparkles className="h-5 w-5" aria-hidden />
-                  </div>
-                  <h2 className="font-serif text-base font-semibold text-foreground">Automated analysis</h2>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Warnings are generated from verified book metadata and sources, then mapped to a fixed taxonomy—so you get consistent labels, not random adjectives.
-                  </p>
-                </li>
-                <li className="space-y-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Eye className="h-5 w-5" aria-hidden />
-                  </div>
-                  <h2 className="font-serif text-base font-semibold text-foreground">Honest about evidence</h2>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    We aim to be clear when something is strongly supported versus thinly described. Subtext is a guide to what is known publicly—not a guarantee about every page.
-                  </p>
-                </li>
-                <li className="space-y-2 sm:col-span-1">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Scale className="h-5 w-5" aria-hidden />
-                  </div>
-                  <h2 className="font-serif text-base font-semibold text-foreground">Your judgment</h2>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    Built for parents, educators, booksellers, and readers who want a head start—never a substitute for your own standards or context.
-                  </p>
-                </li>
-              </ul>
-            </div>
+          </div>
+
+          {/* Trust strip */}
+          <div className="mt-14 md:mt-20">
+            <ul className="grid sm:grid-cols-3 gap-6 text-left rounded-2xl border border-border/50 bg-card/40 dark:bg-card/20 px-5 py-6 md:px-8 md:py-8 shadow-sm">
+              <li className="space-y-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Sparkles className="h-5 w-5" aria-hidden />
+                </div>
+                <h2 className="font-serif text-base font-semibold text-foreground">Automated analysis</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Warnings are generated from verified book metadata and sources, then mapped to a fixed taxonomy—so you get consistent labels, not random adjectives.
+                </p>
+              </li>
+              <li className="space-y-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Eye className="h-5 w-5" aria-hidden />
+                </div>
+                <h2 className="font-serif text-base font-semibold text-foreground">Honest about evidence</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  We aim to be clear when something is strongly supported versus thinly described. Subtext is a guide to what is known publicly—not a guarantee about every page.
+                </p>
+              </li>
+              <li className="space-y-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Scale className="h-5 w-5" aria-hidden />
+                </div>
+                <h2 className="font-serif text-base font-semibold text-foreground">Your judgment</h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Built for parents, educators, booksellers, and readers who want a head start—never a substitute for your own standards or context.
+                </p>
+              </li>
+            </ul>
           </div>
         </div>
       </section>

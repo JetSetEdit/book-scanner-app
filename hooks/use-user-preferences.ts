@@ -5,7 +5,6 @@ import { useLocalStorage } from './use-browser-storage'
 import type { AestheticThemeId } from '@/lib/config/aesthetic-themes'
 
 export interface UserPreferences {
-  strictnessMode?: 'standard' | 'strict' | 'parent'
   showRawApiResponse?: boolean
   autoSelectSingleCandidate?: boolean
   theme?: 'light' | 'dark' | 'system'
@@ -19,7 +18,6 @@ export interface UserPreferences {
 const PREFERENCES_KEY = 'book-scanner-preferences'
 
 const defaultPreferences: UserPreferences = {
-  strictnessMode: 'standard',
   showRawApiResponse: false,
   autoSelectSingleCandidate: true,
   theme: 'system',

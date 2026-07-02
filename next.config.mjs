@@ -3,7 +3,7 @@ import { existsSync } from 'fs'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Note: eslint config moved to separate eslintrc file (Next.js 15+)
+  // ESLint: use `npm run lint` (eslint.config.mjs). `next lint` was removed in Next.js 16.
   typescript: {
     ignoreBuildErrors: true,
   },

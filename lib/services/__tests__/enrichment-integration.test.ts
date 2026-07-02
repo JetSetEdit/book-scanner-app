@@ -39,7 +39,7 @@ describe('Enrichment result shape (real enrichWithWebSearch)', () => {
 })
 
 describe('Analysis with minimal description (real analyzeBookWithMultiModel)', () => {
-  it('uses enrichment so we get warnings or needsReview for a known book (no short-circuit)', async () => {
+  it('uses enrichment so we get warnings or analyzed no-warnings reasoning for a known book (no short-circuit)', async () => {
     if (!hasOpenAI || !hasSupabase) {
       console.warn('Skipping: OPENAI_API_KEY or Supabase env not set')
       return
@@ -62,15 +62,37 @@ describe('Analysis with minimal description (real analyzeBookWithMultiModel)', (
         enableGemini: false,
       }
     )
-    // Should not short-circuit: we have enrichment for this book, so we get either warnings or needsReview
+    // Should not short-circuit without trying enrichment: pipeline returns web_enrichment when enrichment runs.
     const shortCircuitReasoning = 'No content warnings found because there was no description or external context to analyze'
+    expect(result.web_enrichment?.attempted).toBe(true)
     if (result.warnings.length === 0) {
-      expect(result.needsReview).toBe(true)
+      expect(result.noWarningsReasoning).toBeDefined()
       expect(result.noWarningsReasoning).not.toBe(shortCircuitReasoning)
     } else {
       expect(result.warnings.length).toBeGreaterThan(0)
       expect(result.noWarningsReasoning).toBeUndefined()
     }
+
+    // Audit-diagnostics blob (what gets persisted to ai_audit_logs.raw_ai_response).
+    expect(result.audit_diagnostics).toBeDefined()
+    const diag = result.audit_diagnostics
+    expect(Object.keys(diag).sort()).toEqual(
+      ['adversarial', 'options', 'prompts', 'raw_responses', 'scan_started_at', 'taxonomy_version', 'timings', 'verification'].sort()
+    )
+    // OpenAI enabled, Gemini disabled in this test config.
+    expect(diag.options.enableOpenAI).toBe(true)
+    expect(diag.options.enableGemini).toBe(false)
+    expect(typeof diag.prompts.openai).toBe('string')
+    expect(diag.prompts.openai!.length).toBeGreaterThan(100)
+    expect(diag.prompts.gemini).toBeNull()
+    expect(diag.raw_responses.openai).not.toBeNull()
+    if (diag.raw_responses.openai && diag.raw_responses.openai.status === 'ok') {
+      expect(Array.isArray(diag.raw_responses.openai.warnings)).toBe(true)
+    }
+    expect(diag.raw_responses.gemini).toBeNull()
+    expect(typeof diag.timings.total_ms).toBe('number')
+    expect(diag.taxonomy_version).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(typeof diag.scan_started_at).toBe('string')
   }, 60_000)
 })
 
@@ -100,7 +122,10 @@ describe('Short-circuit when no description and no enrichment (real)', () => {
       }
     )
     expect(result.warnings).toHaveLength(0)
-    expect(result.noWarningsReasoning).toContain('no description or external context')
-    expect(result.needsReview).toBe(false)
+    expect(result.web_enrichment?.attempted).toBe(true)
+    // Copy evolves with the model; assert substantive "no usable input" semantics.
+    expect(result.noWarningsReasoning?.toLowerCase()).toMatch(
+      /no .*book description|blurb|textual|enrichment context|without any textual/
+    )
   }, 45_000)
 })

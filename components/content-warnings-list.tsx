@@ -40,7 +40,7 @@ import { getWarningContext, getContextInfo, shouldShowWarning } from "@/lib/util
 import { getVariantConfig } from "@/lib/config/variants"
 import { useUserPreferences } from "@/hooks/use-user-preferences"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { getWarningPhrase, sanitizeDescriptionForDisplay } from "@/lib/services/warning-phraser"
+import { sanitizeDescriptionForDisplay } from "@/lib/services/warning-phraser"
 import { SpoilerText } from "@/components/spoiler-text"
 
 interface ContentWarning {
@@ -388,7 +388,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       if (!bookIsbn && typeof window !== 'undefined') {
         const currentUrl = window.location.pathname
         const isbnMatch = currentUrl.match(/\/book\/([^\/]+)/)
-        bookIsbn = isbnMatch ? isbnMatch[1] : null
+        bookIsbn = isbnMatch ? isbnMatch[1] : undefined
       }
       
       if (!bookIsbn) {
@@ -464,7 +464,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
           <CheckCircle className="h-8 w-8 text-forest" />
         </div>
         <h3 className="text-lg font-serif font-medium text-foreground mb-1">✨ Comfort Read</h3>
-        <p className="text-muted-foreground text-sm mb-4">We analyzed this book and found no concerning content. This appears to be a safe, cozy read.</p>
+        <p className="text-muted-foreground text-sm mb-4">We analyzed this book and found no flagged content. This appears to be a cozy read.</p>
         
         {/* Dev Mode: Show AI reasoning for why no warnings were generated */}
         {isDevMode && noWarningsReasoning && (
@@ -933,7 +933,7 @@ export function ContentWarningsList({ warnings, isAuthorApproved, analysisStatus
       {showReasoning && (
       <div className="mt-12 pt-8 border-t border-border">
         <p className="text-[10px] text-muted-foreground leading-relaxed text-center italic max-w-xl mx-auto">
-          All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment.
+          All warnings include source citations and reasoning for transparency. Author-provided warnings are prioritized and shown first. Severity is subjective—varying by individual sensitivity—so use your own judgment. A flagged warning never means a book is bad or wrong—more information means more reader autonomy.
         </p>
       </div>
       )}
@@ -965,13 +965,7 @@ function WarningDisclosure({ warning, isAi = false, showReasoningInWarnings = tr
 
   const severity = (warning.severity ?? "mild").toString().toLowerCase() as "mild" | "moderate" | "severe"
   const severityLabel = severity === "severe" ? "Severe" : severity === "moderate" ? "Moderate" : "Mild"
-  const descriptionText = (() => {
-    const raw = sanitizeDescriptionForDisplay(warning.description ?? '')
-    if (!raw) return ''
-    const phrase = getWarningPhrase(warning.category_id)
-    if (raw.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) return raw
-    return `${phrase.replace("…", "")} ${raw.toLowerCase()}`
-  })()
+  const descriptionText = sanitizeDescriptionForDisplay(warning.description ?? '')
 
   const severityBorder =
     severity === "severe"
@@ -1185,16 +1179,7 @@ function WarningItem({ warning, isAi = false, isVerified = false, showReasoningI
               </div>
             ) : (
               <p className="text-muted-foreground text-base leading-relaxed font-serif">
-                {(() => {
-                  const phrase = getWarningPhrase(warning.category_id)
-                  // If description already starts with a phrase-like pattern, use it as-is
-                  if (warning.description.match(/^(Contains|Includes|Explores|Features|Addresses|Touches)/i)) {
-                    return warning.description
-                  }
-                  // Otherwise, prepend the rotated phrase
-                  const cleanPhrase = phrase.replace('…', '')
-                  return `${cleanPhrase} ${warning.description.toLowerCase()}`
-                })()}
+                {sanitizeDescriptionForDisplay(warning.description ?? '')}
               </p>
             )}
           </div>

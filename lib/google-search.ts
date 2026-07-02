@@ -107,23 +107,20 @@ export async function searchForContentWarnings(
   // Construct targeted queries that focus on user-generated content warnings.
   // We run multiple variants to increase recall for "missing major themes" cases,
   // including explicit searches for high-severity content that's often sanitized from blurbs.
+  // Enrichment now runs for most scans, so keep the query count lean (Google Custom Search
+  // free tier is only 100 queries/day). These three are the workhorses that consistently
+  // surface trusted CW databases; the previous 7-query set (incl. duplicated infanticide /
+  // torture probes) exhausted quota fast without adding recall. The broad "sexual violence"
+  // query stays because that is the single most commonly omitted-from-blurb severe theme.
   const queries = [
-    // General content warning searches
     `"${title}" "${author}" content warnings trigger warnings parents guide`,
     `"${title}" "${author}" "TW" "CW" "content warnings"`,
-    // High-severity content that's often omitted from descriptions
-    `"${title}" "${author}" trigger warnings torture explicit sexual content`,
-    // Explicit infanticide/child harm searches (for books like Verity)
-    `"${title}" "${author}" infanticide child murder baby death intentional child harm`,
-    `"${title}" "${author}" content warnings infanticide child harm`,
-    // Explicit sexual violence searches (for books like Normal People)
-    `"${title}" "${author}" sexual assault groping unwanted touching molestation`,
-    `"${title}" "${author}" content warnings sexual violence non-consensual`,
+    `"${title}" "${author}" content warnings sexual assault sexual violence`,
   ]
 
   const results: SearchResult[] = []
   for (const q of queries) {
-    const r = await performWebSearch(q, 3)
+    const r = await performWebSearch(q, 4)
     results.push(...r)
   }
 
