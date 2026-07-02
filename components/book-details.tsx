@@ -413,7 +413,7 @@ export function BookDetails({ book, warnings, analysisStatus = 'unknown', metada
               {book.categories && (
                 <div className="flex flex-wrap gap-2 mb-4">
                   {book.categories
-                    .filter((c: string) => !c.startsWith('CLASSIFICATION:') && !c.startsWith('nyt:'))
+                    .filter((c: string) => !c.startsWith('CLASSIFICATION:') && !c.startsWith('nyt:') && !c.startsWith('REGISTER:') && !c.startsWith('GRAPHIC:'))
                     .map((category: string, i: number) => (
                       <span
                         key={i}

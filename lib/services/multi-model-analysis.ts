@@ -122,9 +122,15 @@ export type AuditDiagnostics = {
   scan_started_at: string
 }
 
+type BookAssessmentRaw = {
+  treatment_register?: string | null
+  most_graphic_level?: string | null
+}
+
 type ModelInvocationEnvelope = {
   warnings: EnhancedContentWarning[]
   noWarningsReasoning?: string
+  bookAssessment?: BookAssessmentRaw | null
   rawResponse: Extract<RawModelResponseSlot, { status: 'ok' }>
   prompt: string
   timing_ms: number
@@ -584,8 +590,16 @@ Instructions:
       ]
     }
   ],
-  "no_warnings_reasoning": "If warnings array is empty, provide a brief explanation (2-4 sentences) of why no content warnings were identified. Explain what content was reviewed (e.g., 'romance themes', 'lighthearted tone', 'no violence or sensitive themes mentioned') and why it does not meet the threshold for content warnings. Use Australian Classification Board terminology. This field should only be present when warnings array is empty."
-}`
+  "no_warnings_reasoning": "If warnings array is empty, provide a brief explanation (2-4 sentences) of why no content warnings were identified. Explain what content was reviewed (e.g., 'romance themes', 'lighthearted tone', 'no violence or sensitive themes mentioned') and why it does not meet the threshold for content warnings. Use Australian Classification Board terminology. This field should only be present when warnings array is empty.",
+  "book_assessment": {
+    "treatment_register": "one of: childrens | middle_grade | ya | adult",
+    "most_graphic_level": "one of: none | mild | moderate | graphic | explicit"
+  }
+}
+
+BOOK_ASSESSMENT (always include, even if warnings is empty):
+- "treatment_register": judge WHO the book is written FOR from HOW the content is told — its vocabulary, framing, and the explicitness with which mature themes are handled — NOT from marketing labels, shelving category, or cover. A dark theme told gently for young readers (e.g. child-peril in a middle-grade horror like Coraline) is "childrens" or "middle_grade"; a book with on-page explicit sex or graphic gore is "adult" even if it is marketed or shelved as YA/children's. When unsure between two, pick the OLDER register.
+- "most_graphic_level": the single most graphic/explicit depiction ANYWHERE in the book — "none" (no sensitive content), "mild" (referenced/implied only), "moderate" (present but not graphically detailed), "graphic" (violence/gore shown in detail), or "explicit" (on-page explicit sexual content). This reflects DETAIL of depiction, not how dark the themes are.`
 
   try {
     const modelName = model || MODEL_VERSION
@@ -666,9 +680,16 @@ DESCRIPTION FORMAT (Australian Classification Board style):
     const rawSnapshot = JSON.parse(JSON.stringify(rawWarnings))
     const warnings = processWarnings(rawWarnings, 'openai')
     const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
+    const bookAssessment = analysis.book_assessment && typeof analysis.book_assessment === 'object'
+      ? {
+          treatment_register: analysis.book_assessment.treatment_register ?? null,
+          most_graphic_level: analysis.book_assessment.most_graphic_level ?? null,
+        }
+      : null
     return {
       warnings,
       noWarningsReasoning,
+      bookAssessment,
       rawResponse: {
         status: 'ok',
         warnings: rawSnapshot,
@@ -835,8 +856,14 @@ Instructions:
       "evidence": [{"source": "text", "excerpt": "...", "confidence": 0.8}],
       "other_note": "Only include if subcategory_id starts with 'other_'. Provide a concise explanation of the specific content."
     }
-  ]
-}`
+  ],
+  "book_assessment": {
+    "treatment_register": "one of: childrens | middle_grade | ya | adult",
+    "most_graphic_level": "one of: none | mild | moderate | graphic | explicit"
+  }
+}
+
+BOOK_ASSESSMENT (always include): "treatment_register" = who the book is written FOR, judged from HOW content is told (vocabulary, framing, explicitness), NOT marketing/shelving/cover. A dark theme told gently for young readers is "childrens"/"middle_grade"; on-page explicit sex or graphic gore makes it "adult" even if shelved YA/children's; when unsure pick the OLDER register. "most_graphic_level" = the single most graphic depiction anywhere: none | mild (referenced/implied) | moderate (present, not detailed) | graphic (detailed violence/gore) | explicit (on-page explicit sex). This is about DETAIL of depiction, not darkness of theme.`
 
   try {
     // Use newer Gemini models with fallback chain:
@@ -881,9 +908,16 @@ Instructions:
     const rawSnapshot = JSON.parse(JSON.stringify(rawWarnings))
     const warnings = processWarnings(rawWarnings, 'gemini')
     const noWarningsReasoning = analysis.no_warnings_reasoning || undefined
+    const bookAssessment = analysis.book_assessment && typeof analysis.book_assessment === 'object'
+      ? {
+          treatment_register: analysis.book_assessment.treatment_register ?? null,
+          most_graphic_level: analysis.book_assessment.most_graphic_level ?? null,
+        }
+      : null
     return {
       warnings,
       noWarningsReasoning,
+      bookAssessment,
       rawResponse: {
         status: 'ok',
         warnings: rawSnapshot,
@@ -1904,6 +1938,7 @@ export async function analyzeBookWithMultiModel(
   }
   web_enrichment?: WebEnrichmentInfo
   audit_diagnostics: AuditDiagnostics
+  bookAssessment?: BookAssessmentRaw | null
 }> {
   const scanStartedAt = new Date().toISOString()
   const totalStartTime = performance.now()
@@ -2445,6 +2480,8 @@ export async function analyzeBookWithMultiModel(
     },
     web_enrichment: webEnrichment,
     audit_diagnostics: auditDiagnostics,
+    // Prefer OpenAI's holistic read; fall back to Gemini's when OpenAI didn't run/return one.
+    bookAssessment: scratch.openaiEnvelope?.bookAssessment ?? scratch.geminiEnvelope?.bookAssessment ?? null,
   }
 }
 

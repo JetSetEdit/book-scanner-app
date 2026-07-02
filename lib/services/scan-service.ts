@@ -1362,12 +1362,24 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
             // Calculate and store age rating based on Australian Classification Board methodology
             try {
               const { calculateAgeRating } = await import('@/lib/utils/age-rating')
-              const ageRating = calculateAgeRating(analysisResult.warnings)
+              const assessment = analysisResult.bookAssessment
+                ? {
+                    treatmentRegister: analysisResult.bookAssessment.treatment_register,
+                    mostGraphicLevel: analysisResult.bookAssessment.most_graphic_level,
+                  }
+                : undefined
+              const ageRating = calculateAgeRating(analysisResult.warnings, assessment)
 
-              // Update book with age rating in categories array
+              // Update book with age rating in categories array. Persist the model's holistic
+              // register/graphic read as tags so the display-time recompute (book page) reproduces
+              // the same capped rating instead of re-inflating it.
               const currentCategories = currentBook?.categories || []
-              const categoriesWithoutRating = currentCategories.filter((c: string) => !c.startsWith('CLASSIFICATION:'))
-              const updatedCategories = [...categoriesWithoutRating, `CLASSIFICATION:${ageRating.rating}`]
+              const categoriesWithoutRating = currentCategories.filter((c: string) =>
+                !c.startsWith('CLASSIFICATION:') && !c.startsWith('REGISTER:') && !c.startsWith('GRAPHIC:'))
+              const assessmentTags: string[] = []
+              if (analysisResult.bookAssessment?.treatment_register) assessmentTags.push(`REGISTER:${analysisResult.bookAssessment.treatment_register}`)
+              if (analysisResult.bookAssessment?.most_graphic_level) assessmentTags.push(`GRAPHIC:${analysisResult.bookAssessment.most_graphic_level}`)
+              const updatedCategories = [...categoriesWithoutRating, ...assessmentTags, `CLASSIFICATION:${ageRating.rating}`]
 
               const { error: updateError } = await supabaseAdmin
                 .from('books')

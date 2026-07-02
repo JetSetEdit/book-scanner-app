@@ -115,7 +115,19 @@ function getPresentationMultiplier(warning: EnhancedContentWarning): number {
  * - R18+: High impact (multiple severe warnings, explicit sexual content, extreme violence)
  * - RC: Very high impact (refused classification - extreme content)
  */
-export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatingResult {
+export interface BookAssessment {
+  /** How the content is TOLD, judged from the text — not the marketing/shelving category.
+   *  One of: 'childrens' | 'middle_grade' | 'ya' | 'adult'. */
+  treatmentRegister?: string | null
+  /** The single most graphic depiction anywhere in the book.
+   *  One of: 'none' | 'mild' | 'moderate' | 'graphic' | 'explicit'. */
+  mostGraphicLevel?: string | null
+}
+
+export function calculateAgeRating(
+  warnings: EnhancedContentWarning[],
+  assessment?: BookAssessment
+): AgeRatingResult {
   if (!warnings || warnings.length === 0) {
     return {
       rating: 'G',
@@ -335,6 +347,47 @@ export function calculateAgeRating(warnings: EnhancedContentWarning[]): AgeRatin
     rating = floor
     ageRecommendation = floor === 'R18+' ? 'Recommended for ages 18+' : 'Recommended for ages 15+'
     reasoning = `${floor} floor applied due to ${hasSexualViolence ? 'sexual violence' : hasIncestOrTabooSex ? 'incest/taboo sexual content' : 'explicit sexual content'}. ${reasoning}`
+  }
+
+  // REGISTER CAP: a book written in a young-audience register AND told non-graphically should
+  // not be over-rated by strong-but-gently-handled themes (the "Coraline problem": genuine
+  // child-peril, but told for 9-year-olds, was landing at MA15+).
+  //
+  // This is judged from the CONTENT (via the model's holistic read), not from marketing
+  // metadata — so it does not repeat the mislabeling this product exists to catch. Two hard
+  // safety properties: (1) it ONLY ever LOWERS a rating, never raises; (2) it requires BOTH a
+  // young register AND non-graphic treatment, so a mis-shelved adult/graphic book (e.g. ACOTAR
+  // tagged "Children's") is never capped down — its graphic level keeps it strict. Hard content
+  // floors (sexual violence, explicit/taboo sex) are never overridden.
+  const register = (assessment?.treatmentRegister || '').toLowerCase().trim()
+  const graphic = (assessment?.mostGraphicLevel || '').toLowerCase().trim()
+  const isNonGraphic = graphic === 'none' || graphic === 'mild' || graphic === 'moderate'
+  const hasHardFloor = hasSexualViolence || hasIncestOrTabooSex || hasExplicitSexualContent || hasExplicitOnPageSexualContent
+  // Content-level backstop: block the cap if the book contains an inherently GRAPHIC
+  // subcategory (graphic violence, gore, torture, explicit/sexual violence). This guards
+  // against a mislabeled register on a genuinely graphic book (e.g. ACOTAR) WITHOUT relying on
+  // per-warning explicitness, which is noisy (blurb-derived) and was false-blocking the cap on
+  // non-graphic children's books like Coraline (child-peril, but nothing graphically depicted).
+  const GRAPHIC_SUBCATEGORIES = ['graphic_violence', 'gore', 'dismember', 'torture', 'explicit_sexual_content', 'sexual_violence', 'extreme_']
+  const hasGraphicContentWarning = warnings.some(w => {
+    const sub = (w.subcategory_id || '').toLowerCase()
+    return GRAPHIC_SUBCATEGORIES.some(g => sub.includes(g))
+  })
+  if (register && isNonGraphic && !hasHardFloor && !hasGraphicContentWarning) {
+    let cap: ClassificationRating | null = null
+    if (register === 'childrens') cap = graphic === 'moderate' ? 'M' : 'PG'
+    else if (register === 'middle_grade') cap = 'M'
+    else if (register === 'ya') cap = (graphic === 'none' || graphic === 'mild') ? 'M' : 'MA15+'
+    // register === 'adult' => no cap (content justifies whatever the impact indicates)
+
+    if (cap && ratingRank[rating] > ratingRank[cap]) {
+      const prev = rating
+      rating = cap
+      ageRecommendation = cap === 'PG' ? 'Recommended for ages 8+'
+        : cap === 'M' ? 'Recommended for ages 13+'
+        : 'Recommended for ages 15+'
+      reasoning = `Capped ${prev} → ${cap}: written in a ${register} register with non-graphic treatment (most graphic level: ${graphic || 'unspecified'}), so strong themes are handled for that audience. ${reasoning}`
+    }
   }
 
   // Add explainable reasoning with top contributing warning
