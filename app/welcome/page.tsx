@@ -57,10 +57,10 @@ export default function WelcomePage() {
           </div>
           <h1 className="font-serif text-3xl mb-2 text-[#2C2416]">Welcome to Subtext</h1>
           <p className="text-[#4A4A4A] mb-2">
-            Subtext is in beta. Access is by invite code only.
+            Subtext is free to use—scan any book and see what&apos;s inside.
           </p>
           <p className="text-[#4A4A4A] text-sm">
-            Enter the code from your invite to continue.
+            Have a supporter code? Enter it below for unlimited deep scans.
           </p>
         </div>
 
