@@ -1123,6 +1123,23 @@ Be factual and specific. Only quote from sources that are safe to use. If you ca
 
         timings.aiContentWarningGeneration = performance.now() - analysisStartTime
 
+        // On a forced rescan that now yields ZERO warnings, clear any stale AI-generated
+        // warnings from a previous scan. Without this, a book that was over-flagged before
+        // (e.g. a children's book wrongly tagged "severe domestic violence") keeps showing
+        // those warnings forever even after the corrected pipeline finds nothing.
+        if (analysisResult.warnings.length === 0 && forceRefresh && bookId) {
+          const { error: clearError } = await supabaseAdmin
+            .from('content_warnings')
+            .delete()
+            .eq('book_id', bookId)
+            .eq('source', 'ai_generated')
+          if (clearError) {
+            console.error('Failed to clear stale warnings on zero-result rescan:', clearError)
+          } else {
+            onProgress?.('✅ Cleared stale AI-generated warnings (fresh scan found none)')
+          }
+        }
+
         if (analysisResult.warnings.length > 0) {
           onProgress?.(`✓ Found ${analysisResult.warnings.length} warning${analysisResult.warnings.length === 1 ? '' : 's'} - finalizing results...`)
           onProgress?.('⏳ Saving results...')

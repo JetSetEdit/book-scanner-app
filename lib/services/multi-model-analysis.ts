@@ -376,6 +376,10 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with at least one evidence span containing: source: "text", excerpt: short quote, confidence: 0-1)
+     * EVIDENCE DISTINCTNESS (critical, prevents fabrication): each warning's excerpt must be a DISTINCT quote that DIRECTLY and SPECIFICALLY names or depicts that exact content type. Do NOT reuse the same excerpt across multiple warnings.
+     * A single vague phrase (e.g. "an unspeakable childhood trauma", "a heart-wrenching story", "a dark past") is NOT evidence for specific severe categories (infanticide, grooming, torture, sexual violence, self-harm, suicide). If the text is only vague/atmospheric, emit at most ONE general warning (e.g. mental_health or trauma) — never a fan-out of specific severe warnings all citing that one phrase.
+     * If you cannot point to a distinct, specific excerpt for a severe category, do not emit it.
+     * EXCEPTION — EXPLICIT COMMUNITY LISTS: when the "Additional context from community sources" EXPLICITLY LISTS a content/trigger warning (e.g. "Trigger warnings: self-harm, suicide, child sexual abuse, domestic violence"), that listed item IS valid, specific evidence. You MUST emit a warning for each such listed item (use evidence source "text", excerpt = the listed warning phrase). This exception exists so documented warnings absent from a sanitized blurb are still surfaced.
    - reasoning: A clear explanation of why this warning was assigned, using Australian Classification Board style language. Explain what evidence supports the warning and why the severity level (Strong/Moderate/Mild) is appropriate. When assessing impact, explicitly consider: Emphasis (how prominently featured), Tone (manner of presentation), Frequency (how often it appears), Context (setting and justification), Detail (amount of detail), and Cumulative effect (how it combines with other elements). CRITICAL: If context modifiers are applied (e.g., educational_or_analytical, historical_context, condemned_by_narrative), explicitly explain how the context reduces the impact and justifies a lower severity level. Conversely, if content is endorsed_by_narrative or exploitative, explain how this increases impact. DO NOT mention specific character names, plot events, or story details. Keep it generic and focused on content types.
      * GOOD: "Strong themes of emotional abuse are present as a central element of the narrative (emphasis: central, frequency: repeated theme). The content explores psychological manipulation and control within relationships with moderate detail (detail: moderate), presented in a serious tone (tone: serious), which justifies a high severity classification."
      * GOOD: "Moderate violence is depicted, including physical abuse within relationships. The content includes scenes of domestic violence (frequency: repeated scenes, detail: moderate, context: relationship setting), supporting a moderate severity rating."
@@ -780,6 +784,10 @@ Instructions:
    - centrality_hint (throwaway, minor, central)
    - is_spoiler (boolean: true if this warning reveals major plot twists, character deaths, relationship outcomes, or other significant plot points not already mentioned in the book description)
    - evidence (array with evidence spans)
+     * EVIDENCE DISTINCTNESS (critical, prevents fabrication): each warning's excerpt must be a DISTINCT quote that DIRECTLY and SPECIFICALLY names or depicts that exact content type. Do NOT reuse the same excerpt across multiple warnings.
+     * A single vague phrase (e.g. "an unspeakable childhood trauma", "a heart-wrenching story", "a dark past") is NOT evidence for specific severe categories (infanticide, grooming, torture, sexual violence, self-harm, suicide). If the text is only vague/atmospheric, emit at most ONE general warning — never a fan-out of specific severe warnings all citing that one phrase.
+     * If you cannot point to a distinct, specific excerpt for a severe category, do not emit it.
+     * EXCEPTION — EXPLICIT COMMUNITY LISTS: when the "Additional context from community sources" EXPLICITLY LISTS a content/trigger warning (e.g. "Trigger warnings: self-harm, suicide, child sexual abuse, domestic violence"), that listed item IS valid, specific evidence. You MUST emit a warning for each such listed item (use evidence source "text", excerpt = the listed warning phrase). This exception exists so documented warnings absent from a sanitized blurb are still surfaced.
    - other_note (REQUIRED if subcategory_id starts with "other_"): A concise explanation (10-200 chars) of what specific content this refers to. Do NOT just copy the description. Instead, extract the key detail that makes this an "other" category. For example, if using "other_mental_health", explain what specific mental health aspect (e.g., "Depiction of social anxiety and difficulty reading social cues" not just the full description text).
 
 2. CRITICAL: Be specific and evidence-based. Only include warnings you can identify from ACTUAL CONTENT in the description. 
@@ -1279,6 +1287,122 @@ function processWarnings(
   }, [])
 }
 
+/**
+ * Final-stage safety net that (a) removes fabricated warnings and (b) keeps each warning's
+ * severity and description in sync. Runs over the fully-assembled warning list (post combine /
+ * adversarial / verification / enrichment) so it catches drift introduced by any stage.
+ *
+ * Two problems it defends against, both observed in real scans of blurb-only books:
+ *   1. FABRICATED EVIDENCE — one vague phrase ("a man scarred by an unspeakable childhood
+ *      trauma") used as the sole "textual" proof for a dozen SPECIFIC-SEVERE categories
+ *      (infanticide, grooming, torture, sexual violence). We drop specific-severe claims that
+ *      rest only on vague excerpts, and de-duplicate a single excerpt spread across many
+ *      specific-severe categories.
+ *   2. SEVERITY⇄DESCRIPTION CONTRADICTION — the adversarial pass bumps `severity` but not the
+ *      description's leading intensity word ("severe" warning still reads "Mild themes of…").
+ *      We re-run updateDescriptionForSeverity so the wording always matches the final severity.
+ */
+function sanitizeWarnings(
+  warnings: EnhancedContentWarning[],
+  onProgress?: ProgressCallback
+): EnhancedContentWarning[] {
+  // Subcategories whose *specific* claim demands specific evidence. Matched on the second
+  // path segment so it is robust to whatever parent category the taxonomy nests them under.
+  const SPECIFIC_SEVERE = [
+    'infanticide', 'intentional_child_harm', 'child_harm', 'child_abuse', 'child_death',
+    'child', 'against_children', 'torture', 'cannibal', 'grooming', 'sexual_violence',
+    'sexual_assault', 'rape', 'self_harm', 'suicid', 'molestation', 'incest',
+    'trafficking', 'mutilation',
+  ]
+  // Canon (model "general knowledge") inference is only defensible for a narrow set of themes
+  // with broad literary consensus. Everything else must be grounded in text/community evidence.
+  const ALLOWED_CANON = ['suicid', 'self_harm', 'racism', 'discrimination', 'police', 'institutional_abuse']
+
+  const isSpecificSevere = (id: string) => {
+    const sub = (id.split('.')[1] || id)
+    return SPECIFIC_SEVERE.some(k => sub.includes(k))
+  }
+  const isAllowedCanon = (id: string) => {
+    const sub = (id.split('.')[1] || id)
+    return ALLOWED_CANON.some(k => sub.includes(k))
+  }
+
+  const normalizeExcerpt = (w: EnhancedContentWarning): string =>
+    (w.evidence?.[0]?.excerpt || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+
+  // A "vague" excerpt gestures at darkness/trauma without naming a specific harm.
+  const GENERIC_TONE = ['trauma', 'heart wrenching', 'heartwrenching', 'dark past', 'difficult childhood',
+    'unspeakable', 'troubled past', 'scarred', 'suffering', 'haunted', 'tragic', 'ultimate price', 'harrowing']
+  const SPECIFIC_HARM = ['rape', 'assault', 'suicide', 'self harm', 'self-harm', 'abuse', 'torture', 'murder',
+    'kill', 'molest', 'incest', 'overdose', 'cutting', 'starv', 'groom', 'traffick', 'infanticide', 'stab',
+    'shot', 'strangl', 'beaten', 'drown']
+  const isVagueExcerpt = (ex: string): boolean => {
+    if (!ex) return true
+    const hasSpecific = SPECIFIC_HARM.some(t => ex.includes(t))
+    // Naming a concrete harm makes the excerpt specific — even a short one like "self-harm"
+    // (which is exactly how trusted community CW lists phrase it). Do NOT treat as vague.
+    if (hasSpecific) return false
+    if (ex.length < 60) return true
+    const hasTone = GENERIC_TONE.some(t => ex.includes(t))
+    return hasTone
+  }
+  const allEvidenceVague = (w: EnhancedContentWarning): boolean => {
+    const spans = w.evidence || []
+    if (spans.length === 0) return true
+    return spans.every(s => isVagueExcerpt((s.excerpt || '').toLowerCase()))
+  }
+
+  const dropped: string[] = []
+  let kept = warnings.filter(w => {
+    if (!isSpecificSevere(w.subcategory_id)) return true
+
+    // Community/enrichment evidence is corroborated externally — trust it.
+    const src = (w.evidence?.[0] as any)?.source
+    if (src === 'community' || src === 'canon' && isAllowedCanon(w.subcategory_id)) return true
+    if (w.evidence_source === 'canon') {
+      if (isAllowedCanon(w.subcategory_id)) return true
+      dropped.push(`${w.subcategory_id} (canon-inferred, not a consensus-safe theme)`) ; return false
+    }
+    // Claims textual proof but the excerpt is vague → fabricated specific-severe warning.
+    if (allEvidenceVague(w)) {
+      dropped.push(`${w.subcategory_id} (specific-severe claim from vague evidence)`) ; return false
+    }
+    return true
+  })
+
+  // De-dup: one excerpt used as the sole anchor for many specific-severe categories.
+  const excerptGroups = new Map<string, EnhancedContentWarning[]>()
+  for (const w of kept) {
+    if (!isSpecificSevere(w.subcategory_id)) continue
+    const ex = normalizeExcerpt(w)
+    if (!ex) continue
+    const arr = excerptGroups.get(ex) || []
+    arr.push(w)
+    excerptGroups.set(ex, arr)
+  }
+  const toRemove = new Set<EnhancedContentWarning>()
+  for (const [, group] of excerptGroups) {
+    if (group.length < 3) continue // 1-2 shared is plausible; 3+ specific-severe from one quote is fabrication
+    const best = group.slice().sort((a, b) =>
+      (b.evidence?.[0]?.confidence || 0) - (a.evidence?.[0]?.confidence || 0))[0]
+    for (const w of group) {
+      if (w !== best) { toRemove.add(w); dropped.push(`${w.subcategory_id} (shares one excerpt with ${group.length - 1} other severe warnings)`) }
+    }
+  }
+  if (toRemove.size > 0) kept = kept.filter(w => !toRemove.has(w))
+
+  if (dropped.length > 0) {
+    console.log(`[sanitizeWarnings] Dropped ${dropped.length} fabricated/unsupported warning(s):`, dropped)
+    onProgress?.(`✓ Removed ${dropped.length} unsupported warning${dropped.length === 1 ? '' : 's'}`)
+  }
+
+  // Keep severity and description wording consistent (fixes "severe" warnings that read "Mild…").
+  return kept.map(w => ({
+    ...w,
+    description: updateDescriptionForSeverity(w.description, w.severity),
+  }))
+}
+
 interface VerificationResult {
   subcategory_id: string
   action: 'keep' | 'drop' | 'adjust'
@@ -1465,9 +1589,12 @@ IMPORTANT: If a warning's description reads like a plot summary (e.g., "Characte
       }
     })()
 
-    // Add timeout (10 seconds)
+    // Add timeout. 10s was far too short for a reasoning-model verification call
+    // (GPT-5.x / Gemini structured JSON over a full taxonomy routinely takes 12-25s),
+    // so verification failed on EVERY deep scan and silently discarded refinements.
+    const VERIFICATION_TIMEOUT_MS = 30000
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Verification timeout after 10s')), 10000)
+      setTimeout(() => reject(new Error('Verification timeout after 30s')), VERIFICATION_TIMEOUT_MS)
     })
 
     try {
@@ -1930,8 +2057,14 @@ export async function analyzeBookWithMultiModel(
     }
   }
 
-  // POC: Verify unique warnings only
+  // Verify unique warnings only — but ONLY those that survived the adversarial pass.
+  // Previously we verified the raw unique set from combineResults; when verification then
+  // timed out and fell back to "original unique warnings", any warning the adversarial pass
+  // had removed (e.g. a bogus "grief" inferred from tone) got re-injected. Filtering to the
+  // refined set here means removed warnings stay removed regardless of verification outcome.
+  const refinedSubcategoryIds = new Set(refinedWarnings.map(w => w.subcategory_id))
   const allUniqueWarnings = [...analysis.unique_to_openai, ...analysis.unique_to_gemini]
+    .filter(w => refinedSubcategoryIds.has(w.subcategory_id))
   let finalWarnings = refinedWarnings
   let verificationMetrics: VerificationMetrics | undefined = undefined
   let verificationDiagnostics: AuditDiagnostics['verification'] = null
@@ -1960,8 +2093,11 @@ export async function analyzeBookWithMultiModel(
 
     // Replace unique warnings in combined list with verified ones
     // Remove original unique warnings
+    // Start from the ADVERSARIALLY-REFINED set (not raw `combined`), then swap the unique
+    // warnings for their verified versions. Using `combined` here was the second half of the
+    // re-injection bug — it resurrected warnings the adversarial pass had already dropped.
     const uniqueSubcategoryIds = new Set(allUniqueWarnings.map(w => w.subcategory_id))
-    finalWarnings = combined.filter(w => !uniqueSubcategoryIds.has(w.subcategory_id))
+    finalWarnings = refinedWarnings.filter(w => !uniqueSubcategoryIds.has(w.subcategory_id))
 
     // Add verified warnings
     finalWarnings.push(...verified)
@@ -1980,7 +2116,7 @@ export async function analyzeBookWithMultiModel(
     verificationDiagnostics = {
       fired: true,
       status: metrics.failed
-        ? (metrics.latency_ms >= 10000 ? 'timeout' : 'failed')
+        ? (metrics.latency_ms >= 30000 ? 'timeout' : 'failed')
         : 'passed',
       duration_ms: metrics.latency_ms,
       kept: metrics.kept,
@@ -2036,7 +2172,20 @@ export async function analyzeBookWithMultiModel(
   // Enrichment can help recover the specific violence type from community sources.
   const hasOtherViolence = finalWarnings.some(w => w.subcategory_id === 'violence.other_violence')
 
-  if (effectiveOptions.enableWebEnrichment && (finalWarnings.length <= 2 || looksLikeGenericCluster || looksLikeViolenceWithoutSex || hasOtherViolence)) {
+  // BLURB-ONLY DEFENCE (the master defect fix). The first analysis only ever sees the
+  // marketing description, which routinely omits the very warnings readers need (e.g. the
+  // domestic-violence / attempted-rape threads in "It Ends With Us" are absent from its long
+  // but sanitized blurb). We therefore ALWAYS consult community CW sources unless the book
+  // already has many warnings — the relevance-gated, trusted-source-only enrichment above
+  // makes this safe (unrelated pages can no longer inject warnings). enrichWithWebSearch
+  // itself short-circuits when >7 warnings already exist, so this stays bounded.
+  const alreadyHasCommunityEvidence = finalWarnings.some(w => (w.evidence?.[0] as any)?.source === 'community')
+
+  if (
+    effectiveOptions.enableWebEnrichment &&
+    !alreadyHasCommunityEvidence &&
+    finalWarnings.length <= 7
+  ) {
     // Check if we only have generic romance warnings (which might indicate sanitized description)
     const hasOnlyGenericWarnings = finalWarnings.length > 0 &&
       finalWarnings.every(w =>
@@ -2044,22 +2193,11 @@ export async function analyzeBookWithMultiModel(
         w.subcategory_id === 'substance_use_or_alcohol.alcohol'
       )
 
-    // Trigger enrichment if:
-    // 1. We have 0 warnings (definitely need enrichment)
-    // 2. We only have generic warnings (likely sanitized)
-    // 3. We have 1-2 warnings but they're all relationship/alcohol (might be missing mental health)
-    // 4. We have "other_violence" (likely masking specific severe content like infanticide)
-    const shouldEnrich = finalWarnings.length === 0 ||
-      looksLikeGenericCluster ||
-      looksLikeViolenceWithoutSex ||
-      hasOtherViolence ||
-      hasOnlyGenericWarnings ||
-      (finalWarnings.length <= 2 &&
-        !finalWarnings.some(w =>
-          w.subcategory_id?.includes('mental_health') ||
-          w.subcategory_id?.includes('grief') ||
-          w.subcategory_id?.includes('death')
-        ))
+    // Entry was already gated on (<=7 warnings && no community evidence yet), so always enrich.
+    // The specific-cluster heuristics below are retained only as documentation of the patterns
+    // that most benefit; they no longer gate the decision.
+    const shouldEnrich = true
+    void looksLikeGenericCluster; void looksLikeViolenceWithoutSex; void hasOtherViolence; void hasOnlyGenericWarnings
 
     if (shouldEnrich) {
       onProgress?.('⏳ Initial scan found few warnings - searching community sources for additional information...')
@@ -2224,6 +2362,11 @@ export async function analyzeBookWithMultiModel(
       }
     }
   }
+
+  // Final safety net: strip fabricated / unsupported specific-severe warnings and re-sync
+  // each description's intensity word with its final severity. Runs last so it also cleans
+  // up anything the enrichment second-pass introduced.
+  finalWarnings = sanitizeWarnings(finalWarnings, onProgress)
 
   // Apply post-processing caps/stripping for benchmarking / quick modes
   const maxWarningsForReturn =
