@@ -635,9 +635,13 @@ CRITICAL INSTRUCTIONS:
 4. If the description is too minimal or generic, return an empty warnings array.
 5. GENRE-SPECIFIC AWARENESS: For Romance books (including "Sports Romance", "Small Town Romance", "Contemporary Romance", etc.), be especially thorough:
    - Look for heat/spice level indicators (explicit, moderate, mild, or clean/sweet)
-   - Identify common romance tropes that are content warnings (cheating, secret baby, loss/grief, emotional abuse, dubious consent, age gaps, stalking, toxic dynamics)
    - Assess emotional intensity levels
    - If the description is vague about heat level or tropes, note in reasoning that "Analysis based on blurb only; community reviews may indicate different content."
+5a. TROPES ARE REQUIRED, NOT OPTIONAL (this is a discovery signal readers filter by — do NOT suppress them):
+   - Whenever the description OR community/enrichment context evidences a specific relationship trope or dynamic, you MUST emit the matching "tropes.*" subcategory: e.g. tropes.enemies_to_lovers, tropes.bully_romance, tropes.dark_romance, tropes.mafia_romance, tropes.stalker_romance, tropes.age_gap, tropes.forbidden_love, tropes.fake_relationship, tropes.second_chance, tropes.love_triangle, etc. (see the full "tropes" category in the taxonomy).
+   - Cataloging an EVIDENCED trope is NOT a genre assumption and does NOT violate the "no genre inference" rule — it is describing a dynamic that is present. The "no genre inference" rule only forbids INVENTING content from a genre label (e.g. do not assume "dark romance ⇒ non-con"); it does NOT forbid tagging a trope the text or community sources actually indicate.
+   - Tropes are usually mild/moderate severity — tag them at their real (often mild) severity; do NOT drop a trope just because it is mild. A book can have both severe triggers AND several mild tropes; include both.
+   - Only tag tropes that are actually evidenced (from description, tropes in the categories/metadata, or community context) — not purely from the genre label alone.
 6. When assessing impact, ALWAYS consider all six factors from the Publications Guidelines:
    - Emphasis: How prominently the element is featured (e.g., "central theme", "incidental reference")
    - Tone: The manner in which content is presented (e.g., "serious", "graphic", "discreet")
@@ -2410,7 +2414,15 @@ export async function analyzeBookWithMultiModel(
       : effectiveOptions.maxWarnings
 
   if (typeof maxWarningsForReturn === 'number' && maxWarningsForReturn > 0) {
-    finalWarnings = sortWarningsForCapping(finalWarnings).slice(0, maxWarningsForReturn)
+    // Cap TRIGGERS by severity, but keep TROPES on a separate track. Tropes are usually mild,
+    // so a shared severity-sorted cap silently drops them (they always lose to real triggers) —
+    // which is why trope subcategories were near-absent. Tropes are a discovery signal readers
+    // filter by, so preserve them (with their own generous limit) alongside the capped triggers.
+    const isTrope = (w: EnhancedContentWarning) => (w.subcategory_id || '').startsWith('tropes.')
+    const tropes = finalWarnings.filter(isTrope)
+    const triggers = finalWarnings.filter(w => !isTrope(w))
+    const cappedTriggers = sortWarningsForCapping(triggers).slice(0, maxWarningsForReturn)
+    finalWarnings = [...cappedTriggers, ...sortWarningsForCapping(tropes).slice(0, 8)]
   }
   if (effectiveOptions.includeReasoning === false) {
     finalWarnings = finalWarnings.map(w => ({ ...w, reasoning: undefined }))
