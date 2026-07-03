@@ -256,7 +256,17 @@ export default async function BookPage({ params }: BookPageProps) {
       description: w.description,
       reasoning: w.reasoning,
     }))
-    const computed = calculateAgeRating(enhancedWarnings)
+    // Read the persisted holistic register/graphic read so the recompute reproduces the same
+    // capped rating the scan produced (otherwise strong-but-gently-told books re-inflate here).
+    const registerTag = displayCategories.find((c: string) => c.startsWith("REGISTER:"))
+    const graphicTag = displayCategories.find((c: string) => c.startsWith("GRAPHIC:"))
+    const assessment = (registerTag || graphicTag)
+      ? {
+          treatmentRegister: registerTag ? registerTag.replace("REGISTER:", "") : null,
+          mostGraphicLevel: graphicTag ? graphicTag.replace("GRAPHIC:", "") : null,
+        }
+      : undefined
+    const computed = calculateAgeRating(enhancedWarnings, assessment)
     const storedTag = displayCategories.find((c: string) => c.startsWith("CLASSIFICATION:"))
     const storedRating = storedTag ? (storedTag.replace("CLASSIFICATION:", "") as ClassificationRating) : null
     const storedLevel = storedRating != null ? RATING_STRICTNESS[storedRating] ?? -1 : -1
