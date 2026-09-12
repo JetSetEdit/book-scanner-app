@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { dedupeWarningsByCategory, formatCategoryLabel } from '@/lib/utils/warning-display'
 
 const FALLBACK_BOOK = {
   title: 'The Long Game',
@@ -41,12 +42,19 @@ async function getRandomBook() {
 
     if (!warnings?.length) return null
 
+    const uniqueWarnings = dedupeWarningsByCategory(warnings)
+      .sort((a, b) => {
+        const rank = (s: string) => (s === 'severe' ? 0 : s === 'moderate' ? 1 : 2)
+        return rank(a.severity) - rank(b.severity)
+      })
+      .slice(0, 4)
+
     return {
       title: book.title,
       author: book.author ?? '',
       coverUrl: book.cover_url!,
-      warnings: warnings.map(w => ({
-        label: w.category.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase()),
+      warnings: uniqueWarnings.map(w => ({
+        label: formatCategoryLabel(w.category),
         severity: w.severity,
       })),
       context: null,
