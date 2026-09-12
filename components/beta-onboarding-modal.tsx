@@ -73,11 +73,12 @@ export function BetaOnboardingModal() {
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
-        className="max-w-2xl p-8 sm:p-10 max-h-[90vh] overflow-y-auto"
+        className="max-w-2xl p-0 max-h-[min(90vh,720px)] flex flex-col overflow-hidden gap-0"
         showCloseButton={false}
         onInteractOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
       >
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-8 sm:px-10 sm:py-10">
         <DialogHeader className="text-center space-y-4">
           <div className="flex justify-center mb-4">
             <BookSpineLogo className="h-16 w-16 text-foreground" />
@@ -86,7 +87,7 @@ export function BetaOnboardingModal() {
             Welcome to {v.name}
           </DialogTitle>
           <DialogDescription asChild>
-            <div className="text-base text-muted-foreground leading-relaxed max-w-none space-y-6 text-left">
+            <div className="text-base text-muted-foreground leading-relaxed max-w-none space-y-6 text-left pb-2">
               {isLite ? (
                 <>
                   <p className="font-serif italic text-lg text-center">
@@ -150,15 +151,21 @@ export function BetaOnboardingModal() {
             </div>
           </DialogDescription>
         </DialogHeader>
-        
-        <div className="flex justify-center pt-6">
-          <Button
-            onClick={handleAccept}
-            size="lg"
-            className="h-12 px-8 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
-          >
-            I Understand & Agree
-          </Button>
+        </div>
+
+        <div className="shrink-0 border-t border-border/60 bg-background px-6 py-4 sm:px-10 sm:py-5">
+          <p className="mb-3 text-center text-xs text-muted-foreground sm:hidden">
+            Scroll above to read the full terms, then accept below.
+          </p>
+          <div className="flex justify-center">
+            <Button
+              onClick={handleAccept}
+              size="lg"
+              className="h-12 w-full sm:w-auto px-8 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all"
+            >
+              I Understand & Agree
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
